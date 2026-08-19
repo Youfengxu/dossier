@@ -36,6 +36,7 @@ from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import llm                                                   # noqa: E402
 from llm import Client, Embedder, LLMError, cosine, load_doc   # noqa: E402
 
 PROMPT_VERSION = "trace-6"
@@ -381,7 +382,7 @@ def main():
                              "against the whole document using it")
     parser.add_argument("--no-absence-gate", action="store_true")
     parser.add_argument("--embed-url",
-                        default="http://192.168.100.21:8085/v1/embeddings")
+                        default=llm.DEFAULT_EMBED_URL)
     parser.add_argument("--embed-model", default="Qwen3-Embedding-8B-Q4_K_M")
     args = parser.parse_args()
 

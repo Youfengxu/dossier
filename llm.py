@@ -27,8 +27,46 @@ import time
 import urllib.error
 import urllib.request
 
-DEFAULT_URL = "http://localhost:8085/v1/chat/completions"
-DEFAULT_MODEL = "qwen3.6-35b-a3b"
+def _setting(name, fallback):
+    """Config resolution, in one place, honoured by every tool.
+
+    These were read by the `dossier` wrapper alone, so the documented escape
+    hatch worked for wrapper subcommands and was silently ignored by every
+    direct script invocation — which is what the fixture READMEs, the docstrings
+    and half this project's own examples use. A stranger who set DOSSIER_MODEL
+    and ran ./trace.py got someone else's LAN address and a GGUF filename they
+    do not have. Environment first, then a file, then a default that points at
+    the thing most people already have running.
+    """
+    value = os.environ.get(name)
+    if value:
+        return value
+    for path in (os.path.join(os.path.expanduser("~"), ".config", "dossier",
+                              "config"),
+                 os.path.join(os.path.expanduser("~"), ".dossier")):
+        try:
+            for line in open(path, encoding="utf-8"):
+                line = line.strip()
+                if not line or line.startswith("#") or "=" not in line:
+                    continue
+                key, _, val = line.partition("=")
+                if key.strip() == name:
+                    return val.strip().strip('"\'')
+        except OSError:
+            continue
+    return fallback
+
+
+# Ollama, because it is what a stranger has running. The homelab this was built
+# on is an example in the README, not the default — a default nobody else can
+# reach is indistinguishable from a broken tool.
+DEFAULT_URL = _setting("DOSSIER_CHAT_URL",
+                       "http://localhost:11434/v1/chat/completions")
+DEFAULT_MODEL = _setting("DOSSIER_MODEL", "qwen3:8b")
+# Consecutive transport failures, with zero successes, before a run is
+# treated as pointing at nothing. Small enough to fail fast, large enough
+# to ride out a single blip on a warm endpoint.
+DEAD_AFTER = 4
 CACHE_DIR = ".dossier-cache"
 LOG_FILE = ".dossier-log.jsonl"
 
@@ -169,6 +207,21 @@ class Client:
                            "prompt_sha256": key[:16], "attempt": attempt,
                            "seconds": round(time.time() - started, 2),
                            "error": f"transport: {exc}", "raw": ""})
+                # Every tool turns an LLMError into a row — "unverifiable",
+                # "unclear", an empty inventory entry — which is right for a
+                # model that answered badly and wrong for an endpoint that is
+                # not there. Left alone, a stack that refuses every connection
+                # produces a complete, plausible, empty result: 74 sections
+                # extracted to nothing, written to disk, and read downstream as
+                # a document containing nothing. Once it is proven that nothing
+                # has ever got through, stop here rather than in each of the
+                # seven tools that would otherwise each need their own guard.
+                if self.stats["transport"] >= DEAD_AFTER and self.dead():
+                    raise SystemExit(
+                        f"\naborting: {self.stats['transport']} calls failed to "
+                        f"reach {self.url} and none has succeeded.\n"
+                        f"model={self.model!r} — check the endpoint is up and "
+                        f"serving that model. Nothing was written.")
                 raise LLMError(f"{label}: endpoint call failed: {exc}") from exc
             elapsed = time.time() - started
             self.stats["calls"] += 1
@@ -230,8 +283,9 @@ class Client:
 
 
 
-DEFAULT_EMBED_URL = "http://localhost:8085/v1/embeddings"
-DEFAULT_EMBED_MODEL = "bge-m3"
+DEFAULT_EMBED_URL = _setting("DOSSIER_EMBED_URL",
+                             "http://localhost:11434/v1/embeddings")
+DEFAULT_EMBED_MODEL = _setting("DOSSIER_EMBED_MODEL", "bge-m3")
 
 
 class Embedder:

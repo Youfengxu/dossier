@@ -26,6 +26,7 @@ from collections import Counter, defaultdict
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from trace import chunk, load_obligations                 # noqa: E402
+import llm                                                   # noqa: E402
 from llm import Embedder, cosine, load_doc                # noqa: E402
 
 # A heading that names a real part of the document, as opposed to front matter,
@@ -45,7 +46,7 @@ def main():
     parser.add_argument("--scope", default=None)
     parser.add_argument("--passages", type=int, default=12)
     parser.add_argument("--embed-url",
-                        default="http://192.168.100.21:8085/v1/embeddings")
+                        default=llm.DEFAULT_EMBED_URL)
     parser.add_argument("--embed-model", default="Qwen3-Embedding-8B-Q4_K_M")
     parser.add_argument("--show", type=int, default=14)
     args = parser.parse_args()

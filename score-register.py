@@ -43,6 +43,7 @@ import sys
 from collections import OrderedDict, defaultdict
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import llm                                                   # noqa: E402
 from llm import Embedder, cosine                          # noqa: E402
 
 FLAGGED = ("unmet", "partial", "unverifiable")
@@ -83,7 +84,7 @@ def main():
                              "finding's OWN text rather than a hand-written "
                              "summary — richer, and not tunable by me.")
     parser.add_argument("--embed-url",
-                        default="http://192.168.100.21:8085/v1/embeddings")
+                        default=llm.DEFAULT_EMBED_URL)
     parser.add_argument("--embed-model", default="Qwen3-Embedding-8B-Q4_K_M")
     args = parser.parse_args()
 

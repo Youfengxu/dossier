@@ -30,6 +30,7 @@ import sys
 from collections import defaultdict
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import llm                                                   # noqa: E402
 from llm import Client, Embedder, LLMError, cosine        # noqa: E402
 
 STOP = set("""the a an and or of to in for on with by is are be been shall must
@@ -354,7 +355,7 @@ def main():
                              "pairs, which is what makes it affordable.")
     parser.add_argument("--model", default="Qwen3-Coder-Next-UD-Q4_K_M")
     parser.add_argument("--url",
-                        default="http://192.168.100.148:8085/v1/chat/completions")
+                        default=llm.DEFAULT_URL)
     parser.add_argument("--concurrency", type=int, default=1)
     parser.add_argument("--components", default="components.yaml",
                         help="normalise owner strings onto the document's named "
@@ -363,7 +364,7 @@ def main():
     parser.add_argument("--cap", type=int, default=900,
                         help="maximum pairs to adjudicate per class")
     parser.add_argument("--embed-url",
-                        default="http://192.168.100.21:8085/v1/embeddings")
+                        default=llm.DEFAULT_EMBED_URL)
     parser.add_argument("--embed-model", default="Qwen3-Embedding-8B-Q4_K_M")
     args = parser.parse_args()
 

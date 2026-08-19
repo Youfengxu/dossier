@@ -28,6 +28,7 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.abspath(os.path.join(HERE, "..", "..")))
 from trace import chunk, retrieve, terms                    # noqa: E402
+import llm                                                   # noqa: E402
 from llm import Embedder, cosine, load_doc                  # noqa: E402
 from collections import Counter                             # noqa: E402
 
@@ -64,13 +65,13 @@ def main():
     parser.add_argument("--retrieval", choices=("embed", "terms", "hybrid", "expand", "rerank"), default="embed")
     parser.add_argument("--rerank-model", default="bge-reranker-v2-m3")
     parser.add_argument("--rerank-url",
-                        default="http://192.168.100.21:8085/v1/rerank")
+                        default=None)
     parser.add_argument("--rerank-depth", type=int, default=40,
                         help="candidates to score jointly before taking top-k")
     parser.add_argument("--model")
     parser.add_argument("--url")
     parser.add_argument("--embed-url",
-                        default="http://192.168.100.21:8085/v1/embeddings")
+                        default=llm.DEFAULT_EMBED_URL)
     parser.add_argument("--embed-model", default="Qwen3-Embedding-8B-Q4_K_M")
     parser.add_argument("--k", type=int, nargs="*", default=[4, 6, 12, 24])
     args = parser.parse_args()

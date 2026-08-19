@@ -30,6 +30,7 @@ import re
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import llm                                                   # noqa: E402
 from llm import Embedder, cosine                          # noqa: E402
 
 FLAGGED = ("unmet", "partial", "unverifiable")
@@ -70,7 +71,7 @@ def main():
     parser.add_argument("--register", default=None)
     parser.add_argument("--map", default="register-map.yaml")
     parser.add_argument("--embed-url",
-                        default="http://192.168.100.21:8085/v1/embeddings")
+                        default=llm.DEFAULT_EMBED_URL)
     parser.add_argument("--embed-model", default="Qwen3-Embedding-8B-Q4_K_M")
     parser.add_argument("--out", default="candidates.csv")
     parser.add_argument("--show", type=int, default=12)

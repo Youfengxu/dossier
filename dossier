@@ -31,18 +31,20 @@ import sys
 # realpath, not abspath: this is normally invoked through a symlink on PATH, and
 # abspath would resolve the scripts relative to the symlink's directory.
 HERE = os.path.dirname(os.path.realpath(__file__))
-CHAT = os.environ.get("DOSSIER_CHAT_URL",
-                      "http://192.168.100.148:8085/v1/chat/completions")
-MODEL = os.environ.get("DOSSIER_MODEL", "Qwen3-Coder-Next-UD-Q4_K_M")
-VLLM = os.environ.get("DOSSIER_VLLM_URL",
-                      "http://192.168.100.148:8000/v1/chat/completions")
-VLLM_MODEL = os.environ.get("DOSSIER_VLLM_MODEL", "qwen32")
-# Embeddings default to the Mac's own llama-swap, which serves bge-m3. Set
-# DOSSIER_EMBED_URL to run them on k11 instead (also bge-m3, so vectors stay
-# comparable — changing the embedding model invalidates every cached vector and
-# every convergence threshold measured against them).
-EMBED = os.environ.get("DOSSIER_EMBED_URL")
-EMBED_MODEL = os.environ.get("DOSSIER_EMBED_MODEL")
+sys.path.insert(0, HERE)
+import llm                                                   # noqa: E402
+
+# One resolution path, in llm.py, so a direct `./trace.py` and a
+# `dossier coverage` reach the same endpoint. The wrapper used to carry its own
+# defaults — a different model name and a different address from the library —
+# so the two disagreed, and since the model name is part of the cache key the
+# same question asked two ways produced two cache entries.
+CHAT = llm.DEFAULT_URL
+MODEL = llm.DEFAULT_MODEL
+VLLM = os.environ.get("DOSSIER_VLLM_URL", llm.DEFAULT_URL)
+VLLM_MODEL = os.environ.get("DOSSIER_VLLM_MODEL", llm.DEFAULT_MODEL)
+EMBED = llm.DEFAULT_EMBED_URL
+EMBED_MODEL = llm.DEFAULT_EMBED_MODEL
 
 
 def run(script, *args, quiet=False):
@@ -320,6 +322,11 @@ def main():
         "--xlsx", a.xlsx, "--sheet", a.sheet, "--col", a.col,
         *(["--out", a.out] if a.out else []),
         *(["--overwrite"] if a.overwrite else [])))
+
+    p = sub.add_parser("doctor")
+    p.add_argument("--project", nargs="?")
+    p.set_defaults(fn=lambda a: run("doctor.py",
+                                    *(["--project", a.project] if a.project else [])))
 
     p = sub.add_parser("status"); p.add_argument("project")
     p.set_defaults(fn=cmd_status)

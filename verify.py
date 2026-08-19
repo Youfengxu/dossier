@@ -40,6 +40,7 @@ import sys
 from collections import Counter
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import llm                                                   # noqa: E402
 from llm import Client, Embedder, LLMError, cosine, load_doc   # noqa: E402
 from trace import chunk, retrieve, terms                       # noqa: E402
 
@@ -197,7 +198,7 @@ def main():
     parser.add_argument("--model", default="qwen3.6-35b-a3b")
     parser.add_argument("--url", default="http://localhost:8085/v1/chat/completions")
     parser.add_argument("--embed-url",
-                        default="http://192.168.100.21:8085/v1/embeddings")
+                        default=llm.DEFAULT_EMBED_URL)
     parser.add_argument("--embed-model", default="Qwen3-Embedding-8B-Q4_K_M")
     parser.add_argument("--passages", type=int, default=12,
                         help="wider than the coverage run on purpose")

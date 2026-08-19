@@ -35,6 +35,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import llm                                                   # noqa: E402
 from llm import Client, LLMError, load_doc               # noqa: E402
 
 PROMPT_VERSION = "inventory-3"
@@ -176,7 +177,7 @@ def main():
     parser.add_argument("--doc", required=True)
     parser.add_argument("--model", default="Qwen3-Coder-Next-UD-Q4_K_M")
     parser.add_argument("--url",
-                        default="http://192.168.100.148:8085/v1/chat/completions")
+                        default=llm.DEFAULT_URL)
     parser.add_argument("--out", default="inventory.json")
     parser.add_argument("--concurrency", type=int, default=1)
     parser.add_argument("--limit", type=int, default=0)

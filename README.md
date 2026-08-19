@@ -1,30 +1,113 @@
 # dossier
 
-Reviewing a large deliverable against its requirements, without sending it to a
-commercial model. Everything here runs against the homelab.
+Review a large engineering deliverable against its requirements, using models you
+run yourself.
 
-`DESIGN.md` is the reasoning — every decision, and the evidence for it, including
-the things that did not work. This file is the operating instructions.
+Built for a review where the client's documents could not be sent to a hosted
+model. The naive approach — hand the whole document to a long-context model and
+ask what is missing — was tried first and measured: **153 minutes, 496,949 input
+tokens, zero findings.** Everything here is the reaction to that.
+
+**No dependencies beyond Python and PyYAML.** The toolkit reads and writes
+`.docx` and `.xlsx` by hand, because `openpyxl` would not install on the review
+machine. It runs on a locked-down laptop.
+
+## Try it in thirty seconds, with no model and no configuration
+
+```sh
+git clone <this repo> && cd dossier
+./dossier review fixtures/floodtwin --doc deliverable-v2 --against deliverable-v1
+```
+
+That runs in about **0.15 seconds**, calls nothing, and prints real findings
+against a synthetic deliverable that ships with the repo: every identifier
+referenced once and never elaborated, every cross-reference that resolves to no
+heading, every section that vanished between revisions, and every purpose-term
+the document never uses.
+
+Nothing on that path needs a GPU, an API key or an endpoint. Roughly half the
+toolkit is deterministic and stays that way on purpose.
+
+## What it does
+
+Eight stages. Each consumes the previous one's output, and each is a separate
+script you can run alone.
+
+| Stage | Question | Model? |
+|---|---|---|
+| `freeze` | what exactly are we reviewing? | no |
+| `sweep` | what does the document contradict about itself? | no |
+| `closure` | which of our findings did this revision touch? | no |
+| `obligations` | what does the requirements document actually require? | yes |
+| `coverage` | is each obligation discharged, and where? | yes |
+| `synthesize` | what is wrong that no single obligation asks about? | yes |
+| `verify` | which candidates survive an attempt to refute them? | yes |
+| `report` | the work product | no |
+
+The rule the design turns on: **absence is computed, never asked.** A model is
+never asked "is this missing?" — it cannot see the whole document, and the
+question invites a confident guess. Models propose; deterministic code disposes.
+`undefined.py` is the clearest case: a model nominates terms a section leaves
+unexplained, and then every nomination is checked against the entire document for
+a definition, a glossary entry or a heading before it can survive.
+
+## Measured, including where it fails
+
+Everything below is reproducible from artefacts in this repository.
+
+| | |
+|---|---|
+| Retrieval width, precision | 6 passages 77.8% · **12 → 82.4%** · 24 → 81.2% |
+| Cross-model agreement, 122 comments | 105 agree · 15 differ by one step · **2 contradict** |
+| Run-to-run churn, temperature 0 | **10 of 58 verdicts moved**, leaning lenient |
+| Absence-verdict precision vs length | 97.0% at 12k chars → **83.3% at 52k** |
+| Verification pass | 25 candidates → 19 kept, 5 killed; precision 0.76 → 0.79 |
+
+And the negative results, which are kept in the repository rather than deleted:
+
+- **Five retrieval strategies** were implemented against ground truth — hybrid
+  RRF, generated query expansion, cross-encoder reranking, section-first
+  retrieval, wider windows. **None cleared the bar** on more than one test
+  document.
+- **`claim.py`** (contradiction detection) underperforms badly enough that it is
+  not wired into the pipeline. It ships anyway because the class is real. Its
+  recall has not been re-measured since `score-claims.py` was tightened, so no
+  number is quoted here — an unbacked figure in this table would undermine every
+  other row in it.
+- **The term sweep** was superseded by `undefined.py` (18 of 26 versus a handful)
+  and is kept, marked, so the failed approach stays visible.
+- **Two of three "stability" runs** turned out to be byte-identical cache
+  replays. The cache key is a hash of model, prompt and temperature, so a rerun
+  without `DOSSIER_NO_CACHE` measures its own disk. `compare-coverage.py` exists
+  because of that.
+
+`DESIGN.md` is the long form: every decision, the evidence for it, and §4a, an
+audit of where the author's own parameter choices may be overfitted to a
+21-requirement fixture.
+
+## Installing
+
+```sh
+ln -s "$PWD/dossier" ~/.local/bin/dossier      # or anywhere on your PATH
+pip3 install pyyaml                            # required by the scorers
+```
+
+Point it at any OpenAI-compatible endpoint — Ollama, llama.cpp, vLLM, LM Studio:
+
+```sh
+export DOSSIER_CHAT_URL=http://localhost:11434/v1/chat/completions
+export DOSSIER_MODEL=qwen3:8b
+dossier doctor                                 # says what answers and what does not
+```
 
 ## The one command to remember
 
 ```sh
-~/homelab/tools/dossier/dossier review <project> --doc <new> --against <old>
+dossier review <project> --doc <new> --against <old>
 ```
 
-Runs every check that needs no model, in the order a reviewer wants them, in
-about ten seconds. It ends by printing the next command. If you remember nothing
-else on this page, remember that line — `dossier --help` recovers the rest.
-
-Put it on your PATH once. `~/.local/bin` is on this Mac's PATH (`.zshrc`);
-`~/bin` is **not**, despite holding scripts — check with `env -i HOME="$HOME"
-zsh -lic 'echo $PATH'` rather than `echo $PATH`, since a shell spawned from a
-tool inherits that tool's PATH and will happily report a directory the login
-shell never sees.
-
-```sh
-ln -s ~/homelab/tools/dossier/dossier ~/.local/bin/dossier
-```
+Every check that needs no model, in the order a reviewer wants them, in about ten
+seconds. It ends by printing the command to run next.
 
 ## Starting from scratch
 
