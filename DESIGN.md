@@ -350,9 +350,35 @@ inventory.** The extraction stage is not the hard part.
 >
 > One confound, stated rather than buried: this re-run used a different model
 > from the original measurements, so the drop is not attributable to the scorer
-> alone. Each decision below therefore needs re-deriving before it is quoted;
-> what follows is kept as the record of what was believed and why, not as a
-> current result.
+> alone.
+>
+> **Two of the claims below were then re-derived.** Both are flag-reachable
+> ablations on the same inventory, so they are like-for-like:
+>
+> | configuration | recall | candidates emitted | precision |
+> |---|---|---|---|
+> | 3 passes, no embedding | 3 of 6 | 53 | 5.7% |
+> | 1 pass, embedding | 3 of 6 | 23 | 13.0% |
+> | 3 passes, embedding | **4 of 6** | 40 | 10.0% |
+>
+> §3.22's "deterministic queries alone found 3 of 6" **survives exactly** — the
+> old number was right even though the scorer that produced it was not.
+>
+> §3.31's "more passes help" **survives in direction, not in magnitude**: 3 of 6
+> to 4 of 6, where the old scorer read 4 of 6 to 6 of 6. It also has a cost that
+> was previously invisible, because the old scorer had no precision term — the
+> third pass buys one more defect and seventeen more candidates to read.
+>
+> Embedding now has the measured justification it lacked: against the same
+> inventory it finds one more defect **and** emits thirteen fewer candidates,
+> improving both axes at once. That was previously asserted from a retrieval
+> argument with no discovery-pipeline evidence behind it.
+>
+> **The remaining sections are not re-derived.** §3.24 (entity vocabulary),
+> §3.26 (polarity), §3.28 (verb sense) and §3.30 (authority as rights) are baked
+> into the code with no flag to disable them, so testing each needs surgery
+> rather than a run. Their numbers below are old-scorer numbers and should not
+> be quoted until that work is done.
 
 ### 3.22 The orchestrator should be code — until the candidate set is small
 

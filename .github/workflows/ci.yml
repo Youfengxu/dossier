@@ -1,0 +1,54 @@
+name: ci
+
+# Three gates, none of which need a model, a GPU or a network call. That is the
+# point: the deterministic half of this toolkit is the half that can be checked
+# by a machine, and it is checked on every push.
+on:
+  push:
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # PyYAML is the one dependency, used by the scorers. The tools themselves
+      # are stdlib only, which is why this file installs nothing else.
+      - name: install
+        run: pip install pyyaml
+
+      - name: no engagement material
+        # A one-time scrub is undone by the next commit that pastes in a real
+        # example. This is the gate that stops that, and it is first because a
+        # leak is the only failure here that cannot be taken back.
+        run: python3 check-clean.py
+
+      - name: every tool loads and answers --help
+        run: |
+          fail=0
+          for f in *.py dossier; do
+            python3 "$f" --help >/dev/null 2>&1 || { echo "FAIL: $f"; fail=1; }
+          done
+          exit $fail
+
+      - name: deterministic review runs with no model
+        # The thirty-second demo the README opens with. If this breaks, the
+        # first thing a stranger tries is the thing that fails.
+        run: |
+          ./dossier review fixtures/floodtwin \
+            --doc deliverable-v2 --against deliverable-v1
+
+      - name: corpus is frozen and has not drifted
+        run: python3 freeze.py --project fixtures/floodtwin --check
+
+      - name: scorer reproduces the committed reference run
+        # Scores committed artefacts, not fresh inference, so it measures the
+        # scorer rather than whatever model happens to be reachable.
+        run: |
+          python3 score.py --project fixtures/floodtwin \
+            --coverage cov-embed-12.csv --min 0.75

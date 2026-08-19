@@ -61,7 +61,13 @@ def main():
     parser.add_argument("--project", required=True)
     parser.add_argument("--ground-truth", default="ground-truth.yaml")
     parser.add_argument("--obligations", default="obligations.yaml")
-    parser.add_argument("--coverage", default="coverage.csv")
+    # No default. It used to be "coverage.csv", a file the fixture does not
+    # contain and .gitignore excludes, so the command the README offers as the
+    # way to check your install scored nothing, printed "coverage (not run)",
+    # and exited ok. A check that passes without checking is worse than no
+    # check; if the file is absent, say which one and fail.
+    parser.add_argument("--coverage",
+                        help="coverage CSV to score (e.g. cov-embed-12.csv)")
     parser.add_argument("--findings", default="findings.csv")
     parser.add_argument("--doc", default="deliverable-v1")
     parser.add_argument("--requirements", default="requirements.md")
@@ -94,9 +100,9 @@ def main():
         print("obligations   (not run)")
 
     # -- stage 2: coverage --------------------------------------------------
-    coverage_path = os.path.join(project, args.coverage)
+    coverage_path = os.path.join(project, args.coverage) if args.coverage else None
     by_ref = {}
-    if os.path.exists(coverage_path) and refs:
+    if coverage_path and os.path.exists(coverage_path) and refs:
         for row in csv.DictReader(open(coverage_path, encoding="utf-8")):
             ref = refs.get(row["obligation"])
             if not ref:
@@ -156,8 +162,16 @@ def main():
             failures.append(f"coverage recall {recall:.2f} < {args.min}")
         if precision < args.min:
             failures.append(f"coverage precision {precision:.2f} < {args.min}")
+    elif args.coverage:
+        # Named a file that is not there. Silence here is how the README's own
+        # verification step reported ok while scoring nothing.
+        failures.append(f"coverage file not found: {args.coverage}")
+        print(f"\ncoverage      MISSING — {args.coverage}")
     else:
-        print("\ncoverage      (not run)")
+        print("\ncoverage      (not scored — pass --coverage <file>)")
+        print("              available here: " + ", ".join(sorted(
+            f for f in os.listdir(project) if f.startswith("cov-")
+            and f.endswith(".csv")) or ["none"]))
 
     # -- stage 3: verification ---------------------------------------------
     findings_path = os.path.join(project, args.findings)

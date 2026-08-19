@@ -263,8 +263,16 @@ def main():
 
     p = sub.add_parser("freeze"); p.add_argument("project")
     p.add_argument("--check", action="store_true")
+    # --init exists in freeze.py and was never registered here, so the first
+    # command of the first documented workflow failed with an argparse error.
+    p.add_argument("--init", action="store_true",
+                   help="write a starter corpus.yaml for a new project")
+    p.add_argument("--refreeze", action="store_true",
+                   help="re-extract after a source changed (INVALIDATES locators)")
     p.set_defaults(fn=lambda a: run("freeze.py", "--project", a.project,
-                                    *(["--check"] if a.check else [])))
+                                    *(["--check"] if a.check else []),
+                                    *(["--init"] if a.init else []),
+                                    *(["--refreeze"] if a.refreeze else [])))
 
     p = sub.add_parser("review"); p.add_argument("project")
     p.add_argument("--doc", required=True); p.add_argument("--against", required=True)
