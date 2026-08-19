@@ -78,3 +78,27 @@ only on documents of one shape is fitted to that shape.**
 - **Requirements are instructional.** 60 HTML comment blocks and 28 checkbox
   items, so obligation extraction over-produces. That is realistic, and it is
   the point.
+
+## Re-run 2026-08-19
+
+`fetch.py` verified all four documents after a hash-comparison fix (it had been
+reporting an unchanged corpus as corrupt). Inventory extraction with
+`qwen3.6-35b-a3b`, one pass:
+
+| doc | sections | authority found | exclusions |
+|---|---|---|---|
+| kep-2400 | 98 | 4 | 3 |
+| kep-1287 | 144 | 3 | 0 |
+
+DESIGN §3.29 used this corpus as the cross-genre control for polarity and
+recorded 16 and 17 authority assertions. **That does not reproduce** — see the
+note in §3.29. The fixture's own README already predicted the shape of the
+problem: "a KEP yields about seven non-exclusion authority assertions across a
+hundred sections, because KEPs barely assign component ownership". At four, the
+corpus cannot serve as a control for anything measured as a proportion.
+
+Worth keeping anyway, and for the reason it was built: it is 1,400 lines of
+markdown written by people who never imagined it being parsed, and it exercises
+the extractor against HTML comment blocks, checkbox lists and embedded code
+fences that no synthetic fixture reproduces. It survived that. It just cannot
+carry a statistical claim.

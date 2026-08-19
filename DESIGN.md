@@ -577,6 +577,28 @@ Different mechanism, same phenomenon at higher density. Technical proposals stat
 what they will not do, and an extractor without polarity turns every one of those
 statements into a false capability claim. This is a property of the genre.
 
+> **This control does not reproduce, 2026-08-19.** Re-run on clean extractions —
+> kep-1287 with zero failed sections, kep-2400 re-run after 94 of 146 calls
+> failed at transport on the first attempt:
+>
+> | corpus | as recorded above | re-measured |
+> |---|---|---|
+> | kep-2400 | 16 authority, 9 exclusions | **4 authority, 3 exclusions** |
+> | kep-1287 | 17 authority, 9 exclusions | **3 authority, 0 exclusions** |
+>
+> Authority extraction is four to five times sparser with `qwen3.6-35b-a3b` than
+> with whatever model produced the original figures, and at n = 3 and n = 4 the
+> percentages carry no information: one entry moves them 25 to 33 points. The
+> control neither supports nor refutes the claim at this sample size — it is not
+> a measurement any more.
+>
+> What survives is the diagnosis it was generalising *from*: 1,051 authority
+> assertions and 463 exclusions on a real architecture, which is a large enough
+> sample to mean something. Polarity is still worth extracting on that evidence.
+> What is gone is the cross-genre control, and with it the claim that this is "a
+> property of the genre" rather than of one document. Re-establishing it needs an
+> extractor that finds authority in KEPs at all.
+
 The same control could NOT test verb-blindness: a KEP yields about seven
 non-exclusion authority assertions across a hundred sections, because KEPs barely
 assign component ownership. Absence of a control is not confirmation, so that fix
