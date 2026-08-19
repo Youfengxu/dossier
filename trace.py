@@ -542,7 +542,9 @@ def main():
                 # independently compressed vectors; this scores the pair
                 # jointly, which is what handles paraphrase. Measured on CM-1:
                 # requirements with ALL gold links inside the top 4 rise from
-                # 10/19 to 14/19. Retrieval stays wide and cheap; only the
+                # 10/19 to 14/19 AT k=4 (DESIGN §3.16a; at k=12, the width
+                # this tool uses, reranking measures slightly worse). Retrieval
+                # stays wide and cheap; only the
                 # shortlist is scored.
                 import urllib.request as _u
                 head = order[:args.rerank_depth]

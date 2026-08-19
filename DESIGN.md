@@ -217,6 +217,32 @@ with recall falling too. More context is not monotonically better; past a point
 the model finds something tangentially relevant in the extra material and talks
 itself into a verdict. 12 is the default because it was measured, not chosen.
 
+### 3.16a The retrieval width holds on a corpus nobody here built
+
+`k=12` was chosen on floodtwin — 42 chunks, synthetic, written by the same person
+who wrote the tool. §4a names that as the highest overfitting risk in the project.
+CM-1 is the control: a NASA instrument's requirements and design, published, with
+45 links traced by hand across 19 requirements.
+
+| k | recall@k | requirements fully covered |
+|---|---|---|
+| 4 | 73.3% | 10/19 |
+| 12 | **95.6%** | 17/19 |
+| 24 | 100.0% | 19/19 |
+
+Different corpus, human labels, same answer. That is the strongest evidence in
+this repository that a parameter fitted on the fixture generalises.
+
+Two honest limits. Recall is monotonic in k, so CM-1 can never argue *against* a
+larger k — it shows 12 suffices, not that 12 is the optimum, and the optimum was
+decided on floodtwin. And n = 19, so one requirement moves recall@k by 5.3 points.
+
+**Reranking is narrower than it was recorded as being.** A comment in `trace.py`
+credits the cross-encoder with lifting fully-covered from 10/19 to 14/19; that
+reproduces exactly, at k=4. At k=12 reranking is marginally *worse* — 16/19
+against 17/19, recall 93.3% against 95.6%. It is the right lever when retrieval
+must be narrow, and not an improvement at the width actually used.
+
 ### 3.17 Where a deterministic check exists, it wins
 
 *"Cross-references within the deliverable SHALL resolve"* regressed to `met`

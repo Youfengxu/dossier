@@ -59,3 +59,37 @@ judgement. The optimum is a trade-off, not a peak.
 
 Data courtesy of NASA, collated by Jane Huffman Hayes. Cite Hayes, Dekhtyar &
 Sundaram, *IEEE TSE* 32(1):4-19 (2006) — see `fetch.py`.
+
+## Measured, 2026-08-19
+
+```sh
+./fetch.py
+python3 ../../freeze.py --project .
+./score-retrieval.py --project . --retrieval embed  --k 4 12 24
+./score-retrieval.py --project . --retrieval rerank --k 4 12 24 \
+    --rerank-url <endpoint>/v1/rerank --rerank-model bge-reranker-v2-m3
+```
+
+19 requirements with gold links, 54 design chunks.
+
+| k | recall@k (embed) | fully covered | recall@k (+rerank) | fully covered |
+|---|---|---|---|---|
+| 4 | 73.3% | 10/19 | 75.6% | **14/19** |
+| 12 | **95.6%** | 17/19 | 93.3% | 16/19 |
+| 24 | 100.0% | 19/19 | 100.0% | 19/19 |
+
+**What this corroborates.** `k=12` was chosen on floodtwin, a synthetic fixture
+of 42 chunks; DESIGN §4a names that as the highest overfitting risk in the
+project. Here, on a third-party corpus with human-traced links, recall@12 is
+95.6% against 73.3% at k=4 — a different corpus, different labels, same answer.
+
+**What it qualifies.** Reranking's benefit is at *narrow* retrieval: it lifts
+fully-covered at k=4 from 10 to 14, which is the claim recorded in `trace.py`.
+At k=12 — the default — it is marginally *worse* on both measures. So rerank is
+the right lever when you are forced to retrieve narrowly, and not a free
+improvement at the width this toolkit actually uses.
+
+**What it cannot settle.** Recall is monotonic in k, so this corpus can never
+argue *against* a larger k; it shows 12 suffices for recall, not that 12 is the
+precision/recall optimum. That question was decided on floodtwin and remains
+decided there. n = 19, so a single requirement moves recall@k by 5.3 points.
