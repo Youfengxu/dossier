@@ -1,0 +1,42 @@
+# Real-scale corpus: Kubernetes Enhancement Proposals.
+#
+# The synthetic floodtwin fixture has an exact answer key and is the regression
+# gate. This one has neither — what it has is SCALE, real extraction messiness,
+# and a retrieval regime that matches a live engagement rather than a toy.
+#
+# Requirements side: the KEP template's Production Readiness Review
+# questionnaire. It is a genuine requirements source — a list of questions a KEP
+# MUST answer before it can graduate — written by people who had no idea it
+# would be used this way.
+#
+# Deliverable side: KEP-2400 (node swap), pinned at two revisions eighteen
+# months apart, so version diffing has a real target. KEP-1287 is a second,
+# larger deliverable governed by the same questionnaire — which is exactly the
+# one-requirements-source-many-deliverables shape that --scope exists for.
+#
+# Run ./fetch.py first; source/ is not committed.
+
+documents:
+  - path: source/prr-template.md
+    slug: prr-template
+    role: requirements
+    sha256: 38ed9f6e5c99bf72
+    note: KEP template incl. the Production Readiness Review questionnaire, pinned at 6ab9bf717d12.
+
+  - path: source/kep-2400.md
+    slug: kep-2400
+    role: anchor
+    sha256: 77ff857a211e65df
+    note: KEP-2400 node swap, current revision, pinned at d03d5a6e577a.
+
+  - path: source/kep-2400-2024.md
+    slug: kep-2400-2024
+    role: draft
+    sha256: fb8fc454a2222a3e
+    note: KEP-2400 as at 2024-06-06 (dfb0ff13627f). Diff target, never cited.
+
+  - path: source/kep-1287.md
+    slug: kep-1287
+    role: reference
+    sha256: 97879308d54aef0c
+    note: KEP-1287 in-place pod resource updates, a second deliverable under the same questionnaire.

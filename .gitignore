@@ -1,0 +1,21 @@
+# Per-run artefacts: regenerate them, don't version them.
+.dossier-cache/
+.dossier-log.jsonl
+obligations.yaml
+obligations-baseline.yaml
+coverage.csv
+cov-*.csv
+candidates.csv
+inv-*.json
+inventory*.json
+
+# ...but the fixture obligations are synthetic and ARE the regression gate.
+# score.py cannot score anything without them, so a fresh clone could not run
+# the check the README tells a newcomer to run first.
+!fixtures/*/obligations.yaml
+!fixtures/*/obligations-baseline.yaml
+
+# Working documents that name client identifiers by location. This repository is
+# the one that gets published, so anything naming the engagement lives here and
+# never leaves.
+.private/

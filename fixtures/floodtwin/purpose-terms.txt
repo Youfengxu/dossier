@@ -1,0 +1,12 @@
+# Purpose-bearing terms from RFO MMWA-2029-DT-114, swept against the deliverable.
+# Two of these are decoys: absent as written, but covered by a synonym.
+Port Meridian
+evacuation
+tidal surge
+rainfall intensity
+trade-off
+maturity
+risk
+calibration
+arbitration rule
+SI units

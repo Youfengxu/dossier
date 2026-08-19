@@ -1,0 +1,8 @@
+source/
+parsed/
+obligations.yaml
+answers.yaml
+corpus.yaml
+.dossier-cache/
+.dossier-log.jsonl
+coverage*.csv

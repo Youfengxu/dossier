@@ -1,0 +1,16 @@
+# The fixture is itself a dossier project, so the real tools run against it
+# unmodified. Markdown passes through freeze.py without an extractor, which
+# means locators are line numbers in the source files.
+
+documents:
+  - path: requirements.md
+    slug: requirements
+    role: requirements
+
+  - path: deliverable-v1.md
+    slug: deliverable-v1
+    role: anchor
+
+  - path: deliverable-v2.md
+    slug: deliverable-v2
+    role: draft

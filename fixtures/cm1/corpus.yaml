@@ -1,0 +1,23 @@
+# CM-1: a NASA scientific instrument, from the CoEST traceability community.
+#
+# The only corpus here with a HUMAN-BUILT answer matrix. 22 requirements, 53
+# design elements, 45 hand-traced links out of 1,166 candidate pairs.
+#
+# Its value is isolation. The requirements are already atomic "shall" statements
+# with stable IDs, so extraction cannot be blamed; each design element is its own
+# heading, so a retrieval chunk is exactly one artefact. What is left to measure
+# is retrieval alone — which nothing else here measures at all.
+#
+# Run ./fetch.py first; source/ is not committed. Data courtesy of NASA,
+# collated by Jane Huffman Hayes — see fetch.py for the citation.
+
+documents:
+  - path: source/requirements.md
+    slug: requirements
+    role: requirements
+    note: 22 high-level requirements, one per heading, already atomic.
+
+  - path: source/design.md
+    slug: design
+    role: anchor
+    note: 53 design elements, one per heading, so chunk == artefact.

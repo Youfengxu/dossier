@@ -1,0 +1,9 @@
+# Fetched on demand by fetch.py, pinned by commit SHA and content hash.
+# Not vendored: this is several thousand lines of upstream Apache-2.0 text.
+source/
+parsed/
+.dossier-cache/
+.dossier-log.jsonl
+obligations.yaml
+coverage*.csv
+findings*.csv

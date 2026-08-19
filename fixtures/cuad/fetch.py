@@ -1,0 +1,174 @@
+#!/usr/bin/env python3
+"""Fetch and slice CUAD — expert-annotated contract review.
+
+The Contract Understanding Atticus Dataset: 510+ commercial contracts with
+13,000+ annotations across 41 clause categories, written by lawyers at The
+Atticus Project. CC BY 4.0.
+
+Two things make it the right third corpus:
+
+  * ABSENCE IS LABELLED. About 70% of the question/contract pairs are marked
+    `is_impossible` — the clause genuinely is not in the contract. Everything
+    else here has been measured on corpora where most obligations are MET, so
+    the tools have only ever been tested against one bias. This tests the other.
+
+  * SPANS ARE LABELLED. Where a clause is present, a lawyer marked the exact
+    text. That is the ground truth for quote-with-locator, which nothing else
+    provides — floodtwin checks a quote is verbatim, but never that it is the
+    RIGHT quote.
+
+A slice, not the whole set: three contracts spanning small, medium and large, so
+the corpus stays runnable while covering the retrieval regime honestly.
+
+    ./fetch.py            # download, verify, slice
+    ./fetch.py --update   # print the archive hash to pin
+    ./fetch.py --contracts 5
+
+Writes source/*.md, obligations.yaml and answers.yaml. Nothing is committed.
+"""
+
+import argparse
+import hashlib
+import json
+import os
+import sys
+import urllib.request
+import zipfile
+
+URL = "https://github.com/TheAtticusProject/cuad/raw/main/data.zip"
+ARCHIVE_SHA256 = "f8161d18bea4e9c05e78fa6dda61c19c846fb8087ea969c172753bc2f45b999a"
+SPLIT = "test.json"
+HERE = os.path.dirname(os.path.abspath(__file__))
+
+
+def slugify(title):
+    keep = [c.lower() if c.isalnum() else "-" for c in title]
+    slug = "".join(keep)
+    while "--" in slug:
+        slug = slug.replace("--", "-")
+    return slug.strip("-")[:44]
+
+
+def pick(docs, count):
+    """Deterministic spread across the size range, smallest excluded.
+
+    The very smallest CUAD contracts are two-paragraph filing agreements where
+    40 of the 41 clause questions are trivially absent. They would inflate any
+    absence score without testing anything.
+    """
+    sized = sorted(((len(p["context"]), i) for i, doc in enumerate(docs)
+                    for p in doc["paragraphs"]), key=lambda x: x[0])
+    usable = [i for size, i in sized if size >= 8000]
+    if not usable:
+        usable = [i for _, i in sized]
+    step = max(1, len(usable) // count)
+    return [usable[min(k * step, len(usable) - 1)] for k in range(count)]
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__,
+                                     formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("--force", action="store_true")
+    parser.add_argument("--update", action="store_true")
+    parser.add_argument("--contracts", type=int, default=3)
+    args = parser.parse_args()
+
+    out_dir = os.path.join(HERE, "source")
+    os.makedirs(out_dir, exist_ok=True)
+    archive_path = os.path.join(out_dir, "cuad-data.zip")
+
+    if not os.path.exists(archive_path) or args.force or args.update:
+        try:
+            request = urllib.request.Request(
+                URL, headers={"User-Agent": "dossier-fixture"})
+            with urllib.request.urlopen(request, timeout=300) as response:
+                data = response.read()
+        except Exception as exc:                            # noqa: BLE001
+            sys.exit(f"download failed: {exc}\n  {URL}")
+        with open(archive_path, "wb") as handle:
+            handle.write(data)
+    data = open(archive_path, "rb").read()
+
+    digest = hashlib.sha256(data).hexdigest()
+    if ARCHIVE_SHA256 and digest != ARCHIVE_SHA256 and not args.update:
+        sys.exit(f"archive hash mismatch\n  pinned {ARCHIVE_SHA256}\n  actual {digest}")
+    if args.update:
+        print(f'ARCHIVE_SHA256 = "{digest}"')
+
+    docs = json.loads(zipfile.ZipFile(archive_path).read(SPLIT))["data"]
+    chosen = pick(docs, args.contracts)
+
+    questions, corpus_rows, answers = {}, [], []
+    for index in chosen:
+        doc = docs[index]
+        para = doc["paragraphs"][0]
+        slug = slugify(doc["title"])
+        path = os.path.join(out_dir, slug + ".md")
+        # One paragraph per line keeps locators meaningful; CUAD contexts are
+        # raw contract text with hard wraps already in them.
+        with open(path, "w", encoding="utf-8") as handle:
+            handle.write(f"# {doc['title']}\n\n{para['context']}\n")
+        corpus_rows.append((slug, doc["title"], len(para["context"])))
+
+        for qa in para["qas"]:
+            label = qa["question"].split('related to "', 1)[-1].split('"', 1)[0]
+            questions.setdefault(label, qa["question"])
+            answers.append({
+                "contract": slug, "clause": label,
+                "absent": bool(qa.get("is_impossible")),
+                "spans": [a["text"] for a in qa.get("answers", [])][:3],
+            })
+
+    with open(os.path.join(HERE, "obligations.yaml"), "w", encoding="utf-8") as handle:
+        handle.write("# Generated by fetch.py from CUAD. The 41 clause "
+                     "categories, as obligations.\n"
+                     "# Pre-extracted on purpose: CUAD isolates retrieval and "
+                     "judgement, not extraction.\n\nobligations:\n")
+        for number, (label, question) in enumerate(sorted(questions.items()), 1):
+            handle.write(f"  - id: C-{number:03d}\n")
+            handle.write(f"    modality: SHALL\n")
+            handle.write(f"    subject: \"the contract\"\n")
+            handle.write(f"    text: {json.dumps('Does the contract address: ' + label + '?')}\n")
+            handle.write(f"    source_ref: {json.dumps(label)}\n")
+            handle.write(f"    scope: \"contract\"\n")
+            handle.write(f"    section: \"CUAD clause categories\"\n")
+            handle.write(f"    locator: cuad:{number}\n\n")
+
+    absent = sum(1 for a in answers if a["absent"])
+    with open(os.path.join(HERE, "answers.yaml"), "w", encoding="utf-8") as handle:
+        handle.write("# Generated by fetch.py from CUAD (CC BY 4.0). Do not edit.\n"
+                     "#\n# absent=true means lawyers found the clause is NOT in "
+                     "the contract —\n# the expected verdict is unmet. spans are "
+                     "the exact annotated text.\n"
+                     f"#\n# {len(answers)} labelled pairs, {absent} absent "
+                     f"({100*absent/len(answers):.0f}%)\n\nlabels:\n")
+        for item in answers:
+            handle.write(f"  - contract: {item['contract']}\n")
+            handle.write(f"    clause: {json.dumps(item['clause'])}\n")
+            handle.write(f"    absent: {str(item['absent']).lower()}\n")
+            if item["spans"]:
+                handle.write("    spans:\n")
+                for span in item["spans"]:
+                    handle.write(f"      - {json.dumps(' '.join(span.split())[:400])}\n")
+
+    with open(os.path.join(HERE, "corpus.yaml"), "w", encoding="utf-8") as handle:
+        handle.write("# Generated by fetch.py — CUAD contracts, sliced.\n"
+                     "# Expert-annotated clause spans and absence labels.\n\n"
+                     "documents:\n")
+        for position, (slug, title, size) in enumerate(corpus_rows):
+            role = "anchor" if position == 0 else "reference"
+            handle.write(f"  - path: source/{slug}.md\n    slug: {slug}\n"
+                         f"    role: {role}\n"
+                         f"    note: {json.dumps(title[:90] + f'  ({size:,} chars)')}\n\n")
+
+    print(f"  contracts     {len(corpus_rows)}")
+    for slug, title, size in corpus_rows:
+        print(f"    {slug[:44]:46} {size:8,} chars")
+    print(f"  clause types  {len(questions)}")
+    print(f"  labelled      {len(answers)} pairs, {absent} absent "
+          f"({100*absent/len(answers):.0f}%)")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

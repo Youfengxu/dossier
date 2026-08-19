@@ -1,0 +1,111 @@
+# Partial ground truth for the KEP corpus.
+#
+# This fixture has NO complete answer key and never will — hand-labelling 154
+# obligations against a 1,400-line KEP is not a good use of anyone's time, and a
+# wrong label is worse than no label.
+#
+# What it has instead is three narrower kinds of truth, each cheap to establish
+# and each checking something floodtwin cannot:
+#
+#   structural   facts about the documents that are verifiable by inspection
+#   regression   the real revision diff between two pinned commits
+#   sampled      a small set of obligations labelled by reading the KEP
+#
+# Use floodtwin for exact scoring. Use this one to check that the tools survive a
+# real document: messy markdown, HTML comment blocks, checkbox lists, embedded
+# code fences, and a requirements source written by people who had no idea it
+# would be parsed.
+
+fixture: kep
+version: 1
+
+documents:
+  requirements:  prr-template     # KEP template incl. the PRR questionnaire
+  anchor:        kep-2400         # node swap, current
+  draft:         kep-2400-2024    # node swap, 2024-06-06
+  reference:     kep-1287         # in-place pod resources
+
+# ---------------------------------------------------------------------------
+# STRUCTURAL — verifiable by inspection, no judgement required.
+# ---------------------------------------------------------------------------
+structural:
+  - id: ST-001
+    check: The requirements document is instructional prose, not a clean spec
+    detail: >
+      60 HTML comment blocks and 28 checkbox items. Any extractor that treats
+      comment text as requirement text will over-extract badly. This is the
+      normal condition of a real requirements source.
+
+  - id: ST-002
+    check: Headings are unnumbered
+    detail: >
+      "## Summary", "### Goals". A chunker that requires a leading number to
+      recognise a heading sees the whole document as one section — which is
+      exactly what happened on first run, because every floodtwin heading is
+      numbered and the bug was invisible there.
+
+  - id: ST-003
+    check: One requirements source governs several deliverables
+    detail: >
+      The PRR questionnaire governs every KEP. kep-2400 and kep-1287 are both
+      answerable to it, so --scope has a real target and the
+      one-source-many-deliverables shape is exercised on real documents.
+
+# ---------------------------------------------------------------------------
+# REGRESSION — the genuine diff between two pinned revisions, eighteen months
+# apart. Not planted: this is what the authors actually did.
+# ---------------------------------------------------------------------------
+regression:
+  from: kep-2400-2024        # dfb0ff13627f, 2024-06-06
+  to: kep-2400               # d03d5a6e577a, 2025-07-02
+  expect:
+    - id: RG-001
+      kind: section_removed
+      heading: "### Restrict swap usage at the cgroup level"
+      note: >
+        Present in the 2024 revision, absent from the current one. A real
+        section deletion between revisions — the D7 class, with no synthetic
+        help. A revision diff must surface this.
+    - id: RG-002
+      kind: net_growth
+      note: >
+        1281 -> 1437 lines. Most real revisions GROW, which is why a diff that
+        only reports totals will miss RG-001 entirely. Report per-section and
+        per-identifier movement, not net line count.
+
+# ---------------------------------------------------------------------------
+# SAMPLED — obligations labelled by reading the KEP. Small on purpose; extend
+# it when a disagreement is worth adjudicating, and record the reasoning.
+# ---------------------------------------------------------------------------
+sampled:
+  anchor: kep-2400
+  labels:
+    - question: "How can this feature be enabled / disabled in a live cluster?"
+      expect: met
+      evidence: "### Feature Enablement and Rollback  (kep-2400:964)"
+
+    - question: "Can the feature be disabled once it has been enabled?"
+      expect: met
+      evidence: "kep-2400:1008 — the question is present and answered inline"
+
+    - question: "What are the reasonable SLOs for the enhancement?"
+      expect: met
+      evidence: "### Monitoring Requirements (kep-2400:1116)"
+
+    - question: "Rollout, upgrade and rollback planning"
+      expect: met
+      evidence: "### Rollout, Upgrade and Rollback Planning (kep-2400:1060)"
+
+    - question: "Dependencies on other components"
+      expect: met
+      evidence: "### Dependencies (kep-2400:1199)"
+
+    - question: "Scalability impact"
+      expect: met
+      evidence: "### Scalability (kep-2400:1224)"
+
+  # A caution about this sample: KEP-2400 reached beta, so it has been through
+  # production-readiness review by people whose job is exactly this. Most PRR
+  # obligations SHOULD come back met. A run that reports many unmet against a
+  # graduated KEP is more likely wrong than the KEP is — which makes this corpus
+  # a useful FALSE-POSITIVE detector even without a complete key.

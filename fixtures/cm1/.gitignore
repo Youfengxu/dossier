@@ -1,0 +1,6 @@
+source/
+parsed/
+answers.yaml
+.dossier-cache/
+.dossier-log.jsonl
+coverage*.csv
