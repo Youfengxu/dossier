@@ -414,6 +414,20 @@ def cosine(a, b):
     return dot / (na * nb) if na and nb else 0.0
 
 
+# extract.py writes "########## <path> ##########" between concatenated inputs.
+# It carries an ABSOLUTE path, so it differs whenever the source file moves —
+# and a diff of two revisions then reports one change that is not in either
+# document. On a revision that changed four lines, that inflated the count by
+# 25%. sweep.py already excludes these lines from heading detection; nothing was
+# excluding them from comparison.
+BANNER = "##########"
+
+
+def content_lines(lines):
+    """The document's own lines, without the extractor's provenance banners."""
+    return [l for l in lines if not l.lstrip().startswith(BANNER)]
+
+
 def load_doc(project, slug):
     """Read a frozen document. Refuses unfrozen corpora — a locator into text
     that can still move is not a locator."""

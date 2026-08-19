@@ -39,7 +39,7 @@ import urllib.request
 from concurrent.futures import ThreadPoolExecutor
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from llm import Client, Embedder, LLMError, cosine, load_doc                  # noqa: E402
+from llm import Client, Embedder, LLMError, content_lines, cosine, load_doc                  # noqa: E402
 import matrix as matrix_reader                              # noqa: E402
 import writeback                                            # noqa: E402
 
@@ -121,6 +121,10 @@ def normalise_title(text):
     return re.sub(r"[^a-z0-9 ]", " ", re.sub(r"\d+$", "", text).lower()).strip()
 
 
+# A page number run onto the end of a heading: the mark of a contents entry.
+TOC_TITLE = re.compile(r"[A-Za-z)\]]\s*\d{1,4}$")
+
+
 def pick(index, number, want_title=None):
     """The real occurrence of a section: the one with the most body.
 
@@ -140,6 +144,19 @@ def pick(index, number, want_title=None):
         titled = [c for c in candidates if normalise_title(c[0]) == wanted]
         if titled:
             candidates = titled
+
+    # Drop table-of-contents entries before choosing on size. A TOC line carries
+    # the page number glued to the title — "Analytics, validation, and approved
+    # use159" — which is the signature, and index_headings has always collected
+    # both copies. Choosing purely on body size assumed the real section was
+    # bigger; in a document whose contents page runs to several hundred lines,
+    # the TOC block wins. §13 resolved to lines 91-449, the contents listing,
+    # rather than to the 80-line section at 5758. The verdict was then reached by
+    # diffing the table of contents, which never changes, and the locator printed
+    # as evidence pointed a reader at the wrong page.
+    real = [c for c in candidates if not TOC_TITLE.search(c[0].strip())]
+    if real:
+        candidates = real
     return max(candidates, key=lambda c: c[2] - c[1])
 
 
@@ -370,9 +387,12 @@ def main():
                 print(f"  endpoint reports max_model_len={limit:,} tokens; "
                       f"budget {budget:,} -> {max(room, 4000):,} chars")
                 budget = max(room, 4000)
+        # content_lines, not the raw lines: the extractor's path banner differs
+        # whenever a source file moves, and a whole-document diff would then
+        # open with a change that is in neither document.
         whole_diff = "\n".join(difflib.unified_diff(
-            old_lines, new_lines, fromfile=args.old, tofile=args.new,
-            lineterm="", n=2))
+            content_lines(old_lines), content_lines(new_lines),
+            fromfile=args.old, tofile=args.new, lineterm="", n=2))
         mode = args.unreferenced
         if mode == "auto":
             mode = "whole" if len(whole_diff) <= budget else "retrieve"
