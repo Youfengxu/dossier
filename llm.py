@@ -13,7 +13,7 @@ So:
   * every call is CACHED by content hash, so a re-run after an interruption or a
     prompt tweak only pays for what actually changed.
   * every call is LOGGED to JSONL — model, prompt hash, latency, raw output. The
-    cheap substitute for a tracing service (dossier design 7.6, layer L3).
+    cheap substitute for a tracing service.
   * every call is SCHEMA-CHECKED, with one corrective retry, then it gives up
     loudly rather than returning something malformed.
 

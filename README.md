@@ -115,7 +115,7 @@ seconds. It ends by printing the command to run next.
 **Read**, in this order, and stop when you can run the two workflows below:
 
 1. This file, end to end. Twenty minutes.
-2. `DESIGN.md` **§4a (the overfitting audit)** and the **"Known not to work"**
+2. `DESIGN.md` **§4a (the overfitting audit)** and the **§3.19, "Three things that did not work"**
    entries. Read these before you improve anything — several obvious ideas were
    tried and measured worse, and the reasoning is recorded so you can disagree
    with evidence rather than repeat the experiment.

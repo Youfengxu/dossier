@@ -28,6 +28,12 @@ jobs:
         # leak is the only failure here that cannot be taken back.
         run: python3 check-clean.py
 
+      - name: DESIGN references resolve
+        # §1 names cross-reference rot as a motivating failure and this repo had
+        # four of its own. sweep.py xref catches this in a client deliverable;
+        # nothing was pointing it here.
+        run: python3 check-refs.py
+
       - name: every tool loads and answers --help
         run: |
           fail=0

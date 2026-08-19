@@ -297,7 +297,7 @@ obligations collapse to 13 candidate findings, and reading the **top three**
 reaches six of the ten register findings that map at all; the top five reach
 seven. A finding buried at rank 32 under tight clustering surfaces at rank 3.
 
-This is why the many-to-one matcher in §A mattered. One-best-row matching
+This is why the many-to-one matcher in `score-register.py` mattered. One-best-row matching
 reported convergence as unmatched noise, which inverted the most useful signal
 the pipeline produces.
 

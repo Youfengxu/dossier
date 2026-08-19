@@ -2,7 +2,7 @@
 """Terms the document leans on and never defines.
 
 The largest class hiding inside "framing". On a live review, 15 of 26 findings
-filed as framing — the class DESIGN 5.5 calls permanently human — were one
+filed as framing — the class DESIGN §6 calls out of reach — were one
 shape: a term used repeatedly and defined nowhere. On that review one term
 appeared 77 times with no definition, a second 19 times, a third 5. None of them
 needed knowledge from outside the document, which is what "framing" was supposed
