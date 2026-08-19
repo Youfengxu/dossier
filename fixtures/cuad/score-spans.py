@@ -66,6 +66,7 @@ def main():
 
     matrix = Counter()
     span_hit = span_total = 0
+    tightness = []
     wrong_absent, wrong_present, blind_hits = [], [], []
 
     for row in rows:
@@ -87,11 +88,28 @@ def main():
         if not expected_absent and row.get("quote"):
             span_total += 1
             quoted = tokens(row["quote"])
-            best = 0.0
+            # TWO numbers, because they answer two questions and the original
+            # reported only the first while being read as both.
+            #
+            #   coverage  len(quoted & want) / len(want) — did the quote MISS
+            #             the annotated span? No precision term at all: quoting
+            #             the whole contract scores 1.0 against every span in it.
+            #   tightness Jaccard — is the quote the span, rather than a
+            #             haystack containing it? Quoting the whole contract
+            #             scores about 0.005.
+            #
+            # Replacing coverage with tightness outright would have been the
+            # same mistake in reverse: the 0.30 threshold was calibrated against
+            # coverage, and a correctly tight quote of a short span scores about
+            # 0.29 by Jaccard, so every honest answer would have failed.
+            best = best_tight = 0.0
             for span in label.get("spans") or []:
                 want = tokens(span)
                 if want:
-                    best = max(best, len(quoted & want) / len(want))
+                    overlap = len(quoted & want)
+                    best = max(best, overlap / len(want))
+                    best_tight = max(best_tight, overlap / len(quoted | want))
+            tightness.append(best_tight)
             if best >= args.overlap:
                 span_hit += 1
             elif row["verdict"] in ("met", "partial"):
@@ -126,6 +144,10 @@ def main():
 
     print(f"\nSPAN FIDELITY  (is the quote the RIGHT text, not merely verbatim?)")
     print(f"  quotes checked          {span_total}")
+    if tightness:
+        mean = sum(tightness) / len(tightness)
+        print(f"  quote tightness         {mean:.2f} mean Jaccard "
+              f"(1.0 = the quote IS the span; 0.01 = a haystack containing it)")
     print(f"  overlap the gold span   {pct(span_hit, span_total)} "
           f"(>= {args.overlap:.0%} of gold tokens)")
     if blind_hits:

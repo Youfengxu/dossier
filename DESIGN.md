@@ -254,6 +254,14 @@ document is 10,000 lines, five times the large contract here.
 Span fidelity held at 100% in both. When the model does find evidence it quotes
 the right text; the failure is entirely in claiming there is none.
 
+> **What that 100% actually measured.** Gold-token recall — the quoted text did
+> not *miss* the annotated span. It carried no precision term, so a quote that
+> merely contained the span scored the same as one that was the span, and
+> quoting the whole contract would have scored 1.0 against every clause in it.
+> `score-spans.py` now reports a mean Jaccard beside it. The conclusion above is
+> about absence and is unaffected; the span claim is weaker than it reads and
+> should be re-run before it is quoted again.
+
 ### 3.19 Three things that did not work
 
 Recorded because a negative result measured is worth more than a feature shipped

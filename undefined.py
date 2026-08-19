@@ -236,13 +236,46 @@ def main():
         truth = closure.load_yaml(os.path.join(project, args.score))
         wanted = [f for f in truth["findings"] if f.get("class") == "framing"
                   and f.get("terms")]
-        got = " ".join(f["term"].lower() for f in findings)
-        hit = [f for f in wanted
-               if any(t.lower() in got or
-                      any(w in got for w in t.lower().split() if len(w) > 5)
-                      for t in f["terms"])]
+        # One reported term satisfies at most one register finding, and the
+        # match is between two TERMS — not between a term and the concatenation
+        # of every term the tool reported. The previous version joined all
+        # output into one string and counted a finding surfaced if any single
+        # word longer than five characters appeared anywhere in it, so a run
+        # that emitted enough candidates scored well by volume alone. The same
+        # shape was removed from synthesize.py; this is the other one.
+        def same(reported, wanted_term):
+            a, b = _loose(reported), _loose(wanted_term)
+            if not a or not b:
+                return False
+            if a == b:
+                return True
+            # Containment either way, because the register may record "frozen
+            # execution order" where the tool reports "execution order", and may
+            # record a one-word coinage the tool reports inside a longer phrase.
+            # But the contained side has to be most of the container: bare
+            # "order" sits inside "frozen execution order" and is not the same
+            # finding, and accepting it is how a scorer starts rewarding vague
+            # output.
+            short, long = sorted((a, b), key=len)
+            if f" {short} " in f" {long} ":
+                return len(short) >= 0.6 * len(long)
+            return False
+
+        claimed, hit = set(), []
+        for finding in wanted:
+            match = next(
+                (i for i, item in enumerate(findings)
+                 if i not in claimed
+                 and any(same(item["term"], t) for t in finding["terms"])),
+                None)
+            if match is not None:
+                claimed.add(match)
+                hit.append(finding)
         print(f"\n-- against the register's framing findings --")
-        print(f"  {len(hit)}/{len(wanted)} surfaced")
+        print(f"  recall     {len(hit)}/{len(wanted)} surfaced")
+        if findings:
+            print(f"  precision  {len(claimed)}/{len(findings)} reported terms "
+                  f"matched a register finding")
         for f in wanted:
             mark = "FOUND" if f in hit else "miss "
             print(f"  {mark} {f['id']:8} {str(f['terms'])[:58]}")

@@ -70,12 +70,15 @@ quoted without them.
   "unmet" to everything scores 0.79 precision and 1.00 recall. The 83.3% above is
   roughly four points over that floor, not 83 points over zero. Reported without
   the baseline it reads far stronger than it is.
-- **The span metric has no precision term.** It computes gold-token recall over
-  deduplicated token sets, thresholded at 0.30, so a quote that is a *superset*
-  of the annotated span scores 1.0. "Span fidelity 100%" therefore says the model
-  did not miss the span; it does not say the model quoted it tightly. The
-  prompt's instruction to quote short is probably doing more work than the metric
-  is. Character-offset IoU, or adding a precision term, would fix it.
+- **The span metric now reports two numbers, and the old one meant less than it
+  looked.** "Span fidelity 100%" was gold-token recall — it says the quote did
+  not *miss* the annotated span, and says nothing about whether it quoted
+  tightly, because quoting the whole contract scores 1.0 against every span in
+  it. A mean Jaccard is reported alongside it: 1.0 means the quote *is* the span,
+  0.01 means a haystack containing it. Both are kept rather than one replacing
+  the other — the 0.30 threshold was calibrated against coverage, and a correctly
+  tight quote of a short span scores about 0.29 by Jaccard, so swapping the
+  metric outright would have failed every honest answer.
 - **n = 41, no confidence intervals.** 97.0% against 83.3% on 41 items has
   overlapping Wilson intervals. The direction is consistent and the mechanism is
   convincing; the two numbers are not statistically separable as they stand.
