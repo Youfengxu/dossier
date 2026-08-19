@@ -74,7 +74,13 @@ def main():
                 handle.write(data)
 
         digest = sha256(data)
-        if expected and digest != expected and not args.update:
+        # A pin may be a prefix. --update printed digest[:16] for pasting while
+        # this compared the full 64-character digest, so following the
+        # documented workflow produced a permanent "content hash mismatch" on an
+        # unchanged corpus — and the message sends you to look upstream, which
+        # is the one place the problem is not. Prefixes are accepted; --update
+        # now emits the whole digest so new pins are unambiguous.
+        if expected and not digest.startswith(expected) and not args.update:
             failures.append(f"{slug}: content hash mismatch\n"
                             f"     pinned {expected}\n     actual {digest}")
             print(f"  !! {slug:16} HASH MISMATCH")
@@ -87,7 +93,7 @@ def main():
     if args.update:
         print("\nPaste these into SOURCES and into corpus.yaml:")
         for slug, digest in printed:
-            print(f'  {slug:16} {digest[:16]}')
+            print(f'  {slug:16} {digest}')
 
     if failures:
         print("\nFAILED:", file=sys.stderr)
