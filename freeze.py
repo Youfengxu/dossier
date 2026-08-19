@@ -11,7 +11,7 @@ Reads corpus.yaml from the project directory:
     extractor: tools/extract.py        # relative to project dir
     documents:
       - path: source/Foo v5.docx       # relative to project dir
-        slug: arch-v5
+        slug: deliverable-v1
         role: anchor                   # anchor | requirements | draft | reference
         sha256: 1f4cb95c...            # optional; if set, MUST match or we abort
 
@@ -312,6 +312,25 @@ def main():
             return 1
         print("\nno drift — every source and frozen text matches the manifest")
         return 0
+
+    # Drift on a NON-check run used to be detected, discarded unread, and then
+    # papered over: the loop above skips re-extraction for an already-frozen
+    # document, but the entry it builds carries the freshly computed
+    # source_sha256, so writing the manifest recorded the new source against the
+    # old parsed text and every later --check reported clean. One plain `freeze`
+    # after editing a source silently destroyed the guarantee the whole toolkit
+    # rests on — that a locator points into text derived from a known source —
+    # and left no trace that it had happened. Refuse instead, and make the
+    # operator say --refreeze, which already warns that it invalidates locators.
+    if drift:
+        print("\nDRIFT — manifest NOT updated:", file=sys.stderr)
+        for item in drift:
+            print("  " + item, file=sys.stderr)
+        print("\nThe frozen text no longer matches its source. Re-extract with\n"
+              "  freeze.py --project <project> --refreeze\n"
+              "which re-parses and INVALIDATES existing locators, or restore the\n"
+              "source. Nothing was written.", file=sys.stderr)
+        return 1
 
     with open(manifest_path, "w") as handle:
         json.dump({"extractor": extractor, "documents": entries}, handle, indent=2)

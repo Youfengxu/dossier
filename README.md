@@ -84,7 +84,7 @@ committed reference run, which checks the scorer rather than your inference.
    a quoted phrase. Never sweep for strings that happen to match.
 5. **The finding register the tooling reads must be the one your client holds.**
    `register-map.yaml` keys on IDs, and IDs shift when a register is renumbered.
-   Nine of ODIN's B-series pointed at the wrong finding for weeks because the
+   Nine of one review's B-series pointed at the wrong finding for weeks because the
    map was built from a stale copy. `tools/check-map.py` in that project gates
    it in pre-commit; write the equivalent for a new engagement.
 
@@ -96,7 +96,7 @@ committed reference run, which checks the scorer rather than your inference.
 mkdir ~/reviews/acme && cd ~/reviews/acme && git init
 mkdir source && cp ~/Downloads/*.docx source/         # originals, gitignored
 dossier freeze . --init                               # scaffolds corpus.yaml
-dossier add . source/architecture-v3.docx --role draft --slug arch-v3
+dossier add . source/deliverable-v1.docx --role draft --slug deliverable-v1
 dossier add . source/rfo.pdf --role requirements --slug rfo
 dossier status .                                      # what exists, what drifted
 ```
@@ -109,17 +109,17 @@ say beyond that goes in a free-text `note`.
 Then extract obligations and trace them:
 
 ```sh
-dossier coverage . --doc arch-v3 --scope architecture
+dossier coverage . --doc deliverable-v1 --scope architecture
 ```
 
 This is the long one — roughly fifteen minutes, unattended, resumable from cache
-if interrupted. It writes `cov-arch-v3.csv` and then ranks it by convergence.
+if interrupted. It writes `cov-deliverable-v1.csv` and then ranks it by convergence.
 
 **Always pass `--scope`.** One requirements document governs several
 deliverables, and each obligation is tagged at extraction with the one that
 discharges it. Without the flag, the architecture is judged against obligations
 the roadmap or the MVP definition owes, and every one of those comes back
-`unmet` — on ODIN that is 62 structural false positives against 58 real
+`unmet` — on one live review that is 62 structural false positives against 58 real
 obligations, which buries the signal and doubles the model calls. `dossier
 status` lists the scopes in your project and their counts. The tags are a model
 judgement recorded in `obligations.yaml`, so read and correct any you disagree
@@ -128,10 +128,10 @@ with. Reasoning in `DESIGN.md` §3.6.
 ### A new revision lands
 
 ```sh
-dossier add . source/architecture-v4.docx --role draft --slug arch-v4
-dossier review . --doc arch-v4 --against arch-v3          # seconds, no model
-dossier coverage . --doc arch-v4 --scope architecture     # ~15 min, unattended
-dossier report . --from arch-v3 --to arch-v4              # the work product
+dossier add . source/deliverable-v2.docx --role draft --slug deliverable-v2
+dossier review . --doc deliverable-v2 --against deliverable-v1          # seconds, no model
+dossier coverage . --doc deliverable-v2 --scope architecture     # ~15 min, unattended
+dossier report . --from deliverable-v1 --to deliverable-v2              # the work product
 ```
 
 Read the `UNCHANGED` block first. Those are findings sitting on text that did not
@@ -148,13 +148,13 @@ lead with.
 It degrades: run it without a coverage file and you get the closure half alone.
 
 **If the engagement has an agreed adjudication matrix**, put it at
-`source/adjudication-matrix.xlsx` and `report` finds it automatically. Build the
+`source/feedback-matrix.xlsx` and `report` finds it automatically. Build the
 register map from it rather than hand-writing one — its IDs are the ones the
 client and vendor both use, and a map keyed on anything else has to be
 translated by hand before it can be sent:
 
 ```sh
-dossier matrix . --xlsx source/adjudication-matrix.xlsx --sheet "D2 - Architecture" --doc arch-v5
+dossier matrix . --xlsx source/feedback-matrix.xlsx --sheet "Comments" --doc deliverable-v1
 ```
 
 The report then leads with an **adjudication check** instead of the closure
@@ -166,7 +166,7 @@ CHANGE` is the mirror image: not marked done, but the text moved anyway.
 Finally, put the evidence back where the client will read it:
 
 ```sh
-dossier writeback . --from arch-v5 --to arch-v7
+dossier writeback . --from deliverable-v1 --to deliverable-v2
 ```
 
 This fills the *How/where comment adjudicated* column with a verdict and line
@@ -174,7 +174,7 @@ references per row, writing a **new** `-annotated.xlsx` plus a CSV of the same
 content. It never edits the input — the matrix is jointly agreed, and a tool
 that rewrites it in place can silently destroy the other side's entries. Cells
 that already have content are left alone unless you pass `--overwrite`. Use
-`--col K` to write into the DSTA/DIS inputs column instead.
+`--col K` to write into the client inputs column instead.
 
 ## Which tool answers which question
 
@@ -199,7 +199,7 @@ those before anything that costs GPU time.
 surprises you:
 
 - **`lexicon.yaml`** — spelling and synonym variants. Write this the first time a
-  term-based check reports something absent that you know is present. On the ODIN
+  term-based check reports something absent that you know is present. On one
   corpus the requirements are UK-spelled and the deliverable US-spelled, so
   `behaviour` is 0 and `behavior` is 419; without the lexicon every check across
   that pair is silently wrong.
@@ -226,8 +226,8 @@ count is the answer rather than a bug. Mark them and the tool says so:
 
 ```yaml
 - {id: B4, class: compliance, absence: true,
-   title: "Community Behaviour and Effects has no component",
-   terms: ["Community Behaviour and Effects", "community behaviour"]}
+   title: "Hydrology Model has no component",
+   terms: ["Hydrology Model", "hydrology model"]}
 ```
 
 They report `STILL ABSENT` while nothing appears, and `ADDED` the moment it

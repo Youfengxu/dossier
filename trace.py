@@ -218,7 +218,7 @@ def section_index(chunks):
 
     A package in a real architecture runs to hundreds of lines across a dozen
     chunks. Ranking those chunks independently scatters the evidence: the model
-    receives three paragraphs from the middle of the Network Model and never its
+    receives three paragraphs from the middle of the Sensor Fabric and never its
     purpose or boundary, then reports that networks are not addressed.
     """
     groups = {}
@@ -355,7 +355,7 @@ def main():
                         help="judge EVERY chunk against every obligation "
                              "instead of retrieving. Removes the absence "
                              "judgement; costs chunks x obligations calls "
-                             "(arch-v5: ~19,800, about an hour at 16-way)")
+                             "(deliverable-v1: ~19,800, about an hour at 16-way)")
     parser.add_argument("--concurrency", type=int, default=8)
     parser.add_argument("--limit", type=int, default=0)
     parser.add_argument("--unmet-only", action="store_true")
@@ -603,7 +603,7 @@ def main():
         #
         # "contested" means the vocabulary IS present, and it means almost
         # NOTHING. On this corpus the topic is nearly always discussed while the
-        # required artefact is still missing: the Content Inject finding is
+        # required artefact is still missing: the Sensor Fabric finding is
         # contested because "inject" appears 58 times, which is precisely the
         # finding — injects are scheduled, the interface is not specified. Do not
         # use contested to deprioritise; it demotes true positives.

@@ -274,7 +274,7 @@ failure is judgement on long documents, which is what §3.18 measured.
 **A deterministic absence gate demotes true positives.** Sweeping the
 obligation's vocabulary across the whole document before letting "unmet" stand
 looked like the §1 thesis applied to the tool's own output. It fires on 32 of 36
-verdicts, including the true ones: the Content Inject finding is "contested"
+verdicts, including the true ones: the Sensor Fabric finding is "contested"
 because *inject* appears 58 times — which IS the finding, since injects are
 scheduled and the interface is not specified.
 
@@ -390,7 +390,7 @@ component ("this section", "release authority", "the system") — resolves 488 o
 sampling, no model calls, every one auditable.
 
 Longest alias wins, so "platform adapter" does not resolve to "platform" and
-"agent runtime" does not resolve to "context".
+"runtime orchestrator" does not resolve to "context".
 
 The general rule: before comparing entities, agree what the entities ARE. A
 document's own component table is that vocabulary, and it is usually sitting in

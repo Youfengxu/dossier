@@ -272,7 +272,7 @@ def load_components(path):
 
 def to_component(owner, comps, excluded):
     """Longest alias wins, so "platform adapter" does not resolve to "platform"
-    by accident and "agent runtime" does not resolve to "context"."""
+    by accident and "runtime orchestrator" does not resolve to "context"."""
     text = re.sub(r"\s+", " ", (owner or "")).strip().lower()
     if not text or text in excluded:
         return None

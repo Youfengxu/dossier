@@ -6,8 +6,8 @@ and a column where the reviewer says which one they believe. What goes back to
 the client is one sentence per comment, in a voice that does not announce it was
 machine-written.
 
-    ./inputs-column.py --xlsx D2-edited.xlsx --sheet "D2 - Architecture" \
-        --out D2-cleaned.xlsx --by Paul
+    ./inputs-column.py --xlsx D2-edited.xlsx --sheet "Comments" \
+        --out cleaned.xlsx --by "A. Reviewer"
 
 Selection follows the reviewer's column: named model wins, "addressed" means
 they judged it addressed themselves, blank means the default model. A verdict of
@@ -83,7 +83,8 @@ def main():
     parser.add_argument("--pick-col", default="R")
     parser.add_argument("--target-col", default="K")
     parser.add_argument("--by-col", default="L")
-    parser.add_argument("--by", default="REDACTED-45")
+    parser.add_argument("--by", default="",
+                        help="name to write into the reviewer column")
     parser.add_argument("--default-model", default="coder",
                         help="which model an empty pick means")
     parser.add_argument("--model")

@@ -8,27 +8,27 @@
       "source_sha256": "eeb80509b19752b54a7488bb2c81217d0e85ec5bcecfa24230a0dc8b861926ce",
       "source_bytes": 5934,
       "text_sha256": "eeb80509b19752b54a7488bb2c81217d0e85ec5bcecfa24230a0dc8b861926ce",
-      "text_lines": 172,
+      "text_lines": 171,
       "parsed": "parsed/requirements.txt"
     },
     {
       "slug": "deliverable-v1",
       "role": "anchor",
       "path": "deliverable-v1.md",
-      "source_sha256": "8bed3b77e056d69b86c0a1b59c3d8f2d22d3338cda610d7d81ff1b5daf519f26",
-      "source_bytes": 19981,
-      "text_sha256": "8bed3b77e056d69b86c0a1b59c3d8f2d22d3338cda610d7d81ff1b5daf519f26",
-      "text_lines": 575,
+      "source_sha256": "9ff2227d87204055899e59a656931c301984d773ccf1a76a65c447846207f122",
+      "source_bytes": 19960,
+      "text_sha256": "9ff2227d87204055899e59a656931c301984d773ccf1a76a65c447846207f122",
+      "text_lines": 574,
       "parsed": "parsed/deliverable-v1.txt"
     },
     {
       "slug": "deliverable-v2",
       "role": "draft",
       "path": "deliverable-v2.md",
-      "source_sha256": "77da964098c294be1b05d7f433939251e1d601da4eb7dddce694d898719d16c9",
-      "source_bytes": 18100,
-      "text_sha256": "77da964098c294be1b05d7f433939251e1d601da4eb7dddce694d898719d16c9",
-      "text_lines": 533,
+      "source_sha256": "88c632f68d460c9416bf7b629d1e54419fc574d83f66a0776fa8bc1c4160a2b0",
+      "source_bytes": 18079,
+      "text_sha256": "88c632f68d460c9416bf7b629d1e54419fc574d83f66a0776fa8bc1c4160a2b0",
+      "text_lines": 532,
       "parsed": "parsed/deliverable-v2.txt"
     }
   ]

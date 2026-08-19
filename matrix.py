@@ -10,8 +10,8 @@ can be sent.
 This reads the matrix, derives distinctive `terms` for each row, and writes a
 register-map.yaml keyed on the matrix's own IDs.
 
-    ./matrix.py --project . --xlsx ~/Downloads/matrix.xlsx --sheet "D2 - Architecture" \
-        --doc arch-v5 --model Qwen3-Coder-Next-UD-Q4_K_M --url http://gx10:8085/v1/chat/completions
+    ./matrix.py --project . --xlsx ~/Downloads/matrix.xlsx --sheet "Comments" \
+        --doc deliverable-v1 --model Qwen3-Coder-Next-UD-Q4_K_M --url http://gx10:8085/v1/chat/completions
 
 THE MODEL PROPOSES, THE CORPUS DISPOSES. Terms decide whether a finding can be
 tracked across revisions at all, and a term chosen badly fails silently: too
@@ -223,7 +223,7 @@ def main():
         except LLMError as error:
             # Still emit the row. A row dropped on a transport error would leave
             # a map that looks complete and silently never asks about that
-            # finding — the same failure that hid two findings in the ODIN
+            # finding — the same failure that hid two findings in a live
             # register for weeks. An empty term list is visibly unfinished.
             print(f"  {rid}: CALL FAILED — {str(error)[:80]}")
             failed.append(rid)

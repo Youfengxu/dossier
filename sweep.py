@@ -9,9 +9,9 @@ neither of which needs inference:
   vocab  D9 — vocabulary gaps. Purpose-bearing terms from the requirements side
               that are absent, or nearly absent, from the deliverable.
 
-    ./sweep.py xref  --project ~/reviews/some-engagement --doc arch-v5
-    ./sweep.py vocab --project ~/reviews/some-engagement --doc arch-v5
-    ./sweep.py xref  --project . --doc arch-v6 --compare arch-v5
+    ./sweep.py xref  --project ~/reviews/some-engagement --doc deliverable-v1
+    ./sweep.py vocab --project ~/reviews/some-engagement --doc deliverable-v1
+    ./sweep.py xref  --project . --doc deliverable-v2 --compare deliverable-v1
 
 Both read parsed/MANIFEST.json and refuse to run on an unfrozen corpus, because
 a locator into text that can still move is not a locator.
@@ -255,7 +255,7 @@ QUANTITY = re.compile(
     r"([A-Za-z\u03b1-\u03c9][A-Za-z0-9_\u03b1-\u03c9]{0,14})\b")
 SYMBOLIC = re.compile(r"\b([\u03b1-\u03c9][A-Za-z0-9_]{0,12})\b")
 # Underscore notation is how technical documents actually write symbols once
-# the greek is stripped by extraction. arch-v5 carries exactly one greek
+# the greek is stripped by extraction. deliverable-v1 carries exactly one greek
 # character in 690k and thirty-one uses of p_like; the fixture's theta_surge is
 # the same shape with a greek head. Without this the sweep sees nothing on the
 # document it was built for.
@@ -338,16 +338,16 @@ def cmd_quantity(args, project):
 # SUPERSEDED BY undefined.py. Kept because the negative result is worth having,
 # not because this should be run: frequency over n-grams gave 3,370 candidates
 # on a real architecture, three tightenings reached 593, and it can never see
-# "REDACTED-08" — 77 uses, no definition — because one word is not an n-gram.
+# a one-word coinage — 77 uses, no definition — since one word is not an n-gram.
 # The model-screened version reaches 18 of 26 register findings. Use that.
 #
 # Undefined term — the largest class hiding inside "framing".
 #
 # 15 of the 26 framing findings on a live review are one shape: a term the
-# document leans on and never defines. "REDACTED-08" appears 73 times with no
-# definition, "REDACTED-10" 19 times, "REDACTED-09" 5. None of
-# those need knowledge from outside the document, which is what "framing" was
-# supposed to mean — they were filed there because nothing detected them.
+# document leans on and never defines. One appeared 73 times with no definition,
+# another 19 times, a third 5. None of them needed knowledge from outside the
+# document, which is what "framing" was supposed to mean — they were filed there
+# because nothing detected them.
 #
 # Deliberately frequency-first. A term used once and left undefined is a
 # reviewer's judgement call; a term used seventy-three times and never defined
@@ -398,7 +398,7 @@ def cmd_term(args, project):
 
     # An architecture document defines its components STRUCTURALLY — "Narrative
     # Lifecycle" is defined by section 10 existing, not by a sentence saying
-    # "Narrative Lifecycle is ...". Without this the output is dominated by the
+    # "Calibration Pipeline is ...". Without this the output is dominated by the
     # document's own component names, which are the best-defined things in it.
     headings = " ".join(l.lower() for l in lines
                         if l.strip().startswith("#")

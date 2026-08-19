@@ -33,9 +33,9 @@ B4-style findings ("this component is never named") it is the answer, and for a
 mistyped term it is a bug. Only the register knows which, so only the register
 gets to say.
 
-    ./closure.py --project . --from arch-v5 --to arch-v6
-    ./closure.py --project . --from arch-v5 --to arch-v7 --show-unchanged
-    ./closure.py --project . --from arch-v5 --to arch-v7 --class compliance
+    ./closure.py --project . --from deliverable-v1 --to deliverable-v2
+    ./closure.py --project . --from deliverable-v1 --to deliverable-v2 --show-unchanged
+    ./closure.py --project . --from deliverable-v1 --to deliverable-v2 --class compliance
 
 WHAT THIS DOES NOT DO. A CHANGED verdict says the text moved, not that the
 finding is closed; a fix and a cosmetic reword look identical here. Only
@@ -89,7 +89,7 @@ def expand(terms, lexicon):
     The lexicon is keyed by single words but terms are usually phrases, so
     substitute variants WORD BY WORD inside the phrase as well as looking the
     whole term up. Looking up only the whole term silently reintroduces the bug
-    the lexicon exists to fix: "community behaviour" is not a lexicon key, so it
+    the lexicon exists to fix: "hydrology model" is not a lexicon key, so it
     would never reach "community behavior" and would report absent against a
     document that uses the US spelling throughout.
     """

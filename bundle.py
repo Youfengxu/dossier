@@ -6,10 +6,10 @@ candidates CSV from cluster-findings.py, a terms JSON from undefined.py. Each is
 shaped for the tool that wrote it. A reviewer wants one list, ordered by what
 deserves attention first, with somewhere to write a reply.
 
-    ./bundle.py --project . --doc arch-v7 \
-        --coverage cov-arch-v7.csv --undefined undefined-arch7.json \
-        --out-xlsx v7-eval/out/v7-findings.xlsx \
-        --out-md   v7-eval/out/v7-findings.md
+    ./bundle.py --project . --doc deliverable-v2 \
+        --coverage cov-deliverable-v2.csv --undefined undefined-arch7.json \
+        --out-xlsx out/v7-findings.xlsx \
+        --out-md   out/v7-findings.md
 
 Two outputs from one pass so they cannot disagree. The xlsx carries an empty
 Comments column; the markdown carries a blank line under each finding. Both are

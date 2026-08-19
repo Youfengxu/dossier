@@ -23,8 +23,8 @@ distinctive match terms:
     findings:
       - id: B7
         class: compliance
-        title: Content Inject interface is not specified
-        terms: ["content inject"]
+        title: Sensor Fabric interface is not specified
+        terms: ["sensor fabric"]
 
 Classes are free text; they are grouped and reported as given. Matching is
 deliberately crude and fully auditable: a register finding counts as surfaced
@@ -92,7 +92,7 @@ def main():
 
     # A finding's own wording is far better matching material than a summary I
     # wrote. B7's register entry names "content payload, asset agent or
-    # receiving target"; my summary said "Content Inject interface is not
+    # receiving target"; my summary said "Sensor Fabric interface is not
     # specified", which shares no vocabulary with the obligations that found it.
     if args.register:
         body = open(os.path.join(project, args.register),
@@ -147,7 +147,7 @@ def main():
         by_class[cls]["total"] += 1
         # MANY-TO-ONE. Several obligations converging on one gap is the
         # strongest signal the pipeline produces — three separate obligations
-        # landing on a missing Content Inject interface is corroboration, not
+        # landing on a missing Sensor Fabric interface is corroboration, not
         # duplication. A one-best-row matcher reports the extras as unmatched
         # noise, which inverts the meaning.
         hits = []

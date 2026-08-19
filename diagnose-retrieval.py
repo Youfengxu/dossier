@@ -9,8 +9,8 @@ far more likely — and this makes it visible.
 For each obligation it reports which named sections the retriever returned, and
 flags the ones that reached no substantive section at all.
 
-    ./diagnose-retrieval.py --project <dir> --doc arch-v5 --obligations obligations.yaml
-    ./diagnose-retrieval.py --project <dir> --doc arch-v5 --coverage cov.csv --unmet-only
+    ./diagnose-retrieval.py --project <dir> --doc deliverable-v1 --obligations obligations.yaml
+    ./diagnose-retrieval.py --project <dir> --doc deliverable-v1 --coverage cov.csv --unmet-only
 
 With --coverage it restricts to flagged rows, which is usually what you want:
 the question is not "does retrieval work" but "did retrieval work for the

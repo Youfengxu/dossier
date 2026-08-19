@@ -6,8 +6,8 @@ it by hand is the last manual step in the loop: the evidence already exists as
 line numbers in a frozen document, and copying 85 of them across is exactly the
 kind of transcription that introduces errors nobody catches.
 
-    ./writeback.py --project . --from arch-v5 --to arch-v7 \
-        --xlsx source/adjudication-matrix.xlsx --sheet "D2 - Architecture"
+    ./writeback.py --project . --from deliverable-v1 --to deliverable-v2 \
+        --xlsx source/feedback-matrix.xlsx --sheet "Comments"
 
 Writes a NEW workbook — `<name>-annotated.xlsx` — and a CSV of the same content
 for anyone who would rather paste two columns than open a second file.
@@ -152,10 +152,10 @@ def main():
     parser.add_argument("--from", dest="old", required=True)
     parser.add_argument("--to", dest="new", required=True)
     parser.add_argument("--xlsx", required=True)
-    parser.add_argument("--sheet", default="D2 - Architecture")
+    parser.add_argument("--sheet", default="Comments")
     parser.add_argument("--col", default="I",
                         help="column to fill (default I, 'How/where comment "
-                             "adjudicated'). Use K for the DSTA/DIS inputs "
+                             "adjudicated'). Use K for the client inputs "
                              "column instead.")
     parser.add_argument("--id-col", default="A")
     parser.add_argument("--map", default="register-map.yaml")

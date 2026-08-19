@@ -17,8 +17,8 @@ section needs — the ones that need none first:
     4  Apparently addressed   ADDED, for absence findings.
     5  New candidate gaps     Coverage clusters that corroborate no open finding.
 
-    ./register.py --project . --from arch-v5 --to arch-v7 \
-        --coverage cov-arch-v7.csv --candidates candidates-arch-v7.csv
+    ./register.py --project . --from deliverable-v1 --to deliverable-v2 \
+        --coverage cov-deliverable-v2.csv --candidates candidates-deliverable-v2.csv
 
 WHERE THE JUDGEMENT STILL LIVES. Section 3 is a reading list, not a verdict: a
 real fix and a cosmetic reword are identical to every check here. Section 5 is
@@ -84,7 +84,7 @@ SECTIONS = [
 def converge(coverage, synthesis, findings_map, lexicon):
     """Rank candidates by how many independent methods reached them.
 
-    Measured on arch-v5 against a 90-finding human register: coverage tracing
+    Measured on deliverable-v1 against a 90-finding human register: coverage tracing
     reaches 29, inventory synthesis reaches 27, and their UNION reaches 40 —
     because they share no machinery. Sixteen findings are reached by both.
 
@@ -169,7 +169,7 @@ def main():
     parser.add_argument("--lexicon", default="lexicon.yaml")
     parser.add_argument("--matrix",
                         help="adjudication matrix .xlsx; adds the claim check")
-    parser.add_argument("--sheet", default="D2 - Architecture")
+    parser.add_argument("--sheet", default="Comments")
     parser.add_argument("--status-col", default="H")
     parser.add_argument("--adjudicated-col", default="I")
     parser.add_argument("--out", help="default review-<new>.md")

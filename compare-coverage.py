@@ -7,7 +7,7 @@ retry path all move, and a failed call degrades one obligation's verdict
 without degrading the run. The only way to know how much of a verdict is the
 document and how much is the weather is to run it twice and look.
 
-    ./compare-coverage.py --a cov-arch-v7.runB.csv --b cov-arch-v7.runC.csv
+    ./compare-coverage.py --a cov-deliverable-v2.runB.csv --b cov-deliverable-v2.runC.csv
 
 Reports agreement, then every obligation that moved, worst direction first. A
 met->unmet flip is a finding appearing out of nowhere; unmet->met is one

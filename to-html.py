@@ -6,7 +6,7 @@ The round trip through one of them truncated a 1054-character cell to a single
 character — silently, and in the one cell that mattered. A browser cannot do
 that: there is no write path.
 
-    ./to-html.py --xlsx D2-inputs-column.xlsx --sheet "D2 - Architecture" \
+    ./to-html.py --xlsx D2-inputs-column.xlsx --sheet "Comments" \
                  --cols A,C,D,K,L --out D2-inputs-column.html
 
 Long cells are the point, so nothing is truncated and nothing is ellipsised;

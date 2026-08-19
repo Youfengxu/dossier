@@ -20,8 +20,8 @@ Three stages, and the middle one is the whole design:
   3  ADJUDICATE  each candidate pair gets one independent call asking whether
                both can hold, with both quotes verified verbatim first.
 
-    ./claim.py --project . --doc arch-v5 --out claims-v5.json
-    ./claim.py --project . --doc arch-v5 --report          # from a saved index
+    ./claim.py --project . --doc deliverable-v1 --out claims-v5.json
+    ./claim.py --project . --doc deliverable-v1 --report          # from a saved index
 
 WHY GROUPING IS THE HARD PART. If subjects do not normalise, claims about the
 same thing never meet and the tool finds nothing while appearing to work — the
@@ -68,11 +68,11 @@ only these four kinds:
 
 SUBJECT is the thing the claim is asserting ABOUT — usually the actor. A short
 noun phrase in the document's own words. Use the most specific named thing
-available: "REDACTED-14", not "the system".
+available: "Alerting Service", not "the system".
 
 OBJECT is the capability, artefact, quantity or decision the claim concerns —
 what the subject acts on, owns, constrains or is assigned. "" if the claim has
-no object ("the Decision Engine is stateless").
+no object ("the Alerting Service is stateless").
 
 The object matters as much as the subject and is easy to leave out. Two
 statements that conflict often have DIFFERENT subjects and the SAME object:

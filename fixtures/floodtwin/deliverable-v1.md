@@ -1,4 +1,4 @@
-# Flood Response Digital Twin — Logical Architecture and Technical Solutioning
+# Flood Response Digital Twin — System Design Description
 
 **Tidewater Systems Pte Ltd** · Prepared for Meridian Metropolitan Water Authority
 Document version 1.4 · Response to RFO MMWA-2029-DT-114

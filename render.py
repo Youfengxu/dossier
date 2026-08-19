@@ -7,7 +7,7 @@ truncates, and a reviewer working through a hundred rows needs to move down a
 page, not across one. So: no tables, one section per row, the two judgements as
 sentences, and the rows that need a human first.
 
-    ./render.py --xlsx out/D2-dual-judge.xlsx --sheet "D2 - Architecture" \
+    ./render.py --xlsx out/D2-dual-judge.xlsx --sheet "Comments" \
                 --title "D2 Architecture" --out out/D2-dual-judge.md
 
 Ordering is deliberate. Contradictions lead, then near-misses, then agreement,

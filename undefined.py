@@ -3,18 +3,18 @@
 
 The largest class hiding inside "framing". On a live review, 15 of 26 findings
 filed as framing — the class DESIGN 5.5 calls permanently human — were one
-shape: a term used repeatedly and defined nowhere. "REDACTED-08" appears 77
-times with no definition, "REDACTED-10" 19, "REDACTED-09" 5.
-None of those need knowledge from outside the document. They were filed under
-framing because nothing detected them.
+shape: a term used repeatedly and defined nowhere. On that review one term
+appeared 77 times with no definition, a second 19 times, a third 5. None of them
+needed knowledge from outside the document, which is what "framing" was supposed
+to mean — they were filed there because nothing detected them.
 
-    ./undefined.py --project . --doc arch-v5 --model gpt-oss-120b --url ...
-    ./undefined.py --project . --doc arch-v5 --score      # against the register
+    ./undefined.py --project . --doc deliverable-v1 --model gpt-oss-120b --url ...
+    ./undefined.py --project . --doc deliverable-v1 --score      # against the register
 
 WHY NOT A DETERMINISTIC SWEEP. That was tried first and abandoned, and the
 record is worth more than the code: n-gram frequency over the document gave
 3,370 candidates, and tightening it three times reached 593 — still noise, and
-still structurally unable to see "REDACTED-08", because a single word is not an
+still structurally unable to see a one-word coinage, because a single word is not an
 n-gram. Frequency cannot tell jargon from prose. A model can.
 
 So the shape is matrix.py's, which has worked repeatedly here: THE MODEL
@@ -50,8 +50,8 @@ A term qualifies when a competent reader of this document — an engineer who
 knows the domain but not this project — would have to guess what it means.
 Include:
   - project coinages and named concepts used as though already agreed
-    ("REDACTED-09", "REDACTED-11", "REDACTED-10")
-  - status or state words carrying specific weight ("REDACTED-08", "remain open")
+    ("frozen execution order", "escalation contracts", "calibration baselines")
+  - status or state words carrying specific weight ("provisional", "remain open")
   - compound nouns naming a mechanism, boundary or artefact
 
 Do NOT include:
@@ -94,8 +94,8 @@ DEFINITION_LIST = r"^\s*{}\s*[:\u2014]"          # term at line start, then : or
 
 def _loose(text):
     """Hyphens and case are not meaning. The document writes a component as
-    "REDACTED-17" in its heading and "platform-model" in prose, and matching
-    literally left 181 uses of platform-model at the top of the output as
+    "Platform Adapter" in its heading and "platform-adapter" in prose, and matching
+    literally left 181 uses of platform-adapter at the top of the output as
     undefined — when section 9 defines it."""
     return re.sub(r"[^a-z0-9]+", " ", text.lower()).strip()
 

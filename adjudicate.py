@@ -17,8 +17,8 @@ So, per row:
      rather than the 83% seen over long inputs
   4. inconclusive -> escalate to the whole section in the new revision
 
-    ./adjudicate.py --project . --xlsx matrix.xlsx --sheet "D2 - Architecture" \
-        --from arch-v5 --to arch-v7 --out v7-eval/out/adjudicated.xlsx
+    ./adjudicate.py --project . --xlsx matrix.xlsx --sheet "Comments" \
+        --from deliverable-v1 --to deliverable-v2 --out out/adjudicated.xlsx
 
 Writes a COPY of the matrix with two new columns. Never the original: it is
 jointly agreed with the vendor, and a tool that edits it in place can destroy

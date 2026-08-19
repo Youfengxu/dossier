@@ -26,7 +26,7 @@ flag, because an immaterial finding is still true and a material one can still b
 wrong. Nothing is deleted — refuted rows stay in the
 output with the refutation attached, because a refutation is itself information.
 
-    ./verify.py --project . --doc arch-v5 --coverage coverage-architecture.csv
+    ./verify.py --project . --doc deliverable-v1 --coverage coverage-architecture.csv
 
 This is what local hardware buys that a metered API does not: three extra calls
 per candidate is unremarkable at 0.5s each and unaffordable at frontier prices.

@@ -7,7 +7,7 @@ attention first are not the confident ones — they are the ones where a second
 model, run independently on the same evidence, reached a different answer.
 
     ./agree.py --a out/D2-adjudicated-v7.xlsx --b out/D2-adjudicated-v7-glimmer.xlsx \
-               --sheet "D2 - Architecture" --out out/D2-dual-judge.xlsx
+               --sheet "Comments" --out out/D2-dual-judge.xlsx
 
 Column M/N keep judge A's verdict and rationale (the file's existing layout).
 O/P take judge B's. Q is the flag a reviewer sorts on:

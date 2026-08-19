@@ -21,7 +21,7 @@ section is independent. Whether it helps depends on the server: llama.cpp with
 --parallel 1 will queue, vLLM will not.
 
     ./inventory.py --project . --doc deliverable-v1 --concurrency 8
-    ./inventory.py --project . --doc arch-v5 --out inventory-arch.json
+    ./inventory.py --project . --doc deliverable-v1 --out inventory-arch.json
 
 Writes inventory.json. Feed it to synthesize.py.
 """

@@ -4,7 +4,7 @@
 No python-docx / python-pptx / openpyxl required — none were installable on the
 review machine. Handles typical vendor deliverables well enough for grep and reading.
 
-    python3 extract.py "Logical Architecture and Technical Solutioning v5.docx" > v5.txt
+    python3 extract.py "System Design Description v2.docx" > v2.txt
     python3 extract.py *.pptx
 
 Tables come out as sequential paragraph text (cell structure is lost but content

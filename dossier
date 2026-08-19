@@ -148,7 +148,7 @@ def cmd_sweep(args):
 
 
 def candidates_for(coverage):
-    """cov-arch-v7.csv -> candidates-arch-v7.csv
+    """cov-deliverable-v2.csv -> candidates-deliverable-v2.csv
 
     cluster-findings.py defaults to writing candidates.csv, so two coverage runs
     in one project silently overwrite each other's ranked output — including a
@@ -192,7 +192,7 @@ def cmd_report(args):
     # The adjudication matrix, if the project keeps one where freeze.py puts
     # sources. Its presence changes what the report leads with: not "what did
     # they change" but "what did they claim, and does the document support it".
-    matrix = args.matrix or "source/adjudication-matrix.xlsx"
+    matrix = args.matrix or "source/feedback-matrix.xlsx"
     if os.path.exists(os.path.join(project, matrix)):
         extra += ["--matrix", matrix]
         if args.sheet:
@@ -311,8 +311,8 @@ def main():
     p = sub.add_parser("writeback"); p.add_argument("project")
     p.add_argument("--from", dest="old", required=True)
     p.add_argument("--to", dest="new", required=True)
-    p.add_argument("--xlsx", default="source/adjudication-matrix.xlsx")
-    p.add_argument("--sheet", default="D2 - Architecture")
+    p.add_argument("--xlsx", default="source/feedback-matrix.xlsx")
+    p.add_argument("--sheet", default="Comments")
     p.add_argument("--col", default="I"); p.add_argument("--out")
     p.add_argument("--overwrite", action="store_true")
     p.set_defaults(fn=lambda a: run(
