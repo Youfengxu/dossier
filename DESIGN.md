@@ -326,6 +326,34 @@ evidence claims, 20 authority assertions, 8 deferrals, 24 produces / 31 consumes
 **Every one of the six planted D3/D5/D6/D8 defects has its evidence in the
 inventory.** The extraction stage is not the hard part.
 
+> **§3.22–§3.31 were re-measured on 2026-08-19 and the numbers below are the old
+> ones.** Every "N of 6" in this range was produced by a scorer that has since
+> been deleted: it joined every reported finding into one string and counted a
+> planted defect as found when 30% of its title's words appeared anywhere in
+> that string. There was no attribution to a finding and no precision term, and
+> it got easier to satisfy the more candidates the tool emitted — a bag of the
+> deliverable's own nouns, representing no findings at all, scored 6 of 6.
+>
+> Re-run with evidence-anchored, one-to-one matching, three extraction passes,
+> and `Qwen3-Coder-Next`:
+>
+> | | old scorer | corrected |
+> |---|---|---|
+> | recall | 6 of 6 | **4 of 6** |
+> | precision | not measured | **4 of 40 candidates** |
+>
+> The two misses are real — no candidate mentions the frozen-schedule dual
+> ownership (D5) or the unconsumed calibration vector (D8) at all. The precision
+> figure is newly visible: the pipeline emits forty candidates to reach four
+> defects, which is the number a reviewer actually pays for and which the old
+> scorer structurally could not report.
+>
+> One confound, stated rather than buried: this re-run used a different model
+> from the original measurements, so the drop is not attributable to the scorer
+> alone. Each decision below therefore needs re-deriving before it is quoted;
+> what follows is kept as the record of what was believed and why, not as a
+> current result.
+
 ### 3.22 The orchestrator should be code — until the candidate set is small
 
 Ninety section summaries is ~28k tokens, exactly the long-context regime where
@@ -507,7 +535,8 @@ resulting graph finds it, deterministically, and names the loop in the finding.
 useless because recall stayed at 5/6 across 1, 2 and 3 passes. It was not
 useless: at one pass only two legs of the cycle were captured, at three all
 three were — and the broken detector was masking the difference. With cycle
-detection the fixture goes to **6/6 at three passes and 4/6 at one**.
+detection the fixture goes to **6/6 at three passes and 4/6 at one**
+(old scorer; 4/6 at three passes when re-measured — see the note at §3.22).
 
 A negative result measured through a broken instrument is not a negative result.
 Both were wrong together, and only fixing the detector made the extraction

@@ -23,6 +23,7 @@ asserts it; this queries an inventory built by reading 100% of the document.
 """
 
 import argparse
+import difflib
 import json
 import os
 import re
@@ -285,6 +286,12 @@ def to_component(owner, comps, excluded):
     return best
 
 
+# Fraction of a ground-truth anchor that one finding must contain contiguously.
+# 0.6 accepts reformatting and truncation; it rejects word bags, which share
+# vocabulary but no phrasing.
+ANCHOR_COVERAGE = 0.6
+
+
 def _flat(text):
     """Lowercase, punctuation and line breaks collapsed to single spaces.
 
@@ -323,15 +330,24 @@ def reached(defect, kind, label, members):
 
     anchor = _flat(defect.get("anchor") or "")
     if anchor:
-        # A prefix, because the answer key truncates anchors and the tool
-        # truncates quotes; both keep the opening.
-        needle = " ".join(anchor.split()[:6])
-        if needle:
-            haystacks = [_flat(label)]
-            for member in members:
-                haystacks += [_flat(member.get(f, "")) for f in
-                              ("quote", "claim", "name", "capability", "label")]
-            if any(needle in h for h in haystacks if h):
+        # Longest CONTIGUOUS run shared with one finding's own text, as a
+        # fraction of the anchor. Contiguity is what keeps this honest: a bag of
+        # the document's words contains every word of the anchor and almost none
+        # of its phrasing, so it scores near zero, while a real finding that
+        # reformats the sentence — "assessed -> Section 9" for "assessed in
+        # Section 9" — still shares most of it. A plain prefix test was tried
+        # first and under-counted, missing two defects the pipeline had in fact
+        # reported, because the finding label truncates and rewrites the middle.
+        haystacks = [_flat(label)]
+        for member in members:
+            haystacks += [_flat(member.get(f, "")) for f in
+                          ("quote", "claim", "name", "capability", "label")]
+        for hay in haystacks:
+            if not hay:
+                continue
+            match = difflib.SequenceMatcher(None, anchor, hay).find_longest_match(
+                0, len(anchor), 0, len(hay))
+            if match.size >= ANCHOR_COVERAGE * len(anchor):
                 return True
     return False
 

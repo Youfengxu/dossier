@@ -62,6 +62,7 @@ Everything below is reproducible from artefacts in this repository.
 | Run-to-run churn, temperature 0 | **10 of 58 verdicts moved**, leaning lenient |
 | Absence-verdict precision vs length | 97.0% at 12k chars → **83.3% at 52k** |
 | Verification pass | 25 candidates → 19 kept, 5 killed; precision 0.76 → 0.79 |
+| Discovery, re-measured | **4 of 6** planted defects reached, at **4 of 40** candidates |
 
 And the negative results, which are kept in the repository rather than deleted:
 
