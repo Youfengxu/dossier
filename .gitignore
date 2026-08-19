@@ -19,3 +19,7 @@ inventory*.json
 # the one that gets published, so anything naming the engagement lives here and
 # never leaves.
 .private/
+
+# Compiled bytecode. Committed by an early "git add ." and caught later.
+__pycache__/
+*.pyc
