@@ -47,9 +47,14 @@ variable:
 
 | | 8k chars | 52k chars |
 |---|---|---|
-| precision of "unmet" | 97.0% | **83.3%** |
-| recall on absent | 97.0% | **100.0%** |
-| span fidelity | 100% | 100% |
+| precision of "unmet" | 100.0% | **87.1%** |
+| recall on absent | 87.9% | 90.0% |
+| overall accuracy | 90.2% | **82.9%** |
+| quote tightness (mean Jaccard) | 0.62 | 0.77 |
+| always-unmet baseline, precision | — | 73.2% |
+
+*(Re-measured 2026-08-19 with `qwen3.6-35b-a3b`. The original run read 97.0% →
+83.3% on precision; a different model, the same direction.)*
 
 As the document grows the model becomes *more* willing to assert absence and
 *less* often right to. It reported that the passages contained no mention of a
@@ -66,10 +71,10 @@ judgement.
 Stated here because the numbers above are quoted elsewhere and should not be
 quoted without them.
 
-- **No majority-class baseline.** At 79% absent, a classifier that answers
-  "unmet" to everything scores 0.79 precision and 1.00 recall. The 83.3% above is
-  roughly four points over that floor, not 83 points over zero. Reported without
-  the baseline it reads far stronger than it is.
+- **The majority-class baseline is now reported.** 30 of the large contract's 41
+  clauses are absent, so answering "unmet" to everything scores 73.2% precision
+  and 100% recall. The re-measured 87.1% is about fourteen points over that
+  floor. Any absence result on this corpus should be read against it.
 - **The span metric now reports two numbers, and the old one meant less than it
   looked.** "Span fidelity 100%" was gold-token recall — it says the quote did
   not *miss* the annotated span, and says nothing about whether it quoted

@@ -280,13 +280,35 @@ document is 10,000 lines, five times the large contract here.
 Span fidelity held at 100% in both. When the model does find evidence it quotes
 the right text; the failure is entirely in claiming there is none.
 
-> **What that 100% actually measured.** Gold-token recall — the quoted text did
-> not *miss* the annotated span. It carried no precision term, so a quote that
-> merely contained the span scored the same as one that was the span, and
-> quoting the whole contract would have scored 1.0 against every clause in it.
-> `score-spans.py` now reports a mean Jaccard beside it. The conclusion above is
-> about absence and is unaffected; the span claim is weaker than it reads and
-> should be re-run before it is quoted again.
+> **Re-measured 2026-08-19, on a different model (`qwen3.6-35b-a3b`) and with a
+> corrected span metric.** The direction holds; the numbers move.
+>
+> | | 8k chars | 52k chars |
+> |---|---|---|
+> | precision of "unmet" | 100.0% | **87.1%** |
+> | recall on absent | 87.9% | 90.0% |
+> | overall accuracy | 90.2% | **82.9%** |
+> | quote tightness (mean Jaccard) | 0.62 | 0.77 |
+>
+> Precision of an absence claim still falls as the document grows — 100% to
+> 87.1%, against 97.0% to 83.3% originally — and the failures are the same shape:
+> on the 52k contract the tool asserted that the passages contained no Document
+> Name, no Minimum Commitment and no Most Favored Nation clause, about a contract
+> that has all three.
+>
+> **The majority-class baseline, which was missing.** 30 of 41 clauses are absent
+> in the large contract, so answering "unmet" to everything scores 73.2%
+> precision and 100% recall. 87.1% is about fourteen points over that floor, not
+> eighty-seven points over zero. The result is real and it is smaller than it
+> looks unqualified.
+>
+> **What the old 100% span fidelity meant.** Gold-token recall — the quote did
+> not *miss* the annotated span — with no precision term, so quoting the whole
+> contract would have scored 1.0 against every clause in it. Measured properly
+> the quotes are tight: 0.62 and 0.77 mean Jaccard, and higher on the *larger*
+> document. So the model quotes well when it finds evidence; the degradation is
+> entirely in claiming there is none, which is what §1 argues and what this
+> corpus was fetched to test.
 
 ### 3.19 Three things that did not work
 
