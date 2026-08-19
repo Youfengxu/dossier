@@ -370,8 +370,18 @@ class Embedder:
         out, pending, positions = [None] * len(texts), [], []
         for index, text in enumerate(texts):
             path = self._path(text)
+            cached = None
             if os.path.exists(path):
-                out[index] = json.load(open(path))
+                try:
+                    cached = json.load(open(path))
+                except (json.JSONDecodeError, OSError):
+                    # A half-written or double-written entry. Treat it as a
+                    # miss and overwrite rather than crashing a run that is
+                    # forty minutes in: the cache is derived data and the only
+                    # cost of a bad entry is recomputing it.
+                    cached = None
+            if cached is not None:
+                out[index] = cached
                 self.hits += 1
             else:
                 pending.append(text)
@@ -381,7 +391,17 @@ class Embedder:
             vectors = self._post(group)
             for text, vector, index in zip(group, vectors,
                                            positions[start:start + self.batch]):
-                json.dump(vector, open(self._path(text), "w"))
+                # Write-then-rename, because two runs sharing a project share
+                # this cache and the same text embeds to the same path. Writing
+                # in place let two processes interleave into one file, and the
+                # result was a JSON document with a second document appended —
+                # which then crashed every later run that read it. os.replace is
+                # atomic on the same filesystem.
+                final = self._path(text)
+                temporary = f"{final}.{os.getpid()}.tmp"
+                with open(temporary, "w") as handle:
+                    json.dump(vector, handle)
+                os.replace(temporary, final)
                 out[index] = vector
                 self.misses += 1
         return out
