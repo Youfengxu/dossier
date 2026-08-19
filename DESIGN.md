@@ -362,6 +362,47 @@ were flagged or whether the verdicts are right. Precision is unchanged. What
 changes is that the reviewer meets the real findings first, which is the cost
 that actually bites.
 
+### 3.20a The wider window is cheaper, not just better
+
+Judging a comment that names no section can be done two ways: retrieve the
+handful of changed sections nearest it, or show the model the entire diff. The
+assumption was that retrieval is the economical choice and the whole diff a
+luxury bought with context length. On one revision, measured, it is the other
+way round.
+
+`gpt-oss-120b` under vLLM, 55 unreferenced rows, same corpus, same prompts
+otherwise:
+
+| arm | prompt | first call | median | best |
+|---|---|---|---|---|
+| whole diff | ~27k tokens | 22s | **13s** | 7s |
+| retrieval | far smaller | — | **29s** | — |
+
+The whole diff is **2.2x faster per row while sending 2.7x more tokens**, because
+it is byte-identical across every row in the batch. Placed first in the prompt it
+is a shared prefix, so the server prefills it once — 22 seconds on the first row
+— and every row after that reads it back. Retrieval prompts are smaller and share
+nothing, so each one pays full prefill.
+
+This only works if the invariant part comes first. `adjudicate.py` orders the
+diff before the comment for exactly this reason.
+
+**It cannot be made to work in retrieval mode**, and a low cache-hit count there
+is not a tuning problem to chase: every row draws a different set of sections, so
+the only shared text is the system preamble, a couple of hundred tokens. That is
+the structure of the work, not a misconfiguration.
+
+The reason to care is that the two axes agree for once. The same eleven rows
+where the wider window changed the verdict included three the retriever could not
+see at all — changes that existed and were invisible to top-k. So the wider
+window is both more likely to be right and cheaper per row, whenever the diff
+fits the context. Prefer it, and raise `--whole-budget` before reaching for
+retrieval.
+
+The counterweight is §3.18: an absence verdict gets *less* reliable as the
+material grows. Wider retrieval is not free of that, and the four rows that moved
+from `addressed` to `not_addressed` under the whole diff are where it would show.
+
 ### 3.21 Read the document; do not sample it
 
 Coverage tracing is obligation-first: retrieve some passages per obligation and

@@ -449,9 +449,26 @@ def main():
         diff_text = "\n\n".join(pieces)[:budget]
         scope = ("every changed section" if vectors is None else
                  f"the {len(picked)} changed sections closest to this comment")
-        # Diff first, comment last: the diff is identical for every row in this
-        # batch, so a server with prefix caching prefills it once instead of
-        # once per row.
+        # Diff first, comment last, and it is worth more than it looks.
+        #
+        # In WHOLE mode the diff is byte-identical for every row in the batch, so
+        # it is a shared prefix and a server with prefix caching prefills it once
+        # rather than once per row. Measured on gpt-oss-120b under vLLM, 55 rows
+        # against a 27k-token diff: first call 22s, then a median of 13s and a
+        # best of 7s. The retrieval arm of the same run, whose prompts are far
+        # SMALLER but share no prefix, ran a median of 29s. Whole mode was 2.2x
+        # faster per row while sending 2.7x more tokens.
+        #
+        # In RETRIEVE mode the ordering buys nothing and cannot: each row gets a
+        # different set of retrieved sections, so there is no shared prefix
+        # beyond the system preamble — a couple of hundred tokens. Do not read a
+        # low cache-hit count there as a tuning problem; it is the structure of
+        # the work. The only thing that would make it cacheable is content shared
+        # across rows, and there is none.
+        #
+        # The practical consequence is that whole mode is preferable on both
+        # axes when the diff fits the window: it already caught three changes
+        # that top-k retrieval could not see, and it is cheaper per row.
         user = (f"WHAT CHANGED IN {args.new} (vs {args.old}) \u2014 {scope}\n"
                 f"{diff_text}\n\n"
                 f"COMMENT ({rid})\n{comment}\n\n"
