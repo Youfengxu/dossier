@@ -430,11 +430,28 @@ inventory.** The extraction stage is not the hard part.
 > improving both axes at once. That was previously asserted from a retrieval
 > argument with no discovery-pipeline evidence behind it.
 >
-> **The remaining sections are not re-derived.** §3.24 (entity vocabulary),
-> §3.26 (polarity), §3.28 (verb sense) and §3.30 (authority as rights) are baked
-> into the code with no flag to disable them, so testing each needs surgery
-> rather than a run. Their numbers below are old-scorer numbers and should not
-> be quoted until that work is done.
+> **Three of the remaining four are re-derived, 2026-08-19; §3.24 returns a
+> null on this fixture.** §3.24 (entity vocabulary), §3.26 (polarity), §3.28
+> (verb sense) and §3.30 (authority as rights) each now have a flag in
+> `synthesize.py` that restores the behaviour they replaced — `--no-normalise`, `--no-polarity`, `--object-identity`,
+> `--authority-as-dataflow` — and each of those sections carries what flipping
+> it costs. One inventory is shared by every arm (`inv-ablation.json`: three
+> passes, `qwen3.6-35b-a3b`, 74 sections, 40 authority assertions, 4 deferrals,
+> 79 produces / 76 consumes), because extraction is the noisy stage and
+> comparing across two extractions would measure the extraction.
+>
+> **That inventory is weaker than the one above and the two sets of numbers do
+> not compare.** Its baseline is **3 of 6 and 20 candidates**, against 4 of 6
+> and 40. It captured four deferrals where the other captured twelve, so the
+> planted D6 cycle has no legs to close and the D6 class is empty in every arm;
+> the D5 and D8 defects are missed in every arm as well. Everything the four
+> sections below can show is therefore a precision effect, measured on a run
+> that finds only the three D3 defects.
+>
+> Same confound as above, and it bites harder the more of these are re-run:
+> `qwen3.6-35b-a3b` is very probably not the model the original figures were
+> measured with, and §3.29 is the standing demonstration that this alone can
+> move an extraction count by a factor of four.
 
 ### 3.22 The orchestrator should be code — until the candidate set is small
 
@@ -506,6 +523,30 @@ The general rule: before comparing entities, agree what the entities ARE. A
 document's own component table is that vocabulary, and it is usually sitting in
 section 3.
 
+> **Not re-derivable here, 2026-08-19.** `--no-normalise` switches the component
+> resolution off, and against the fixture it changes nothing whatsoever:
+>
+> | | candidates | recall | precision |
+> |---|---|---|---|
+> | baseline | 20 | 3 of 6 | 15.0% |
+> | `--no-normalise` | 20 | 3 of 6 | 15.0% |
+>
+> Identical because the fixture ships no `components.yaml`, so the shipped
+> configuration **is already the ablation** — `load_components` finds no file,
+> returns nothing, and the owner key falls back to free text in both arms. Every
+> number in this section (788 assertions, 240 owner strings, nine components,
+> 10 candidates) comes from a real architecture that is not in this repository
+> and cannot be re-run from it. The flag is real and exercised; there is nothing
+> here for it to act on.
+>
+> The disease is present even though the treatment is not. The one extra false
+> positive that `--object-identity` exposes below is "execution scheduling"
+> asserted by "Runtime Orchestrator" in the fixture's Section 5.2 and by "RO" in
+> its Section 12 — one component under two names, manufacturing a conflict,
+> which is exactly what this section is about. Writing a component vocabulary
+> for the fixture would make this measurable; that is unbuilt work, not a
+> finding.
+
 ### 3.25 Reduce only when exhaustive is out of reach
 
 Clustering the pair space by similarity is the obvious way to make it tractable,
@@ -536,6 +577,39 @@ document turned out to be exclusions** — 44%. D5 candidates halved, 10 to 5.
 Exclusions are not waste. A capability that every component disclaims and none
 claims is a D6 ownership gap, stated outright.
 
+> **Reproduces in direction, not in magnitude, 2026-08-19.** `--no-polarity`
+> puts the disclaimers back in the ownership pool:
+>
+> | | authority pool | D5 candidates | recall | precision |
+> |---|---|---|---|---|
+> | baseline | 40 | 1 | 3 of 6 | 15.0% |
+> | `--no-polarity` | 45 | 2 | 3 of 6 | 14.3% |
+>
+> The extra candidate is this section's mechanism running in front of you: the
+> fixture's Section 6.2 says the Sensor Fabric does **not** decide sensor
+> reactivation, and without polarity that disclaimer becomes a claim and is set
+> against the Validation Authority. It is a false positive, and on the sentence
+> the fixture planted as decoy DC-004 — reactivation is exogenous by design, so
+> nobody deciding it is the correct reading. Exclusions are 5 of 45 assertions
+> here — 11%, against the 44% recorded above on a real architecture.
+>
+> **"D5 candidates halved, 10 to 5" does not reproduce.** That is a 50%
+> reduction; here polarity removes one candidate in 21. The sign is right and
+> the size belongs to a different document.
+>
+> **The other direction is a trap worth recording.** Against a second inventory
+> of the same fixture — twelve deferrals, a different model — `--no-polarity`
+> scores *better* on both axes: 5 of 6 and 11.9%, against 4 of 6 and 10.0%. It
+> is not a real gain. The D5 answer key is anchored on the sentence *"No
+> component may modify a frozen schedule"*, which is the disclaimer itself, so
+> re-admitting the exclusion produces a finding that quotes the anchor and the
+> scorer credits it — while the conflict that finding actually names is Runtime
+> Orchestrator against "any component", not Runtime Orchestrator against the
+> Alerting Service, which is the planted defect. An answer key anchored on the
+> one sentence a fix removes will always score the fix down. That is a fact
+> about the key, and it is why the recall column here should not be read as
+> evidence for polarity either way.
+
 ### 3.27 Single-pass extraction is lossy and varies between runs
 
 Two extractions of the same fixture, same model, temperature 0, differing only in
@@ -559,6 +633,39 @@ Runtime-owned state" are the design working as intended.
 A capability is a verb applied to an object by an owner. Recording only the
 object manufactures conflicts between components doing different things to the
 same artefact.
+
+> **Reproduces, on one candidate, 2026-08-19.** `--object-identity` collapses
+> the action grouping back to one bucket per object:
+>
+> | | D5 candidates | recall | precision |
+> |---|---|---|---|
+> | baseline | 1 | 3 of 6 | 15.0% |
+> | `--object-identity` | 2 | 3 of 6 | 14.3% |
+>
+> One extra false positive, and it is the shape this section predicts: "execution
+> scheduling", *authoritative for* it in the fixture's Section 5.2 and *freezes*
+> it in Section 12 — two verbs, one object, no dispute. The verb separates them
+> and the candidate disappears.
+>
+> Read the owners, though, and the same candidate is also §3.24's failure: the
+> two entries say "Runtime Orchestrator" and "RO", which is one component under
+> two names and could never have been a conflict. So the single candidate this
+> section is confirmed on is one a component vocabulary would have removed as
+> well. Two decisions, one piece of evidence between them.
+>
+> Recall does not move, which is the risk worth having checked: a second key can
+> split a genuine conflict across two buckets and lose it. It does not here.
+>
+> Stacking the flag on `--authority-as-dataflow`, the arm that supplies the
+> data-flow entries this fix was aimed at, leaves the **count** unchanged at ten
+> D5 candidates and the scores identical. It does not leave them label for label,
+> and an earlier draft of this paragraph said it did: uncapped, the "execution
+> scheduling" group carries 17 owners in the data-flow arm and 18 stacked, and
+> the labels differ — the data-flow arm suffixes each with its action, the
+> stacked arm does not. The claim that the competing owners already fall inside
+> one action sub-group is therefore wrong in at least one group. The verb earns
+> its keep on exactly one candidate here. A real effect, a sample of one, and a
+> mechanism that was asserted rather than checked.
 
 ### 3.29 Polarity generalises; the control said so
 
@@ -620,6 +727,39 @@ Verified in both directions on the fixture: the planted dual binding is still
 found, and a planted complementary handoff (DC-009, "Reporting produces the
 RunSummary" against "operations evaluates the RunSummary") is correctly ignored.
 No new threshold — the action grouping reuses the object grouping's.
+
+> **Reproduces, and it is the largest of the four, 2026-08-19.**
+> `--authority-as-dataflow` folds produces/consumes back into the ownership
+> pool, where a data-flow sentence sat before the split:
+>
+> | | authority pool | D5 candidates | recall | precision |
+> |---|---|---|---|---|
+> | baseline | 40 | 1 | 3 of 6 | 15.0% |
+> | `--authority-as-dataflow` | 188 | 10 | 3 of 6 | 10.3% |
+>
+> Nine extra candidates, not one of them a planted defect, and they are the
+> handoffs this section describes: the Platform Adapter, the Sensor Fabric and
+> the Calibration Pipeline "contesting" third-party telemetry integration; the
+> fixture's Section 21 data-store owner against its Section 17 Scenario Library
+> over stored scenario definitions. Recall is untouched, so on this fixture the
+> rights/data-flow split is precision for free — a third of the candidate list
+> removed at no cost.
+>
+> **"The planted dual binding is still found" does not hold on this run.** The
+> D5 defect is missed in every arm, baseline included, so this section's
+> both-directions verification survives only in the direction that says the
+> handoff is ignored. The other direction is untested here rather than refuted.
+>
+> **The flag is the weakest of the four and should not be quoted as a faithful
+> restoration.** The fix itself lives in the extraction prompt, held constant
+> across every arm on purpose, so the ablation rebuilds its effect downstream
+> instead. Two things differ from what the pre-fix extractor did. It read the
+> owner off the sentence, whereas produces/consumes are bare noun phrases whose
+> only available attribution is the component the section is about — 148 of 155
+> entries resolve one and the other seven are dropped rather than given a blank
+> owner. And the verbs collapse to "produces" and "consumes" where the extractor
+> would have recorded "returns", "evaluates", "publishes". The direction is
+> trustworthy; the nine is not a number the old pipeline would have printed.
 
 ### 3.31 A deferral needs its source, and more passes do help after all
 

@@ -1,0 +1,3480 @@
+{
+ "doc": "deliverable-v1",
+ "source_sha256": "9ff2227d87204055899e59a656931c301984d773ccf1a76a65c447846207f122",
+ "sections": [
+  {
+   "capabilities": [
+    {
+     "name": "System Design Description",
+     "quote": "System Design Description"
+    }
+   ],
+   "identifiers": [],
+   "deferred": [],
+   "evidence_claims": [],
+   "authority": [],
+   "defers_to": [],
+   "consumes": [],
+   "produces": [],
+   "heading": "Flood Response Digital Twin \u2014 System Design Description",
+   "locator": "deliverable-v1:1-9"
+  },
+  {
+   "capabilities": [
+    {
+     "name": "defines system boundaries",
+     "quote": "It defines system boundaries, ownership, data and control flow, proposed interfaces, validation structure, and the decisions needed to proceed."
+    },
+    {
+     "name": "defines ownership",
+     "quote": "It defines system boundaries, ownership, data and control flow, proposed interfaces, validation structure, and the decisions needed to proceed."
+    },
+    {
+     "name": "defines data and control flow",
+     "quote": "It defines system boundaries, ownership, data and control flow, proposed interfaces, validation structure, and the decisions needed to proceed."
+    },
+    {
+     "name": "defines proposed interfaces",
+     "quote": "It defines system boundaries, ownership, data and control flow, proposed interfaces, validation structure, and the decisions needed to proceed."
+    },
+    {
+     "name": "defines validation structure",
+     "quote": "It defines system boundaries, ownership, data and control flow, proposed interfaces, validation structure, and the decisions needed to proceed."
+    },
+    {
+     "name": "defines decisions needed to proceed",
+     "quote": "It defines system boundaries, ownership, data and control flow, proposed interfaces, validation structure, and the decisions needed to proceed."
+    },
+    {
+     "name": "defines system boundaries",
+     "quote": "defines system boundaries, ownership, data and control flow, proposed interfaces, validation structure, and the decisions needed to proceed"
+    },
+    {
+     "name": "defines ownership",
+     "quote": "defines system boundaries, ownership, data and control flow, proposed interfaces, validation structure, and the decisions needed to proceed"
+    },
+    {
+     "name": "defines data and control flow",
+     "quote": "defines system boundaries, ownership, data and control flow, proposed interfaces, validation structure, and the decisions needed to proceed"
+    },
+    {
+     "name": "defines proposed interfaces",
+     "quote": "defines system boundaries, ownership, data and control flow, proposed interfaces, validation structure, and the decisions needed to proceed"
+    },
+    {
+     "name": "defines validation structure",
+     "quote": "defines system boundaries, ownership, data and control flow, proposed interfaces, validation structure, and the decisions needed to proceed"
+    },
+    {
+     "name": "defines decisions needed to proceed",
+     "quote": "defines system boundaries, ownership, data and control flow, proposed interfaces, validation structure, and the decisions needed to proceed"
+    }
+   ],
+   "identifiers": [],
+   "deferred": [
+    {
+     "item": "Open items status definitions",
+     "id": "",
+     "owner": ""
+    }
+   ],
+   "evidence_claims": [
+    {
+     "claim": "Full status definitions for open items are provided elsewhere",
+     "points_to": "Section 14 and Appendix F"
+    },
+    {
+     "claim": "Full status definitions are located elsewhere",
+     "points_to": "Section 14 and Appendix F"
+    },
+    {
+     "claim": "Full status definitions are provided",
+     "points_to": "Section 14 and Appendix F"
+    }
+   ],
+   "authority": [],
+   "defers_to": [],
+   "consumes": [],
+   "produces": [],
+   "heading": "1. Document control",
+   "locator": "deliverable-v1:10-23"
+  },
+  {
+   "capabilities": [
+    {
+     "name": "models drainage and coastal defence network",
+     "quote": "The twin models the drainage and coastal defence network of the metropolitan area"
+    },
+    {
+     "name": "supports coastal overtopping scenario",
+     "quote": "supporting two operating scenarios: coastal overtopping of sea defences"
+    },
+    {
+     "name": "supports sustained precipitation scenario",
+     "quote": "and sustained precipitation rate in excess of drainage capacity"
+    },
+    {
+     "name": "drives downstream decision surface",
+     "quote": "Both scenarios drive the same downstream decision surface"
+    },
+    {
+     "name": "model drainage and coastal defence network",
+     "quote": "The twin models the drainage and coastal defence network of the metropolitan area"
+    },
+    {
+     "name": "support operating scenarios",
+     "quote": "supporting two operating scenarios: coastal overtopping of sea defences, and sustained precipitation rate in excess of drainage capacity"
+    },
+    {
+     "name": "drive downstream decision surface",
+     "quote": "Both scenarios drive the same downstream decision surface"
+    }
+   ],
+   "identifiers": [],
+   "deferred": [],
+   "evidence_claims": [],
+   "authority": [],
+   "defers_to": [],
+   "consumes": [],
+   "produces": [],
+   "heading": "2. Introduction",
+   "locator": "deliverable-v1:24-34"
+  },
+  {
+   "capabilities": [],
+   "identifiers": [],
+   "deferred": [],
+   "evidence_claims": [],
+   "authority": [],
+   "defers_to": [],
+   "consumes": [],
+   "produces": [],
+   "heading": "3. Stakeholders and concerns",
+   "locator": "deliverable-v1:35-46"
+  },
+  {
+   "capabilities": [
+    {
+     "name": "Execution scheduling",
+     "quote": "Execution scheduling"
+    },
+    {
+     "name": "Tick advancement",
+     "quote": "tick advancement"
+    },
+    {
+     "name": "State commit",
+     "quote": "state commit"
+    },
+    {
+     "name": "Telemetry ingest",
+     "quote": "Telemetry ingest"
+    },
+    {
+     "name": "Quality flags",
+     "quote": "quality flags"
+    },
+    {
+     "name": "Gap filling",
+     "quote": "gap filling"
+    },
+    {
+     "name": "Hydraulic state estimation",
+     "quote": "Hydraulic state estimation"
+    },
+    {
+     "name": "Forward projection",
+     "quote": "forward projection"
+    },
+    {
+     "name": "Threshold evaluation",
+     "quote": "Threshold evaluation"
+    },
+    {
+     "name": "Alert emission",
+     "quote": "alert emission"
+    },
+    {
+     "name": "Parameter estimation",
+     "quote": "Parameter estimation"
+    },
+    {
+     "name": "Integration with third-party telemetry platforms",
+     "quote": "Integration with third-party telemetry platforms"
+    },
+    {
+     "name": "Parameter estimation",
+     "quote": "Parameter estimation against historical events"
+    }
+   ],
+   "identifiers": [
+    "RO",
+    "SF",
+    "HM",
+    "AS",
+    "CP",
+    "PA"
+   ],
+   "deferred": [],
+   "evidence_claims": [],
+   "authority": [],
+   "defers_to": [],
+   "consumes": [],
+   "produces": [],
+   "heading": "4. Component overview",
+   "locator": "deliverable-v1:47-57"
+  },
+  {
+   "capabilities": [
+    {
+     "name": "advances simulation state",
+     "quote": "The Runtime Orchestrator advances simulation state one tick at a time."
+    },
+    {
+     "name": "executes tick phases",
+     "quote": "Each tick proceeds through ingest, estimation, evaluation, and commit phases."
+    }
+   ],
+   "identifiers": [],
+   "deferred": [],
+   "evidence_claims": [],
+   "authority": [],
+   "defers_to": [],
+   "consumes": [
+    "simulation state"
+   ],
+   "produces": [
+    "simulation state"
+   ],
+   "heading": "5. Runtime Orchestrator",
+   "locator": "deliverable-v1:58-64"
+  },
+  {
+   "capabilities": [
+    {
+     "name": "execution scheduling",
+     "quote": "The Runtime Orchestrator is authoritative for execution scheduling."
+    },
+    {
+     "name": "constructs per-tick execution order",
+     "quote": "It constructs the per-tick execution order"
+    },
+    {
+     "name": "freezes execution order",
+     "quote": "freezes it before the ingest phase begins"
+    },
+    {
+     "name": "commits schedule state",
+     "quote": "commits the resulting state at end of tick"
+    },
+    {
+     "name": "freezes schedule before ingest",
+     "quote": "freezes it before the ingest phase begins"
+    },
+    {
+     "name": "commits resulting state at end of tick",
+     "quote": "commits the resulting state at end of tick"
+    }
+   ],
+   "identifiers": [],
+   "deferred": [],
+   "evidence_claims": [],
+   "authority": [
+    {
+     "capability": "execution scheduling",
+     "action": "is authoritative for",
+     "owner": "Runtime Orchestrator",
+     "polarity": "owns",
+     "quote": "The Runtime Orchestrator is authoritative for execution scheduling."
+    },
+    {
+     "capability": "modifying frozen schedule",
+     "action": "may modify",
+     "owner": "No component",
+     "polarity": "excludes",
+     "quote": "No component may modify a frozen schedule."
+    }
+   ],
+   "defers_to": [],
+   "consumes": [
+    "per-tick execution order",
+    "schedule state"
+   ],
+   "produces": [
+    "per-tick execution order",
+    "schedule state",
+    "resulting state"
+   ],
+   "heading": "5.2 Scheduling authority",
+   "locator": "deliverable-v1:65-71"
+  },
+  {
+   "capabilities": [
+    {
+     "name": "advances simulation in ticks",
+     "quote": "Simulation advances in ticks."
+    },
+    {
+     "name": "decouples simulation from host performance",
+     "quote": "This decouples the twin from host performance variation"
+    },
+    {
+     "name": "makes replay deterministic",
+     "quote": "makes replay deterministic."
+    },
+    {
+     "name": "makes replay deterministic",
+     "quote": "makes replay deterministic"
+    }
+   ],
+   "identifiers": [],
+   "deferred": [],
+   "evidence_claims": [],
+   "authority": [],
+   "defers_to": [],
+   "consumes": [
+    "wall-clock time"
+   ],
+   "produces": [
+    "simulation ticks"
+   ],
+   "heading": "5.3 Time base",
+   "locator": "deliverable-v1:72-78"
+  },
+  {
+   "capabilities": [
+    {
+     "name": "carries state vector",
+     "quote": "Each modelled node carries a state vector s(i,t)"
+    },
+    {
+     "name": "comprises state vector components",
+     "quote": "s(i,t) comprises: water level, flow rate, gate position, sensor confidence, saturation index, upstream inflow, downstream head, and defence status."
+    },
+    {
+     "name": "carries a state vector",
+     "quote": "Each modelled node carries a state vector s(i,t)"
+    },
+    {
+     "name": "Carries a state vector",
+     "quote": "Each modelled node carries a state vector s(i,t)"
+    }
+   ],
+   "identifiers": [
+    "s(i,t)"
+   ],
+   "deferred": [],
+   "evidence_claims": [],
+   "authority": [],
+   "defers_to": [],
+   "consumes": [],
+   "produces": [],
+   "heading": "5.4 State vector",
+   "locator": "deliverable-v1:79-85"
+  },
+  {
+   "capabilities": [],
+   "identifiers": [
+    "RO-G01",
+    "RO-G02",
+    "RO-G03",
+    "RO-G04",
+    "RO-G05",
+    "RO-G06"
+   ],
+   "deferred": [
+    {
+     "item": "Tick budget under peak sensor load unproven",
+     "id": "RO-G01",
+     "owner": "RO lead"
+    },
+    {
+     "item": "Commit ordering under partial component failure",
+     "id": "RO-G02",
+     "owner": "RO lead"
+    },
+    {
+     "item": "Replay determinism across host classes",
+     "id": "RO-G03",
+     "owner": "RO lead"
+    },
+    {
+     "item": "Checkpoint and branch semantics",
+     "id": "RO-G04",
+     "owner": "RO lead"
+    },
+    {
+     "item": "Backpressure policy when SF lags",
+     "id": "RO-G05",
+     "owner": "RO lead"
+    },
+    {
+     "item": "Authorisation model for schedule override",
+     "id": "RO-G06",
+     "owner": "RO lead"
+    }
+   ],
+   "evidence_claims": [
+    {
+     "claim": "Tick budget under peak sensor load unproven",
+     "points_to": "Load test report"
+    },
+    {
+     "claim": "Commit ordering under partial component failure",
+     "points_to": "Failure-mode analysis"
+    },
+    {
+     "claim": "Replay determinism across host classes",
+     "points_to": "Replay diff report"
+    },
+    {
+     "claim": "Checkpoint and branch semantics",
+     "points_to": "Design note"
+    },
+    {
+     "claim": "Backpressure policy when SF lags",
+     "points_to": "Policy statement"
+    },
+    {
+     "claim": "Authorisation model for schedule override",
+     "points_to": "Security review"
+    },
+    {
+     "claim": "Closure evidence for RO-G01 is a Load test report",
+     "points_to": "Load test report"
+    },
+    {
+     "claim": "Closure evidence for RO-G02 is a Failure-mode analysis",
+     "points_to": "Failure-mode analysis"
+    },
+    {
+     "claim": "Closure evidence for RO-G03 is a Replay diff report",
+     "points_to": "Replay diff report"
+    },
+    {
+     "claim": "Closure evidence for RO-G04 is a Design note",
+     "points_to": "Design note"
+    },
+    {
+     "claim": "Closure evidence for RO-G05 is a Policy statement",
+     "points_to": "Policy statement"
+    },
+    {
+     "claim": "Closure evidence for RO-G06 is a Security review",
+     "points_to": "Security review"
+    },
+    {
+     "claim": "Load test report",
+     "points_to": "Closure evidence for RO-G01"
+    },
+    {
+     "claim": "Failure-mode analysis",
+     "points_to": "Closure evidence for RO-G02"
+    },
+    {
+     "claim": "Replay diff report",
+     "points_to": "Closure evidence for RO-G03"
+    },
+    {
+     "claim": "Design note",
+     "points_to": "Closure evidence for RO-G04"
+    },
+    {
+     "claim": "Policy statement",
+     "points_to": "Closure evidence for RO-G05"
+    },
+    {
+     "claim": "Security review",
+     "points_to": "Closure evidence for RO-G06"
+    }
+   ],
+   "authority": [],
+   "defers_to": [],
+   "consumes": [],
+   "produces": [],
+   "heading": "5.5 Risks and open decisions",
+   "locator": "deliverable-v1:86-96"
+  },
+  {
+   "capabilities": [
+    {
+     "name": "ingest telemetry",
+     "quote": "The Sensor Fabric ingests telemetry from fixed gauges, tide boards, and third-party platforms via the Platform Adapter."
+    },
+    {
+     "name": "apply quality flags",
+     "quote": "It applies quality flags"
+    },
+    {
+     "name": "fill short gaps by interpolation",
+     "quote": "fills short gaps by interpolation."
+    },
+    {
+     "name": "ingest telemetry from fixed gauges, tide boards, and third-party platforms",
+     "quote": "The Sensor Fabric ingests telemetry from fixed gauges, tide boards, and third-party platforms"
+    },
+    {
+     "name": "fill short gaps by interpolation",
+     "quote": "fills short gaps by interpolation"
+    }
+   ],
+   "identifiers": [],
+   "deferred": [],
+   "evidence_claims": [],
+   "authority": [],
+   "defers_to": [],
+   "consumes": [
+    "telemetry from fixed gauges",
+    "telemetry from tide boards",
+    "telemetry from third-party platforms"
+   ],
+   "produces": [
+    "quality flagged telemetry",
+    "interpolated telemetry",
+    "telemetry with quality flags"
+   ],
+   "heading": "6. Sensor Fabric",
+   "locator": "deliverable-v1:97-104"
+  },
+  {
+   "capabilities": [
+    {
+     "name": "state transition management",
+     "quote": "Sensors transition between commissioned, active, degraded, dormant, and decommissioned states."
+    },
+    {
+     "name": "reactivation observation",
+     "quote": "the fabric does not decide reactivation, it observes it."
+    },
+    {
+     "name": "calibration offset restoration",
+     "quote": "Reactivation restores the prior calibration offset unless the dormancy exceeded the revalidation window."
+    },
+    {
+     "name": "event logging and replay",
+     "quote": "Reactivation events are logged and are replayable."
+    },
+    {
+     "name": "reactivation event observation",
+     "quote": "the fabric does not decide reactivation, it observes it."
+    },
+    {
+     "name": "State transition management",
+     "quote": "Sensors transition between commissioned, active, degraded, dormant, and decommissioned states."
+    },
+    {
+     "name": "Reactivation handling",
+     "quote": "Reactivation of a dormant sensor is modelled as an exogenous event: the fabric does not decide reactivation, it observes it."
+    },
+    {
+     "name": "Calibration offset restoration",
+     "quote": "Reactivation restores the prior calibration offset unless the dormancy exceeded the revalidation window."
+    },
+    {
+     "name": "Event logging",
+     "quote": "Reactivation events are logged and are replayable."
+    }
+   ],
+   "identifiers": [],
+   "deferred": [],
+   "evidence_claims": [],
+   "authority": [
+    {
+     "capability": "reactivation decision",
+     "action": "does not decide",
+     "owner": "the fabric",
+     "polarity": "excludes",
+     "quote": "the fabric does not decide reactivation, it observes it."
+    }
+   ],
+   "defers_to": [],
+   "consumes": [
+    "prior calibration offset",
+    "dormancy duration"
+   ],
+   "produces": [
+    "reactivation events",
+    "Reactivation events"
+   ],
+   "heading": "6.2 Sensor lifecycle",
+   "locator": "deliverable-v1:105-112"
+  },
+  {
+   "capabilities": [
+    {
+     "name": "flag sensor disagreement",
+     "quote": "the fabric flags the disagreement"
+    }
+   ],
+   "identifiers": [],
+   "deferred": [
+    {
+     "item": "resolution of sensor disagreement",
+     "id": "",
+     "owner": "Hydrology Model"
+    }
+   ],
+   "evidence_claims": [],
+   "authority": [
+    {
+     "capability": "adjudicate sensor disagreement",
+     "action": "holds",
+     "owner": "Hydrology Model",
+     "polarity": "owns",
+     "quote": "the Hydrology Model, which holds the physical constraint set needed to adjudicate"
+    },
+    {
+     "capability": "resolve sensor disagreement",
+     "action": "holds",
+     "owner": "Hydrology Model",
+     "polarity": "owns",
+     "quote": "the Hydrology Model, which holds the physical constraint set needed to adjudicate"
+    }
+   ],
+   "defers_to": [
+    {
+     "capability": "resolve sensor disagreement",
+     "to": "Hydrology Model"
+    },
+    {
+     "capability": "resolution of sensor disagreement",
+     "to": "Hydrology Model"
+    }
+   ],
+   "consumes": [
+    "incompatible sensor levels",
+    "sensor levels"
+   ],
+   "produces": [
+    "disagreement flag"
+   ],
+   "heading": "6.3 Disagreement between sensors",
+   "locator": "deliverable-v1:113-118"
+  },
+  {
+   "capabilities": [
+    {
+     "name": "Gauge telemetry ingest",
+     "quote": "Gauge telemetry ingest"
+    },
+    {
+     "name": "Quality-flagged observation stream",
+     "quote": "Quality-flagged observation stream"
+    },
+    {
+     "name": "Sensor lifecycle events",
+     "quote": "Sensor lifecycle events"
+    },
+    {
+     "name": "Gap-fill provenance",
+     "quote": "Gap-fill provenance"
+    }
+   ],
+   "identifiers": [
+    "IF-SF-001",
+    "IF-SF-002",
+    "IF-SF-003",
+    "IF-SF-004"
+   ],
+   "deferred": [],
+   "evidence_claims": [],
+   "authority": [],
+   "defers_to": [],
+   "consumes": [
+    "Gauge telemetry ingest",
+    "Gauge telemetry"
+   ],
+   "produces": [
+    "Quality-flagged observation stream",
+    "Sensor lifecycle events",
+    "Gap-fill provenance"
+   ],
+   "heading": "6.4 Interfaces",
+   "locator": "deliverable-v1:119-127"
+  },
+  {
+   "capabilities": [],
+   "identifiers": [
+    "SF-G01",
+    "SF-G02",
+    "SF-G03",
+    "SF-G04",
+    "SF-G05",
+    "SF-G06",
+    "SF-G07"
+   ],
+   "deferred": [
+    {
+     "item": "Gap-fill method not selected",
+     "id": "SF-G01",
+     "owner": "SF lead"
+    },
+    {
+     "item": "Quality flag taxonomy incomplete",
+     "id": "SF-G02",
+     "owner": "SF lead"
+    },
+    {
+     "item": "Third-party platform rate limits unknown",
+     "id": "SF-G03",
+     "owner": "SF lead"
+    },
+    {
+     "item": "Sensor clock skew tolerance",
+     "id": "SF-G04",
+     "owner": "SF lead"
+    },
+    {
+     "item": "Retention period for raw telemetry",
+     "id": "SF-G05",
+     "owner": "Authority"
+    },
+    {
+     "item": "Revalidation window after dormancy",
+     "id": "SF-G06",
+     "owner": "SF lead"
+    },
+    {
+     "item": "Disagreement flag propagation",
+     "id": "SF-G07",
+     "owner": "SF lead"
+    }
+   ],
+   "evidence_claims": [
+    {
+     "claim": "Method comparison is required for SF-G01",
+     "points_to": "Method comparison"
+    },
+    {
+     "claim": "Taxonomy document is required for SF-G02",
+     "points_to": "Taxonomy document"
+    },
+    {
+     "claim": "Operator confirmation is required for SF-G03",
+     "points_to": "Operator confirmation"
+    },
+    {
+     "claim": "Timing analysis is required for SF-G04",
+     "points_to": "Timing analysis"
+    },
+    {
+     "claim": "Policy decision is required for SF-G05",
+     "points_to": "Policy decision"
+    },
+    {
+     "claim": "Calibration note is required for SF-G06",
+     "points_to": "Calibration note"
+    },
+    {
+     "claim": "Interface note is required for SF-G07",
+     "points_to": "Interface note"
+    },
+    {
+     "claim": "Method comparison is the closure evidence for SF-G01",
+     "points_to": "Method comparison"
+    },
+    {
+     "claim": "Taxonomy document is the closure evidence for SF-G02",
+     "points_to": "Taxonomy document"
+    },
+    {
+     "claim": "Operator confirmation is the closure evidence for SF-G03",
+     "points_to": "Operator confirmation"
+    },
+    {
+     "claim": "Timing analysis is the closure evidence for SF-G04",
+     "points_to": "Timing analysis"
+    },
+    {
+     "claim": "Policy decision is the closure evidence for SF-G05",
+     "points_to": "Policy decision"
+    },
+    {
+     "claim": "Calibration note is the closure evidence for SF-G06",
+     "points_to": "Calibration note"
+    },
+    {
+     "claim": "Interface note is the closure evidence for SF-G07",
+     "points_to": "Interface note"
+    },
+    {
+     "claim": "Method comparison",
+     "points_to": "SF-G01 closure evidence"
+    },
+    {
+     "claim": "Taxonomy document",
+     "points_to": "SF-G02 closure evidence"
+    },
+    {
+     "claim": "Operator confirmation",
+     "points_to": "SF-G03 closure evidence"
+    },
+    {
+     "claim": "Timing analysis",
+     "points_to": "SF-G04 closure evidence"
+    },
+    {
+     "claim": "Policy decision",
+     "points_to": "SF-G05 closure evidence"
+    },
+    {
+     "claim": "Calibration note",
+     "points_to": "SF-G06 closure evidence"
+    },
+    {
+     "claim": "Interface note",
+     "points_to": "SF-G07 closure evidence"
+    }
+   ],
+   "authority": [],
+   "defers_to": [],
+   "consumes": [],
+   "produces": [],
+   "heading": "6.5 Risks and open decisions",
+   "locator": "deliverable-v1:128-139"
+  },
+  {
+   "capabilities": [
+    {
+     "name": "estimates hydraulic state",
+     "quote": "The Hydrology Model estimates hydraulic state from flagged observations"
+    },
+    {
+     "name": "projects forward over the alerting horizon",
+     "quote": "projects forward over the alerting horizon"
+    }
+   ],
+   "identifiers": [],
+   "deferred": [],
+   "evidence_claims": [],
+   "authority": [],
+   "defers_to": [],
+   "consumes": [
+    "flagged observations"
+   ],
+   "produces": [
+    "hydraulic state",
+    "projections over the alerting horizon"
+   ],
+   "heading": "7. Hydrology Model",
+   "locator": "deliverable-v1:140-146"
+  },
+  {
+   "capabilities": [
+    {
+     "name": "incorporate readings with reduced confidence",
+     "quote": "the model incorporates both readings with reduced confidence"
+    },
+    {
+     "name": "refer disagreement to Alerting Service",
+     "quote": "refers the disagreement to the Alerting Service"
+    },
+    {
+     "name": "incorporates readings with reduced confidence",
+     "quote": "the model incorporates both readings with reduced confidence"
+    },
+    {
+     "name": "refers disagreement to Alerting Service",
+     "quote": "refers the disagreement to the Alerting Service"
+    }
+   ],
+   "identifiers": [],
+   "deferred": [],
+   "evidence_claims": [
+    {
+     "claim": "operational policy governing which reading to prefer is held by the Alerting Service",
+     "points_to": "Alerting Service"
+    }
+   ],
+   "authority": [
+    {
+     "capability": "govern preference of reading",
+     "action": "holds",
+     "owner": "Alerting Service",
+     "polarity": "owns",
+     "quote": "the Alerting Service, which holds the operational policy governing which reading to prefer"
+    },
+    {
+     "capability": "governs operational policy for reading preference",
+     "action": "holds",
+     "owner": "Alerting Service",
+     "polarity": "owns",
+     "quote": "the Alerting Service, which holds the operational policy governing which reading to prefer"
+    }
+   ],
+   "defers_to": [
+    {
+     "capability": "determine preferred reading",
+     "to": "Alerting Service"
+    },
+    {
+     "capability": "determines which reading to prefer",
+     "to": "Alerting Service"
+    }
+   ],
+   "consumes": [
+    "Sensor Fabric disagreement report",
+    "readings"
+   ],
+   "produces": [
+    "incorporated readings with reduced confidence",
+    "referenced disagreement",
+    "reduced confidence readings",
+    "disagreement referral"
+   ],
+   "heading": "7.2 Disagreement handling",
+   "locator": "deliverable-v1:147-152"
+  },
+  {
+   "capabilities": [
+    {
+     "name": "minimises residual against the physical constraint set",
+     "quote": "State estimation minimises residual against the physical constraint set."
+    }
+   ],
+   "identifiers": [],
+   "deferred": [
+    {
+     "item": "solver selection",
+     "id": "",
+     "owner": ""
+    },
+    {
+     "item": "selection of candidate solvers",
+     "id": "",
+     "owner": ""
+    },
+    {
+     "item": "candidate solvers selection",
+     "id": "",
+     "owner": ""
+    }
+   ],
+   "evidence_claims": [],
+   "authority": [],
+   "defers_to": [],
+   "consumes": [],
+   "produces": [],
+   "heading": "7.3 Estimation",
+   "locator": "deliverable-v1:153-157"
+  },
+  {
+   "capabilities": [
+    {
+     "name": "Flagged observation intake",
+     "quote": "Flagged observation intake"
+    },
+    {
+     "name": "Estimated state publication",
+     "quote": "Estimated state publication"
+    },
+    {
+     "name": "Projection series publication",
+     "quote": "Projection series publication"
+    }
+   ],
+   "identifiers": [
+    "IF-HM-001",
+    "IF-HM-002",
+    "IF-HM-003"
+   ],
+   "deferred": [],
+   "evidence_claims": [],
+   "authority": [],
+   "defers_to": [],
+   "consumes": [
+    "Flagged observation intake",
+    "Flagged observation"
+   ],
+   "produces": [
+    "Estimated state publication",
+    "Projection series publication",
+    "Estimated state",
+    "Projection series"
+   ],
+   "heading": "7.4 Interfaces",
+   "locator": "deliverable-v1:158-165"
+  },
+  {
+   "capabilities": [],
+   "identifiers": [
+    "HM-G01",
+    "HM-G02",
+    "HM-G03",
+    "HM-G04",
+    "HM-G05"
+   ],
+   "deferred": [
+    {
+     "item": "Solver not selected",
+     "id": "HM-G01",
+     "owner": "HM lead"
+    },
+    {
+     "item": "Projection horizon not fixed",
+     "id": "HM-G02",
+     "owner": "HM lead"
+    },
+    {
+     "item": "Residual normalisation denominator undefined",
+     "id": "HM-G03",
+     "owner": "HM lead"
+    },
+    {
+     "item": "Confidence propagation from SF flags",
+     "id": "HM-G04",
+     "owner": "HM lead"
+    },
+    {
+     "item": "Behaviour when constraint set is infeasible",
+     "id": "HM-G05",
+     "owner": "HM lead"
+    }
+   ],
+   "evidence_claims": [
+    {
+     "claim": "Closure evidence for HM-G01 is a Benchmark report",
+     "points_to": "Benchmark report"
+    },
+    {
+     "claim": "Closure evidence for HM-G02 is an Operational requirement",
+     "points_to": "Operational requirement"
+    },
+    {
+     "claim": "Closure evidence for HM-G03 is a Method note",
+     "points_to": "Method note"
+    },
+    {
+     "claim": "Closure evidence for HM-G04 is a Design note",
+     "points_to": "Design note"
+    },
+    {
+     "claim": "Closure evidence for HM-G05 is a Failure analysis",
+     "points_to": "Failure analysis"
+    }
+   ],
+   "authority": [],
+   "defers_to": [],
+   "consumes": [],
+   "produces": [],
+   "heading": "7.5 Risks and open decisions",
+   "locator": "deliverable-v1:166-175"
+  },
+  {
+   "capabilities": [
+    {
+     "name": "evaluates estimated and projected state against thresholds",
+     "quote": "The Alerting Service evaluates estimated and projected state against thresholds"
+    },
+    {
+     "name": "emits alerts to Authority operations",
+     "quote": "emits alerts to Authority operations"
+    },
+    {
+     "name": "evaluates estimated and projected state against thresholds",
+     "quote": "evaluates estimated and projected state against thresholds"
+    }
+   ],
+   "identifiers": [],
+   "deferred": [],
+   "evidence_claims": [],
+   "authority": [],
+   "defers_to": [],
+   "consumes": [
+    "estimated state",
+    "projected state",
+    "thresholds"
+   ],
+   "produces": [
+    "alerts"
+   ],
+   "heading": "8. Alerting Service",
+   "locator": "deliverable-v1:176-182"
+  },
+  {
+   "capabilities": [
+    {
+     "name": "governs emission of coastal overtopping alert",
+     "quote": "The surge threshold \u03b8_surge governs emission of the coastal overtopping alert."
+    },
+    {
+     "name": "governs alert emission",
+     "quote": "The surge threshold \u03b8_surge governs emission of the coastal overtopping alert."
+    }
+   ],
+   "identifiers": [
+    "\u03b8_surge"
+   ],
+   "deferred": [],
+   "evidence_claims": [],
+   "authority": [],
+   "defers_to": [],
+   "consumes": [
+    "service configuration"
+   ],
+   "produces": [
+    "coastal overtopping alert"
+   ],
+   "heading": "8.2 Thresholds",
+   "locator": "deliverable-v1:183-187"
+  },
+  {
+   "capabilities": [],
+   "identifiers": [],
+   "deferred": [],
+   "evidence_claims": [],
+   "authority": [
+    {
+     "capability": "sensor disagreement resolution",
+     "action": "is authoritative for",
+     "owner": "Sensor Fabric",
+     "polarity": "owns",
+     "quote": "the Sensor Fabric is authoritative for it"
+    }
+   ],
+   "defers_to": [],
+   "consumes": [
+    "sensor disagreement"
+   ],
+   "produces": [],
+   "heading": "8.3 Disagreement handling",
+   "locator": "deliverable-v1:188-193"
+  },
+  {
+   "capabilities": [
+    {
+     "name": "determines evaluation order for pending alerts",
+     "quote": "The Alerting Service determines the evaluation order for pending alerts"
+    },
+    {
+     "name": "reorders alerts by severity",
+     "quote": "reordering as necessary so that higher-severity candidates are evaluated first within the tick."
+    },
+    {
+     "name": "determine evaluation order for pending alerts",
+     "quote": "The Alerting Service determines the evaluation order for pending alerts"
+    },
+    {
+     "name": "reorder alerts by severity",
+     "quote": "reordering as necessary so that higher-severity candidates are evaluated first within the tick."
+    }
+   ],
+   "identifiers": [],
+   "deferred": [],
+   "evidence_claims": [],
+   "authority": [
+    {
+     "capability": "determines evaluation order for pending alerts",
+     "action": "determines",
+     "owner": "Alerting Service",
+     "polarity": "owns",
+     "quote": "The Alerting Service determines the evaluation order for pending alerts"
+    },
+    {
+     "capability": "determine evaluation order for pending alerts",
+     "action": "determines",
+     "owner": "Alerting Service",
+     "polarity": "owns",
+     "quote": "The Alerting Service determines the evaluation order for pending alerts"
+    }
+   ],
+   "defers_to": [],
+   "consumes": [
+    "pending alerts"
+   ],
+   "produces": [
+    "ordered alert evaluation sequence",
+    "evaluated alerts",
+    "ordered pending alerts"
+   ],
+   "heading": "8.4 Evaluation order",
+   "locator": "deliverable-v1:194-199"
+  },
+  {
+   "capabilities": [],
+   "identifiers": [
+    "IF-AS-001",
+    "IF-AS-002"
+   ],
+   "deferred": [],
+   "evidence_claims": [],
+   "authority": [],
+   "defers_to": [],
+   "consumes": [
+    "Estimated and projected state intake"
+   ],
+   "produces": [
+    "Alert emission"
+   ],
+   "heading": "8.5 Interfaces",
+   "locator": "deliverable-v1:200-206"
+  },
+  {
+   "capabilities": [],
+   "identifiers": [
+    "AS-G01",
+    "AS-G02",
+    "AS-G03",
+    "AS-G04"
+   ],
+   "deferred": [
+    {
+     "item": "Threshold values not set",
+     "id": "AS-G01",
+     "owner": "AS lead"
+    },
+    {
+     "item": "Alert suppression policy",
+     "id": "AS-G02",
+     "owner": "AS lead"
+    },
+    {
+     "item": "Escalation path on repeated emission",
+     "id": "AS-G03",
+     "owner": "AS lead"
+    },
+    {
+     "item": "Downstream consumer contract",
+     "id": "AS-G04",
+     "owner": "AS lead"
+    }
+   ],
+   "evidence_claims": [
+    {
+     "claim": "Authority decision",
+     "points_to": "Authority decision"
+    },
+    {
+     "claim": "Policy statement",
+     "points_to": "Policy statement"
+    },
+    {
+     "claim": "Runbook",
+     "points_to": "Runbook"
+    },
+    {
+     "claim": "Interface agreement",
+     "points_to": "Interface agreement"
+    }
+   ],
+   "authority": [],
+   "defers_to": [],
+   "consumes": [],
+   "produces": [],
+   "heading": "8.6 Risks and open decisions",
+   "locator": "deliverable-v1:207-215"
+  },
+  {
+   "capabilities": [
+    {
+     "name": "deployment of twin as six services",
+     "quote": "The twin is deployed as six services on the Authority's private cloud tenancy"
+    },
+    {
+     "name": "deployment of Platform Adapter in separate network zone",
+     "quote": "with the Platform Adapter in a separate network zone"
+    },
+    {
+     "name": "provision of operational environment",
+     "quote": "Two environments are provided: an operational environment"
+    },
+    {
+     "name": "provision of replay environment",
+     "quote": "and a replay environment sharing the same image set"
+    },
+    {
+     "name": "horizontal scaling of Sensor Fabric",
+     "quote": "Horizontal scaling applies to the Sensor Fabric only"
+    },
+    {
+     "name": "placement of Platform Adapter in separate network zone",
+     "quote": "with the Platform Adapter in a separate network zone"
+    },
+    {
+     "name": "provision of operational and replay environments",
+     "quote": "Two environments are provided: an operational environment and a replay environment sharing the same image set"
+    }
+   ],
+   "identifiers": [],
+   "deferred": [],
+   "evidence_claims": [
+    {
+     "claim": "Component maturity is assessed",
+     "points_to": "Section 9"
+    }
+   ],
+   "authority": [],
+   "defers_to": [],
+   "consumes": [],
+   "produces": [],
+   "heading": "9. Deployment topology",
+   "locator": "deliverable-v1:216-224"
+  },
+  {
+   "capabilities": [
+    {
+     "name": "estimates model parameters",
+     "quote": "The Calibration Pipeline estimates model parameters against historical event records."
+    },
+    {
+     "name": "produces calibration vector",
+     "quote": "It produces a four-dimensional calibration vector per reach, comprising roughness, storage coefficient, lag, and defence permeability."
+    },
+    {
+     "name": "produces a four-dimensional calibration vector per reach",
+     "quote": "It produces a four-dimensional calibration vector per reach, comprising roughness, storage coefficient, lag, and defence permeability."
+    },
+    {
+     "name": "produces a four-dimensional calibration vector",
+     "quote": "It produces a four-dimensional calibration vector per reach, comprising roughness, storage coefficient, lag, and defence permeability."
+    }
+   ],
+   "identifiers": [],
+   "deferred": [],
+   "evidence_claims": [],
+   "authority": [],
+   "defers_to": [],
+   "consumes": [
+    "historical event records"
+   ],
+   "produces": [
+    "four-dimensional calibration vector",
+    "four-dimensional calibration vector per reach",
+    "roughness",
+    "storage coefficient",
+    "lag",
+    "defence permeability",
+    "calibration vector"
+   ],
+   "heading": "10. Calibration Pipeline",
+   "locator": "deliverable-v1:225-232"
+  },
+  {
+   "capabilities": [
+    {
+     "name": "Fits parameters by least squares",
+     "quote": "Parameters are fitted by least squares against gauge records"
+    },
+    {
+     "name": "Versiones fitted vectors",
+     "quote": "Fitted vectors are versioned"
+    },
+    {
+     "name": "Stores fitted vectors with event set",
+     "quote": "stored with the event set that produced them"
+    },
+    {
+     "name": "Parameter fitting",
+     "quote": "Parameters are fitted by least squares against gauge records for the eleven recorded events in the historical archive."
+    },
+    {
+     "name": "Vector versioning and storage",
+     "quote": "Fitted vectors are versioned and stored with the event set that produced them."
+    },
+    {
+     "name": "fiting parameters",
+     "quote": "Parameters are fitted by least squares against gauge records"
+    },
+    {
+     "name": "versioning fitted vectors",
+     "quote": "Fitted vectors are versioned"
+    },
+    {
+     "name": "storing fitted vectors",
+     "quote": "stored with the event set that produced them"
+    }
+   ],
+   "identifiers": [],
+   "deferred": [],
+   "evidence_claims": [],
+   "authority": [],
+   "defers_to": [],
+   "consumes": [
+    "gauge records",
+    "historical archive",
+    "event set"
+   ],
+   "produces": [
+    "fitted vectors",
+    "event set"
+   ],
+   "heading": "10.2 Method",
+   "locator": "deliverable-v1:233-238"
+  },
+  {
+   "capabilities": [
+    {
+     "name": "Re-run calibration",
+     "quote": "Calibration is re-run when a new event is added to the archive, or annually, whichever is sooner."
+    },
+    {
+     "name": "trigger calibration re-run",
+     "quote": "Calibration is re-run when a new event is added to the archive, or annually, whichever is sooner."
+    }
+   ],
+   "identifiers": [],
+   "deferred": [],
+   "evidence_claims": [],
+   "authority": [],
+   "defers_to": [],
+   "consumes": [
+    "new event",
+    "archive"
+   ],
+   "produces": [
+    "calibration"
+   ],
+   "heading": "10.3 Refresh",
+   "locator": "deliverable-v1:239-243"
+  },
+  {
+   "capabilities": [],
+   "identifiers": [
+    "CAL-G-01",
+    "CAL-G-02",
+    "CAL-G-03",
+    "CAL-G-04",
+    "CAL-G-05"
+   ],
+   "deferred": [
+    {
+     "item": "Historical archive completeness",
+     "id": "CAL-G-01",
+     "owner": "Authority"
+    },
+    {
+     "item": "Fitting method not benchmarked",
+     "id": "CAL-G-02",
+     "owner": "CP lead"
+    },
+    {
+     "item": "Vector versioning scheme",
+     "id": "CAL-G-03",
+     "owner": "CP lead"
+    },
+    {
+     "item": "Treatment of ungauged reaches",
+     "id": "CAL-G-04",
+     "owner": "CP lead"
+    },
+    {
+     "item": "Acceptance criteria for a fitted vector",
+     "id": "CAL-G-05",
+     "owner": "CP lead"
+    }
+   ],
+   "evidence_claims": [
+    {
+     "claim": "Archive audit",
+     "points_to": "Closure evidence for CAL-G-01"
+    },
+    {
+     "claim": "Benchmark report",
+     "points_to": "Closure evidence for CAL-G-02"
+    },
+    {
+     "claim": "Design note",
+     "points_to": "Closure evidence for CAL-G-03"
+    },
+    {
+     "claim": "Method note",
+     "points_to": "Closure evidence for CAL-G-04"
+    },
+    {
+     "claim": "Criteria statement",
+     "points_to": "Closure evidence for CAL-G-05"
+    },
+    {
+     "claim": "Archive audit is the closure evidence for CAL-G-01",
+     "points_to": "Archive audit"
+    },
+    {
+     "claim": "Benchmark report is the closure evidence for CAL-G-02",
+     "points_to": "Benchmark report"
+    },
+    {
+     "claim": "Design note is the closure evidence for CAL-G-03",
+     "points_to": "Design note"
+    },
+    {
+     "claim": "Method note is the closure evidence for CAL-G-04",
+     "points_to": "Method note"
+    },
+    {
+     "claim": "Criteria statement is the closure evidence for CAL-G-05",
+     "points_to": "Criteria statement"
+    }
+   ],
+   "authority": [],
+   "defers_to": [],
+   "consumes": [],
+   "produces": [],
+   "heading": "10.4 Risks and open decisions",
+   "locator": "deliverable-v1:244-253"
+  },
+  {
+   "capabilities": [
+    {
+     "name": "integrates third-party telemetry platforms",
+     "quote": "The adapter integrates third-party telemetry platforms."
+    },
+    {
+     "name": "provides read-only access",
+     "quote": "Access is read-only in all cases"
+    },
+    {
+     "name": "integrate third-party telemetry platforms",
+     "quote": "The adapter integrates third-party telemetry platforms."
+    },
+    {
+     "name": "provide read-only access",
+     "quote": "Access is read-only in all cases"
+    }
+   ],
+   "identifiers": [],
+   "deferred": [],
+   "evidence_claims": [],
+   "authority": [
+    {
+     "capability": "integrate third-party telemetry platforms",
+     "action": "integrates",
+     "owner": "The adapter",
+     "polarity": "owns",
+     "quote": "The adapter integrates third-party telemetry platforms."
+    },
+    {
+     "capability": "write path to an operator platform",
+     "action": "proposes",
+     "owner": "the adapter",
+     "polarity": "excludes",
+     "quote": "no write path to an operator platform is proposed."
+    }
+   ],
+   "defers_to": [],
+   "consumes": [
+    "third-party telemetry platforms"
+   ],
+   "produces": [
+    "read-only access"
+   ],
+   "heading": "11. Platform Adapter",
+   "locator": "deliverable-v1:254-260"
+  },
+  {
+   "capabilities": [
+    {
+     "name": "Operator telemetry pull",
+     "quote": "Operator telemetry pull"
+    },
+    {
+     "name": "Operator availability signal",
+     "quote": "Operator availability signal"
+    },
+    {
+     "name": "Adapter health",
+     "quote": "Adapter health"
+    }
+   ],
+   "identifiers": [
+    "IF-PA-001",
+    "IF-PA-002",
+    "IF-PA-003",
+    "IF-PA-014"
+   ],
+   "deferred": [],
+   "evidence_claims": [
+    {
+     "claim": "Retry and backoff behaviour for operator endpoints is specified",
+     "points_to": "IF-PA-014"
+    }
+   ],
+   "authority": [],
+   "defers_to": [],
+   "consumes": [
+    "Operator telemetry pull",
+    "Operator availability signal"
+   ],
+   "produces": [
+    "Adapter health"
+   ],
+   "heading": "11.2 Interfaces",
+   "locator": "deliverable-v1:261-270"
+  },
+  {
+   "capabilities": [],
+   "identifiers": [
+    "PA-G01",
+    "PA-G02",
+    "PA-G03"
+   ],
+   "deferred": [
+    {
+     "item": "Operator agreements not executed",
+     "id": "PA-G01",
+     "owner": "Authority"
+    },
+    {
+     "item": "Credential rotation approach",
+     "id": "PA-G02",
+     "owner": "PA lead"
+    },
+    {
+     "item": "Behaviour on operator outage",
+     "id": "PA-G03",
+     "owner": "PA lead"
+    }
+   ],
+   "evidence_claims": [
+    {
+     "claim": "Signed agreements",
+     "points_to": "Closure evidence for PA-G01"
+    },
+    {
+     "claim": "Security note",
+     "points_to": "Closure evidence for PA-G02"
+    },
+    {
+     "claim": "Design note",
+     "points_to": "Closure evidence for PA-G03"
+    }
+   ],
+   "authority": [],
+   "defers_to": [],
+   "consumes": [],
+   "produces": [],
+   "heading": "11.3 Risks and open decisions",
+   "locator": "deliverable-v1:271-278"
+  },
+  {
+   "capabilities": [
+    {
+     "name": "Freezes execution order",
+     "quote": "RO freezes the execution order for the tick."
+    },
+    {
+     "name": "freeze execution order",
+     "quote": "RO freezes the execution order for the tick."
+    }
+   ],
+   "identifiers": [
+    "RO"
+   ],
+   "deferred": [],
+   "evidence_claims": [],
+   "authority": [
+    {
+     "capability": "Freezes execution order",
+     "action": "freezes",
+     "owner": "RO",
+     "polarity": "owns",
+     "quote": "RO freezes the execution order for the tick."
+    },
+    {
+     "capability": "freeze execution order",
+     "action": "freezes",
+     "owner": "RO",
+     "polarity": "owns",
+     "quote": "RO freezes the execution order for the tick."
+    }
+   ],
+   "defers_to": [],
+   "consumes": [],
+   "produces": [
+    "execution order"
+   ],
+   "heading": "12. Algorithms",
+   "locator": "deliverable-v1:279-283"
+  },
+  {
+   "capabilities": [
+    {
+     "name": "HM estimates state",
+     "quote": "HM estimates state"
+    },
+    {
+     "name": "HM publishes projections",
+     "quote": "publishes projections"
+    },
+    {
+     "name": "RO commits state",
+     "quote": "RO commits state"
+    },
+    {
+     "name": "RO advances the tick",
+     "quote": "advances the tick"
+    }
+   ],
+   "identifiers": [
+    "CAL-G-07"
+   ],
+   "deferred": [
+    {
+     "item": "Solver and gap-fill candidates selections",
+     "id": "CAL-G-07",
+     "owner": ""
+    },
+    {
+     "item": "Solver and gap-fill candidates",
+     "id": "CAL-G-07",
+     "owner": ""
+    }
+   ],
+   "evidence_claims": [
+    {
+     "claim": "Rationale and assumptions for each step are recorded per component",
+     "points_to": "above"
+    },
+    {
+     "claim": "Rationale and assumptions for each step are recorded per component above",
+     "points_to": "above"
+    }
+   ],
+   "authority": [],
+   "defers_to": [],
+   "consumes": [],
+   "produces": [
+    "projections"
+   ],
+   "heading": "4. HM estimates state and publishes projections, damped by the stability",
+   "locator": "deliverable-v1:286-293"
+  },
+  {
+   "capabilities": [
+    {
+     "name": "perform validation",
+     "quote": "Validation is performed by an independent Validation Authority"
+    },
+    {
+     "name": "review estimation output",
+     "quote": "The Validation Authority reviews estimation output against withheld gauge records"
+    },
+    {
+     "name": "issue validation statement",
+     "quote": "issues a validation statement per release"
+    },
+    {
+     "name": "performs validation",
+     "quote": "Validation is performed by an independent Validation Authority"
+    },
+    {
+     "name": "reviews estimation output against withheld gauge records",
+     "quote": "The Validation Authority reviews estimation output against withheld gauge records"
+    },
+    {
+     "name": "issues a validation statement per release",
+     "quote": "issues a validation statement per release"
+    },
+    {
+     "name": "validation of estimation output",
+     "quote": "The Validation Authority reviews estimation output against withheld gauge records"
+    },
+    {
+     "name": "issuance of validation statement",
+     "quote": "issues a validation statement per release"
+    }
+   ],
+   "identifiers": [],
+   "deferred": [],
+   "evidence_claims": [
+    {
+     "claim": "estimation output is reviewed against withheld gauge records",
+     "points_to": "withheld gauge records"
+    }
+   ],
+   "authority": [
+    {
+     "capability": "perform validation",
+     "action": "performed by",
+     "owner": "Validation Authority",
+     "polarity": "owns",
+     "quote": "Validation is performed by an independent Validation Authority nominated by the Authority"
+    },
+    {
+     "capability": "performs validation",
+     "action": "performs",
+     "owner": "Validation Authority",
+     "polarity": "owns",
+     "quote": "Validation is performed by an independent Validation Authority nominated by the Authority."
+    },
+    {
+     "capability": "validation of estimation output",
+     "action": "performs",
+     "owner": "Validation Authority",
+     "polarity": "owns",
+     "quote": "Validation is performed by an independent Validation Authority nominated by the Authority"
+    },
+    {
+     "capability": "issuance of validation statement",
+     "action": "issues",
+     "owner": "Validation Authority",
+     "polarity": "owns",
+     "quote": "The Validation Authority ... issues a validation statement per release"
+    }
+   ],
+   "defers_to": [],
+   "consumes": [
+    "estimation output",
+    "withheld gauge records"
+   ],
+   "produces": [
+    "validation statement"
+   ],
+   "heading": "13. Validation structure",
+   "locator": "deliverable-v1:294-299"
+  },
+  {
+   "capabilities": [],
+   "identifiers": [
+    "ND-01",
+    "ND-02",
+    "ND-03",
+    "ND-04",
+    "ND-05",
+    "ND-06",
+    "ND-07",
+    "ND-08"
+   ],
+   "deferred": [
+    {
+     "item": "Tick duration",
+     "id": "ND-01",
+     "owner": ""
+    },
+    {
+     "item": "\u03b8_surge value",
+     "id": "ND-02",
+     "owner": ""
+    },
+    {
+     "item": "Residual normalisation denominator",
+     "id": "ND-03",
+     "owner": ""
+    },
+    {
+     "item": "Projection horizon",
+     "id": "ND-04",
+     "owner": ""
+    },
+    {
+     "item": "Revalidation window",
+     "id": "ND-05",
+     "owner": ""
+    },
+    {
+     "item": "Alert suppression window",
+     "id": "ND-06",
+     "owner": ""
+    },
+    {
+     "item": "Raw telemetry retention period",
+     "id": "ND-07",
+     "owner": ""
+    },
+    {
+     "item": "Acceptance threshold for a fitted calibration vector",
+     "id": "ND-08",
+     "owner": ""
+    }
+   ],
+   "evidence_claims": [],
+   "authority": [],
+   "defers_to": [],
+   "consumes": [],
+   "produces": [],
+   "heading": "14. Not-defined register",
+   "locator": "deliverable-v1:300-314"
+  },
+  {
+   "capabilities": [],
+   "identifiers": [],
+   "deferred": [],
+   "evidence_claims": [
+    {
+     "claim": "A detailed mapping of requirements R-001 through R-042 is provided",
+     "points_to": "Appendix A"
+    },
+    {
+     "claim": "Requirements R-001 through R-042 are addressed across Sections 2 to 13.",
+     "points_to": "Sections 2 to 13"
+    },
+    {
+     "claim": "A detailed mapping is provided.",
+     "points_to": "Appendix A"
+    }
+   ],
+   "authority": [],
+   "defers_to": [],
+   "consumes": [],
+   "produces": [],
+   "heading": "15. Traceability summary",
+   "locator": "deliverable-v1:315-319"
+  },
+  {
+   "capabilities": [
+    {
+     "name": "terminates inbound telemetry sessions",
+     "quote": "terminates inbound telemetry sessions"
+    },
+    {
+     "name": "applies rate limiting",
+     "quote": "applies rate limiting"
+    },
+    {
+     "name": "forwards accepted payloads to the Sensor Fabric",
+     "quote": "forwards accepted payloads to the Sensor Fabric"
+    },
+    {
+     "name": "provides network path to third-party operators",
+     "quote": "It is the only component with a network path to third-party operators"
+    },
+    {
+     "name": "provides exclusive network path to third-party operators",
+     "quote": "It is the only component with a network path to third-party operators"
+    },
+    {
+     "name": "maintains exclusive network path to third-party operators",
+     "quote": "It is the only component with a network path to third-party operators"
+    }
+   ],
+   "identifiers": [
+    "Ingest Gateway",
+    "Sensor Fabric"
+   ],
+   "deferred": [],
+   "evidence_claims": [],
+   "authority": [
+    {
+     "capability": "terminates inbound telemetry sessions",
+     "action": "terminates",
+     "owner": "Ingest Gateway",
+     "polarity": "owns",
+     "quote": "The Ingest Gateway terminates inbound telemetry sessions"
+    },
+    {
+     "capability": "applies rate limiting",
+     "action": "applies",
+     "owner": "Ingest Gateway",
+     "polarity": "owns",
+     "quote": "applies rate limiting"
+    },
+    {
+     "capability": "forwards accepted payloads to the Sensor Fabric",
+     "action": "forwards",
+     "owner": "Ingest Gateway",
+     "polarity": "owns",
+     "quote": "forwards accepted payloads to the Sensor Fabric"
+    },
+    {
+     "capability": "provides network path to third-party operators",
+     "action": "owns",
+     "owner": "Ingest Gateway",
+     "polarity": "owns",
+     "quote": "It is the only component with a network path to third-party operators"
+    },
+    {
+     "capability": "network path to third-party operators",
+     "action": "owns",
+     "owner": "Ingest Gateway",
+     "polarity": "owns",
+     "quote": "It is the only component with a network path to third-party operators"
+    },
+    {
+     "capability": "network path to third-party operators",
+     "action": "is",
+     "owner": "Ingest Gateway",
+     "polarity": "owns",
+     "quote": "It is the only component with a network path to third-party operators"
+    }
+   ],
+   "defers_to": [],
+   "consumes": [
+    "inbound telemetry sessions",
+    "third-party operator traffic",
+    "accepted payloads"
+   ],
+   "produces": [
+    "accepted payloads",
+    "forwarded payloads to the Sensor Fabric"
+   ],
+   "heading": "16. Ingest Gateway",
+   "locator": "deliverable-v1:320-327"
+  },
+  {
+   "capabilities": [
+    {
+     "name": "session lifecycle management",
+     "quote": "A session that stalls beyond the stall window is torn down and re-established."
+    },
+    {
+     "name": "Session lifecycle management",
+     "quote": "A session that stalls beyond the stall window is torn down and re-established."
+    },
+    {
+     "name": "Session teardown and re-establishment",
+     "quote": "A session that stalls beyond the stall window is torn down and re-established."
+    }
+   ],
+   "identifiers": [],
+   "deferred": [
+    {
+     "item": "stall window duration",
+     "id": "",
+     "owner": "operator"
+    }
+   ],
+   "evidence_claims": [],
+   "authority": [],
+   "defers_to": [],
+   "consumes": [
+    "session state",
+    "session stall status"
+   ],
+   "produces": [
+    "new session",
+    "re-established session"
+   ],
+   "heading": "16.2 Session handling",
+   "locator": "deliverable-v1:328-332"
+  },
+  {
+   "capabilities": [],
+   "identifiers": [
+    "IF-IG-001",
+    "IF-IG-002",
+    "IF-IG-003"
+   ],
+   "deferred": [],
+   "evidence_claims": [],
+   "authority": [],
+   "defers_to": [],
+   "consumes": [
+    "Operator session intake"
+   ],
+   "produces": [
+    "Accepted payload forwarding",
+    "Session lifecycle events"
+   ],
+   "heading": "16.3 Interfaces",
+   "locator": "deliverable-v1:333-340"
+  },
+  {
+   "capabilities": [],
+   "identifiers": [
+    "IG-G01",
+    "IG-G02",
+    "IG-G03"
+   ],
+   "deferred": [
+    {
+     "item": "Stall window per operator not agreed",
+     "id": "IG-G01",
+     "owner": "IG lead"
+    },
+    {
+     "item": "Rate limit values not set",
+     "id": "IG-G02",
+     "owner": "IG lead"
+    },
+    {
+     "item": "Behaviour on partial payload",
+     "id": "IG-G03",
+     "owner": "IG lead"
+    }
+   ],
+   "evidence_claims": [
+    {
+     "claim": "Closure evidence for IG-G01 is Operator schedule",
+     "points_to": "Operator schedule"
+    },
+    {
+     "claim": "Closure evidence for IG-G02 is Load analysis",
+     "points_to": "Load analysis"
+    },
+    {
+     "claim": "Closure evidence for IG-G03 is Design note",
+     "points_to": "Design note"
+    },
+    {
+     "claim": "Closure evidence for IG-G01 is an operator schedule",
+     "points_to": "Operator schedule"
+    },
+    {
+     "claim": "Closure evidence for IG-G02 is a load analysis",
+     "points_to": "Load analysis"
+    },
+    {
+     "claim": "Closure evidence for IG-G03 is a design note",
+     "points_to": "Design note"
+    }
+   ],
+   "authority": [],
+   "defers_to": [],
+   "consumes": [],
+   "produces": [],
+   "heading": "16.4 Risks and open decisions",
+   "locator": "deliverable-v1:341-348"
+  },
+  {
+   "capabilities": [
+    {
+     "name": "holds scenario definitions",
+     "quote": "The Scenario Library holds scenario definitions used for exercises and for regression runs against the twin."
+    },
+    {
+     "name": "versiones scenario definitions",
+     "quote": "Definitions are versioned"
+    },
+    {
+     "name": "records scenario version used in runs",
+     "quote": "a run records the scenario version it used"
+    },
+    {
+     "name": "Holds scenario definitions",
+     "quote": "The Scenario Library holds scenario definitions used for exercises and for regression runs against the twin."
+    },
+    {
+     "name": "Versions scenario definitions",
+     "quote": "Definitions are versioned"
+    },
+    {
+     "name": "Records scenario version used in a run",
+     "quote": "a run records the scenario version it used"
+    }
+   ],
+   "identifiers": [],
+   "deferred": [],
+   "evidence_claims": [
+    {
+     "claim": "A run records the scenario version it used",
+     "points_to": "the run"
+    }
+   ],
+   "authority": [],
+   "defers_to": [],
+   "consumes": [
+    "scenario definitions",
+    "scenario version"
+   ],
+   "produces": [
+    "scenario definitions",
+    "scenario version record"
+   ],
+   "heading": "17. Scenario Library",
+   "locator": "deliverable-v1:349-356"
+  },
+  {
+   "capabilities": [
+    {
+     "name": "naming a starting state",
+     "quote": "A scenario names a starting state"
+    },
+    {
+     "name": "naming a sequence of forcing events",
+     "quote": "A scenario names ... a sequence of forcing events"
+    },
+    {
+     "name": "naming a duration",
+     "quote": "A scenario names ... a duration"
+    },
+    {
+     "name": "names starting state",
+     "quote": "A scenario names a starting state"
+    },
+    {
+     "name": "names sequence of forcing events",
+     "quote": "A scenario names ... a sequence of forcing events"
+    },
+    {
+     "name": "names duration",
+     "quote": "A scenario names ... a duration"
+    },
+    {
+     "name": "produces expected outputs",
+     "quote": "Expected outputs ... are produced by the run"
+    },
+    {
+     "name": "compares outputs by hand",
+     "quote": "compared by hand"
+    }
+   ],
+   "identifiers": [],
+   "deferred": [],
+   "evidence_claims": [],
+   "authority": [],
+   "defers_to": [],
+   "consumes": [
+    "starting state",
+    "sequence of forcing events",
+    "duration"
+   ],
+   "produces": [
+    "expected outputs"
+   ],
+   "heading": "17.2 Scenario content",
+   "locator": "deliverable-v1:357-362"
+  },
+  {
+   "capabilities": [
+    {
+     "name": "Scenario definition retrieval",
+     "quote": "Scenario definition retrieval"
+    },
+    {
+     "name": "Scenario version pinning",
+     "quote": "Scenario version pinning"
+    }
+   ],
+   "identifiers": [
+    "IF-SL-001",
+    "IF-SL-002"
+   ],
+   "deferred": [],
+   "evidence_claims": [],
+   "authority": [],
+   "defers_to": [],
+   "consumes": [],
+   "produces": [
+    "Scenario definition",
+    "Scenario version",
+    "Scenario definition retrieval",
+    "Scenario version pinning"
+   ],
+   "heading": "17.3 Interfaces",
+   "locator": "deliverable-v1:363-369"
+  },
+  {
+   "capabilities": [],
+   "identifiers": [
+    "SL-G01",
+    "SL-G02"
+   ],
+   "deferred": [
+    {
+     "item": "Authoring workflow not designed",
+     "id": "SL-G01",
+     "owner": "SL lead"
+    },
+    {
+     "item": "Storage format not selected",
+     "id": "SL-G02",
+     "owner": "SL lead"
+    }
+   ],
+   "evidence_claims": [
+    {
+     "claim": "Closure evidence for SL-G01 is a Design note",
+     "points_to": "Design note"
+    },
+    {
+     "claim": "Closure evidence for SL-G02 is a Format decision",
+     "points_to": "Format decision"
+    }
+   ],
+   "authority": [],
+   "defers_to": [],
+   "consumes": [],
+   "produces": [],
+   "heading": "17.4 Risks and open decisions",
+   "locator": "deliverable-v1:370-376"
+  },
+  {
+   "capabilities": [
+    {
+     "name": "reconstruct past tick range",
+     "quote": "The Replay Service reconstructs any past tick range from the committed state log"
+    },
+    {
+     "name": "re-execute deterministically",
+     "quote": "re-executes it deterministically"
+    },
+    {
+     "name": "Reconstruct past tick range",
+     "quote": "The Replay Service reconstructs any past tick range from the committed state log"
+    },
+    {
+     "name": "Re-execute deterministically",
+     "quote": "re-executes it deterministically"
+    }
+   ],
+   "identifiers": [],
+   "deferred": [],
+   "evidence_claims": [],
+   "authority": [],
+   "defers_to": [],
+   "consumes": [
+    "committed state log",
+    "image set"
+   ],
+   "produces": [],
+   "heading": "18. Replay Service",
+   "locator": "deliverable-v1:377-384"
+  },
+  {
+   "capabilities": [
+    {
+     "name": "Freeze execution order before ingest",
+     "quote": "Runtime Orchestrator freezing execution order before ingest"
+    },
+    {
+     "name": "Prevent reordering within a tick",
+     "quote": "Any component that reorders within a tick breaks replay"
+    },
+    {
+     "name": "Freezes execution order before ingest",
+     "quote": "Runtime Orchestrator freezing execution order before ingest"
+    },
+    {
+     "name": "Prevents reordering within a tick",
+     "quote": "Any component that reorders within a tick breaks replay"
+    },
+    {
+     "name": "Freezing execution order before ingest",
+     "quote": "Replay determinism depends on the Runtime Orchestrator freezing execution order before ingest."
+    },
+    {
+     "name": "Preventing reordering within a tick",
+     "quote": "Any component that reorders within a tick breaks replay."
+    }
+   ],
+   "identifiers": [],
+   "deferred": [],
+   "evidence_claims": [],
+   "authority": [
+    {
+     "capability": "Freeze execution order before ingest",
+     "action": "owns",
+     "owner": "Runtime Orchestrator",
+     "polarity": "owns",
+     "quote": "Replay determinism depends on the Runtime Orchestrator freezing execution order before ingest"
+    },
+    {
+     "capability": "Freezes execution order before ingest",
+     "action": "is responsible for",
+     "owner": "Runtime Orchestrator",
+     "polarity": "owns",
+     "quote": "Replay determinism depends on the Runtime Orchestrator freezing execution order before ingest"
+    },
+    {
+     "capability": "Freezing execution order before ingest",
+     "action": "owns",
+     "owner": "Runtime Orchestrator",
+     "polarity": "owns",
+     "quote": "Replay determinism depends on the Runtime Orchestrator freezing execution order before ingest."
+    }
+   ],
+   "defers_to": [],
+   "consumes": [
+    "execution order",
+    "ingest"
+   ],
+   "produces": [
+    "replay determinism"
+   ],
+   "heading": "18.2 Determinism",
+   "locator": "deliverable-v1:385-389"
+  },
+  {
+   "capabilities": [
+    {
+     "name": "comparison of replay output with original run",
+     "quote": "Replay output is compared with the original run."
+    },
+    {
+     "name": "Replay validation",
+     "quote": "Replay output is compared with the original run."
+    }
+   ],
+   "identifiers": [],
+   "deferred": [],
+   "evidence_claims": [
+    {
+     "claim": "The comparison method is described",
+     "points_to": "the delivery plan"
+    },
+    {
+     "claim": "The comparison method is described in the delivery plan.",
+     "points_to": "the delivery plan"
+    }
+   ],
+   "authority": [],
+   "defers_to": [],
+   "consumes": [
+    "replay output",
+    "original run",
+    "Replay output"
+   ],
+   "produces": [
+    "comparison result"
+   ],
+   "heading": "18.3 Validation of replay",
+   "locator": "deliverable-v1:390-394"
+  },
+  {
+   "capabilities": [
+    {
+     "name": "State log read",
+     "quote": "State log read"
+    },
+    {
+     "name": "Replay execution control",
+     "quote": "Replay execution control"
+    },
+    {
+     "name": "Replay output publication",
+     "quote": "Replay output publication"
+    }
+   ],
+   "identifiers": [
+    "IF-RS-001",
+    "IF-RS-002",
+    "IF-RS-003"
+   ],
+   "deferred": [],
+   "evidence_claims": [],
+   "authority": [],
+   "defers_to": [],
+   "consumes": [
+    "State log",
+    "State log read",
+    "Replay execution control"
+   ],
+   "produces": [
+    "Replay output",
+    "Replay output publication"
+   ],
+   "heading": "18.4 Interfaces",
+   "locator": "deliverable-v1:395-402"
+  },
+  {
+   "capabilities": [],
+   "identifiers": [
+    "RS-G01",
+    "RS-G02"
+   ],
+   "deferred": [
+    {
+     "item": "State log retention insufficient for long replays",
+     "id": "RS-G01",
+     "owner": "Authority"
+    },
+    {
+     "item": "Divergence tolerance not defined",
+     "id": "RS-G02",
+     "owner": "RS lead"
+    }
+   ],
+   "evidence_claims": [
+    {
+     "claim": "Retention decision",
+     "points_to": "Closure evidence"
+    },
+    {
+     "claim": "Tolerance statement",
+     "points_to": "Closure evidence"
+    },
+    {
+     "claim": "Retention decision is recorded",
+     "points_to": "Closure evidence for RS-G01"
+    },
+    {
+     "claim": "Tolerance statement is recorded",
+     "points_to": "Closure evidence for RS-G02"
+    }
+   ],
+   "authority": [],
+   "defers_to": [],
+   "consumes": [],
+   "produces": [],
+   "heading": "18.5 Risks and open decisions",
+   "locator": "deliverable-v1:403-409"
+  },
+  {
+   "capabilities": [
+    {
+     "name": "produces post-run summaries",
+     "quote": "Reporting produces post-run summaries for Authority operations"
+    },
+    {
+     "name": "produces post-run summaries",
+     "quote": "Reporting produces post-run summaries for Authority operations: alerts emitted, thresholds crossed, and reach-level peak levels."
+    },
+    {
+     "name": "produce post-run summaries",
+     "quote": "Reporting produces post-run summaries for Authority operations: alerts emitted, thresholds crossed, and reach-level peak levels."
+    }
+   ],
+   "identifiers": [],
+   "deferred": [],
+   "evidence_claims": [],
+   "authority": [],
+   "defers_to": [],
+   "consumes": [
+    "alerts",
+    "thresholds",
+    "reach-level peak levels"
+   ],
+   "produces": [
+    "post-run summaries"
+   ],
+   "heading": "19. Reporting",
+   "locator": "deliverable-v1:410-416"
+  },
+  {
+   "capabilities": [
+    {
+     "name": "Restate emitted alerts",
+     "quote": "A report can restate which alerts were emitted and when."
+    },
+    {
+     "name": "Restate emitted alerts and timestamps",
+     "quote": "A report can restate which alerts were emitted and when."
+    },
+    {
+     "name": "Restating alert emission history",
+     "quote": "A report can restate which alerts were emitted and when."
+    }
+   ],
+   "identifiers": [],
+   "deferred": [],
+   "evidence_claims": [
+    {
+     "claim": "Inputs that caused a given alert are recorded",
+     "points_to": "the state log"
+    },
+    {
+     "claim": "Inputs that caused a given alert are recorded",
+     "points_to": "state log"
+    }
+   ],
+   "authority": [],
+   "defers_to": [],
+   "consumes": [
+    "alert emission data"
+   ],
+   "produces": [
+    "alert report",
+    "report"
+   ],
+   "heading": "19.2 Alert reconstruction",
+   "locator": "deliverable-v1:417-422"
+  },
+  {
+   "capabilities": [],
+   "identifiers": [
+    "IF-RP-001",
+    "IF-RP-002"
+   ],
+   "deferred": [],
+   "evidence_claims": [],
+   "authority": [],
+   "defers_to": [],
+   "consumes": [],
+   "produces": [
+    "Run summary generation",
+    "Report distribution"
+   ],
+   "heading": "19.3 Interfaces",
+   "locator": "deliverable-v1:423-429"
+  },
+  {
+   "capabilities": [],
+   "identifiers": [
+    "RP-G01",
+    "RP-G02"
+   ],
+   "deferred": [
+    {
+     "item": "Report template not agreed",
+     "id": "RP-G01",
+     "owner": "Authority"
+    },
+    {
+     "item": "Distribution list not defined",
+     "id": "RP-G02",
+     "owner": "Authority"
+    }
+   ],
+   "evidence_claims": [
+    {
+     "claim": "Template sign-off is recorded",
+     "points_to": "Closure evidence for RP-G01"
+    },
+    {
+     "claim": "Distribution policy is recorded",
+     "points_to": "Closure evidence for RP-G02"
+    },
+    {
+     "claim": "Template sign-off is recorded as closure evidence",
+     "points_to": "RP-G01 closure evidence column"
+    },
+    {
+     "claim": "Distribution policy is recorded as closure evidence",
+     "points_to": "RP-G02 closure evidence column"
+    }
+   ],
+   "authority": [],
+   "defers_to": [],
+   "consumes": [],
+   "produces": [],
+   "heading": "19.4 Risks and open decisions",
+   "locator": "deliverable-v1:430-436"
+  },
+  {
+   "capabilities": [
+    {
+     "name": "read alerts",
+     "quote": "Operators read alerts"
+    },
+    {
+     "name": "acknowledge alerts",
+     "quote": "acknowledge them"
+    },
+    {
+     "name": "read reports",
+     "quote": "Analysts read alerts, reports"
+    },
+    {
+     "name": "read state log",
+     "quote": "and the state log"
+    },
+    {
+     "name": "manage scenario definitions",
+     "quote": "manage scenario definitions"
+    },
+    {
+     "name": "Define access control roles",
+     "quote": "Three roles are defined: Operator, Analyst, and Administrator."
+    },
+    {
+     "name": "Allow operators to read alerts",
+     "quote": "Operators read alerts"
+    },
+    {
+     "name": "Allow operators to acknowledge alerts",
+     "quote": "acknowledge them"
+    },
+    {
+     "name": "Allow analysts to read alerts",
+     "quote": "Analysts read alerts"
+    },
+    {
+     "name": "Allow analysts to read reports",
+     "quote": "reports"
+    },
+    {
+     "name": "Allow analysts to read state log",
+     "quote": "the state log"
+    },
+    {
+     "name": "Allow administrators to manage scenario definitions",
+     "quote": "Administrators additionally manage scenario definitions"
+    }
+   ],
+   "identifiers": [],
+   "deferred": [],
+   "evidence_claims": [],
+   "authority": [],
+   "defers_to": [],
+   "consumes": [
+    "alerts",
+    "reports",
+    "state log",
+    "scenario definitions"
+   ],
+   "produces": [
+    "acknowledged alerts"
+   ],
+   "heading": "20. Identity and Access",
+   "locator": "deliverable-v1:437-444"
+  },
+  {
+   "capabilities": [
+    {
+     "name": "service-to-service authentication",
+     "quote": "Components authenticate to one another using short-lived tokens issued by the platform identity provider."
+    },
+    {
+     "name": "token scoping",
+     "quote": "Tokens are scoped to the calling component."
+    },
+    {
+     "name": "Service-to-service authentication",
+     "quote": "Components authenticate to one another using short-lived tokens issued by the platform identity provider."
+    }
+   ],
+   "identifiers": [],
+   "deferred": [],
+   "evidence_claims": [],
+   "authority": [],
+   "defers_to": [],
+   "consumes": [
+    "short-lived tokens"
+   ],
+   "produces": [
+    "tokens",
+    "short-lived tokens",
+    "authentication"
+   ],
+   "heading": "20.2 Service-to-service authentication",
+   "locator": "deliverable-v1:445-449"
+  },
+  {
+   "capabilities": [],
+   "identifiers": [
+    "IA-G01",
+    "IA-G02"
+   ],
+   "deferred": [
+    {
+     "item": "Identity provider not selected",
+     "id": "IA-G01",
+     "owner": "IA lead"
+    },
+    {
+     "item": "Rotation responsibilities unassigned",
+     "id": "IA-G02",
+     "owner": "IA lead"
+    }
+   ],
+   "evidence_claims": [
+    {
+     "claim": "Closure evidence for IA-G01 is a Product decision",
+     "points_to": "Product decision"
+    },
+    {
+     "claim": "Closure evidence for IA-G02 is a RACI",
+     "points_to": "RACI"
+    }
+   ],
+   "authority": [],
+   "defers_to": [],
+   "consumes": [],
+   "produces": [],
+   "heading": "20.3 Credential rotation",
+   "locator": "deliverable-v1:450-460"
+  },
+  {
+   "capabilities": [
+    {
+     "name": "Store raw gauge and operator readings",
+     "quote": "Telemetry archive | Raw gauge and operator readings"
+    },
+    {
+     "name": "Store committed per-tick state",
+     "quote": "State log | Committed per-tick state"
+    },
+    {
+     "name": "Store fitted vectors and their event sets",
+     "quote": "Calibration store | Fitted vectors and their event sets"
+    },
+    {
+     "name": "Store scenario definitions",
+     "quote": "Scenario store | Scenario definitions"
+    },
+    {
+     "name": "Store generated run summaries",
+     "quote": "Report store | Generated run summaries"
+    },
+    {
+     "name": "Store raw gauge and operator readings",
+     "quote": "Raw gauge and operator readings"
+    },
+    {
+     "name": "Store committed per-tick state",
+     "quote": "Committed per-tick state"
+    },
+    {
+     "name": "Store fitted vectors and their event sets",
+     "quote": "Fitted vectors and their event sets"
+    },
+    {
+     "name": "Store scenario definitions",
+     "quote": "Scenario definitions"
+    },
+    {
+     "name": "Store generated run summaries",
+     "quote": "Generated run summaries"
+    },
+    {
+     "name": "Store telemetry archive",
+     "quote": "Telemetry archive | Raw gauge and operator readings"
+    },
+    {
+     "name": "Store state log",
+     "quote": "State log | Committed per-tick state"
+    },
+    {
+     "name": "Store calibration data",
+     "quote": "Calibration store | Fitted vectors and their event sets"
+    },
+    {
+     "name": "Store report summaries",
+     "quote": "Report store | Generated run summaries"
+    }
+   ],
+   "identifiers": [
+    "Telemetry archive",
+    "State log",
+    "Calibration store",
+    "Scenario store",
+    "Report store"
+   ],
+   "deferred": [],
+   "evidence_claims": [],
+   "authority": [
+    {
+     "capability": "Store raw gauge and operator readings",
+     "action": "owns",
+     "owner": "SF lead",
+     "polarity": "owns",
+     "quote": "Telemetry archive | Raw gauge and operator readings | SF lead"
+    },
+    {
+     "capability": "Store committed per-tick state",
+     "action": "owns",
+     "owner": "RO lead",
+     "polarity": "owns",
+     "quote": "State log | Committed per-tick state | RO lead"
+    },
+    {
+     "capability": "Store fitted vectors and their event sets",
+     "action": "owns",
+     "owner": "CP lead",
+     "polarity": "owns",
+     "quote": "Calibration store | Fitted vectors and their event sets | CP lead"
+    },
+    {
+     "capability": "Store scenario definitions",
+     "action": "owns",
+     "owner": "SL lead",
+     "polarity": "owns",
+     "quote": "Scenario store | Scenario definitions | SL lead"
+    },
+    {
+     "capability": "Store generated run summaries",
+     "action": "owns",
+     "owner": "RP lead",
+     "polarity": "owns",
+     "quote": "Report store | Generated run summaries | RP lead"
+    },
+    {
+     "capability": "Store telemetry archive",
+     "action": "owns",
+     "owner": "SF lead",
+     "polarity": "owns",
+     "quote": "Telemetry archive | Raw gauge and operator readings | SF lead"
+    },
+    {
+     "capability": "Store state log",
+     "action": "owns",
+     "owner": "RO lead",
+     "polarity": "owns",
+     "quote": "State log | Committed per-tick state | RO lead"
+    },
+    {
+     "capability": "Store calibration data",
+     "action": "owns",
+     "owner": "CP lead",
+     "polarity": "owns",
+     "quote": "Calibration store | Fitted vectors and their event sets | CP lead"
+    },
+    {
+     "capability": "Store report summaries",
+     "action": "owns",
+     "owner": "RP lead",
+     "polarity": "owns",
+     "quote": "Report store | Generated run summaries | RP lead"
+    }
+   ],
+   "defers_to": [],
+   "consumes": [],
+   "produces": [],
+   "heading": "21. Data stores and retention",
+   "locator": "deliverable-v1:461-472"
+  },
+  {
+   "capabilities": [
+    {
+     "name": "telemetry archive retention period management",
+     "quote": "The telemetry archive retention period remains open under SF-G05."
+    },
+    {
+     "name": "indefinite retention for other stores",
+     "quote": "Other stores retain indefinitely."
+    },
+    {
+     "name": "retention period management",
+     "quote": "The telemetry archive retention period remains open under SF-G05."
+    },
+    {
+     "name": "other stores indefinite retention",
+     "quote": "Other stores retain indefinitely."
+    }
+   ],
+   "identifiers": [
+    "SF-G05"
+   ],
+   "deferred": [
+    {
+     "item": "telemetry archive retention period",
+     "id": "SF-G05",
+     "owner": ""
+    }
+   ],
+   "evidence_claims": [],
+   "authority": [],
+   "defers_to": [],
+   "consumes": [],
+   "produces": [],
+   "heading": "21.2 Retention",
+   "locator": "deliverable-v1:473-477"
+  },
+  {
+   "capabilities": [],
+   "identifiers": [],
+   "deferred": [],
+   "evidence_claims": [
+    {
+     "claim": "Deletion behaviour at end of retention is described",
+     "points_to": "the delivery plan"
+    }
+   ],
+   "authority": [],
+   "defers_to": [],
+   "consumes": [],
+   "produces": [],
+   "heading": "21.3 Deletion",
+   "locator": "deliverable-v1:478-483"
+  },
+  {
+   "capabilities": [],
+   "identifiers": [],
+   "deferred": [],
+   "evidence_claims": [],
+   "authority": [],
+   "defers_to": [],
+   "consumes": [],
+   "produces": [],
+   "heading": "22.1 Availability",
+   "locator": "deliverable-v1:484-488"
+  },
+  {
+   "capabilities": [
+    {
+     "name": "sizing for gauge population",
+     "quote": "The Sensor Fabric is sized for the current gauge population plus fifty percent."
+    },
+    {
+     "name": "sensor fabric sizing",
+     "quote": "The Sensor Fabric is sized for the current gauge population plus fifty percent."
+    }
+   ],
+   "identifiers": [],
+   "deferred": [],
+   "evidence_claims": [],
+   "authority": [],
+   "defers_to": [],
+   "consumes": [
+    "gauge population",
+    "current gauge population"
+   ],
+   "produces": [
+    "sized sensor fabric"
+   ],
+   "heading": "22.2 Load",
+   "locator": "deliverable-v1:489-493"
+  },
+  {
+   "capabilities": [
+    {
+     "name": "continues operation on fixed gauges",
+     "quote": "the Sensor Fabric continues on fixed gauges alone"
+    },
+    {
+     "name": "marks affected reaches as degraded",
+     "quote": "marks affected reaches as degraded"
+    },
+    {
+     "name": "Continue operation on fixed gauges",
+     "quote": "the Sensor Fabric continues on fixed gauges alone"
+    },
+    {
+     "name": "Mark affected reaches as degraded",
+     "quote": "marks affected reaches as degraded"
+    }
+   ],
+   "identifiers": [],
+   "deferred": [],
+   "evidence_claims": [],
+   "authority": [],
+   "defers_to": [],
+   "consumes": [
+    "fixed gauges"
+   ],
+   "produces": [
+    "degraded status for affected reaches"
+   ],
+   "heading": "22.3 Degradation",
+   "locator": "deliverable-v1:494-498"
+  },
+  {
+   "capabilities": [],
+   "identifiers": [
+    "NF-G01",
+    "NF-G02"
+   ],
+   "deferred": [
+    {
+     "item": "Recovery objectives not set",
+     "id": "NF-G01",
+     "owner": "Authority"
+    },
+    {
+     "item": "Per-component load targets absent",
+     "id": "NF-G02",
+     "owner": "Architecture lead"
+    }
+   ],
+   "evidence_claims": [
+    {
+     "claim": "Continuity requirement",
+     "points_to": "Closure evidence for NF-G01"
+    },
+    {
+     "claim": "Sizing note",
+     "points_to": "Closure evidence for NF-G02"
+    },
+    {
+     "claim": "Continuity requirement",
+     "points_to": "Closure evidence"
+    },
+    {
+     "claim": "Sizing note",
+     "points_to": "Closure evidence"
+    }
+   ],
+   "authority": [],
+   "defers_to": [],
+   "consumes": [],
+   "produces": [],
+   "heading": "22.4 Risks and open decisions",
+   "locator": "deliverable-v1:499-505"
+  },
+  {
+   "capabilities": [
+    {
+     "name": "crosses trust boundary",
+     "quote": "The Ingest Gateway is the only component that crosses it"
+    }
+   ],
+   "identifiers": [
+    "Authority trust boundary",
+    "Ingest Gateway",
+    "Authority",
+    "Operator platforms"
+   ],
+   "deferred": [],
+   "evidence_claims": [],
+   "authority": [
+    {
+     "capability": "crosses trust boundary",
+     "action": "is the only component that",
+     "owner": "Ingest Gateway",
+     "polarity": "owns",
+     "quote": "The Ingest Gateway is the only component that crosses it"
+    },
+    {
+     "capability": "crosses trust boundary",
+     "action": "is outside",
+     "owner": "Operator platforms",
+     "polarity": "excludes",
+     "quote": "Operator platforms are outside the Authority trust boundary."
+    },
+    {
+     "capability": "crosses trust boundary",
+     "action": "is the only component",
+     "owner": "Ingest Gateway",
+     "polarity": "owns",
+     "quote": "The Ingest Gateway is the only component that crosses it"
+    },
+    {
+     "capability": "crossing the Authority trust boundary",
+     "action": "is the only component that",
+     "owner": "Ingest Gateway",
+     "polarity": "owns",
+     "quote": "The Ingest Gateway is the only component that crosses it"
+    },
+    {
+     "capability": "crossing the Authority trust boundary",
+     "action": "are outside",
+     "owner": "Operator platforms",
+     "polarity": "excludes",
+     "quote": "Operator platforms are outside the Authority trust boundary"
+    }
+   ],
+   "defers_to": [],
+   "consumes": [
+    "inbound sessions"
+   ],
+   "produces": [],
+   "heading": "23. Trust boundaries",
+   "locator": "deliverable-v1:506-510"
+  },
+  {
+   "capabilities": [
+    {
+     "name": "Modelling sustained precipitation rate above drainage capacity",
+     "quote": "Sustained precipitation rate above drainage capacity is modelled as a forcing input to the Hydrology Model."
+    },
+    {
+     "name": "modelling sustained precipitation rate above drainage capacity",
+     "quote": "Sustained precipitation rate above drainage capacity is modelled as a forcing input to the Hydrology Model."
+    },
+    {
+     "name": "expressing precipitation intensity",
+     "quote": "Intensity is expressed per reach per tick."
+    }
+   ],
+   "identifiers": [],
+   "deferred": [],
+   "evidence_claims": [],
+   "authority": [],
+   "defers_to": [],
+   "consumes": [
+    "sustained precipitation rate above drainage capacity",
+    "precipitation rate"
+   ],
+   "produces": [
+    "forcing input to the Hydrology Model",
+    "forcing input"
+   ],
+   "heading": "24. Precipitation handling",
+   "locator": "deliverable-v1:511-515"
+  },
+  {
+   "capabilities": [
+    {
+     "name": "produces the RunSummary",
+     "quote": "Reporting produces the RunSummary"
+    },
+    {
+     "name": "produces the RunSummary",
+     "quote": "Reporting produces the RunSummary at end of run"
+    }
+   ],
+   "identifiers": [],
+   "deferred": [],
+   "evidence_claims": [
+    {
+     "claim": "state log and alert ledger are used as inputs",
+     "points_to": "state log and the alert ledger"
+    }
+   ],
+   "authority": [],
+   "defers_to": [],
+   "consumes": [
+    "state log",
+    "alert ledger"
+   ],
+   "produces": [
+    "RunSummary"
+   ],
+   "heading": "25. Run report handoff",
+   "locator": "deliverable-v1:516-522"
+  },
+  {
+   "capabilities": [
+    {
+     "name": "evaluates RunSummary against exercise objectives",
+     "quote": "operations evaluates the RunSummary against the exercise objectives"
+    },
+    {
+     "name": "decides whether a re-run is required",
+     "quote": "decides whether a re-run is required"
+    }
+   ],
+   "identifiers": [],
+   "deferred": [],
+   "evidence_claims": [],
+   "authority": [
+    {
+     "capability": "evaluates RunSummary against exercise objectives",
+     "action": "evaluates",
+     "owner": "operations",
+     "polarity": "owns",
+     "quote": "operations evaluates the RunSummary against the exercise objectives"
+    },
+    {
+     "capability": "decides whether a re-run is required",
+     "action": "decides",
+     "owner": "operations",
+     "polarity": "owns",
+     "quote": "decides whether a re-run is required"
+    }
+   ],
+   "defers_to": [],
+   "consumes": [
+    "RunSummary",
+    "exercise objectives"
+   ],
+   "produces": [
+    "decision on re-run"
+   ],
+   "heading": "25.2 Operations responsibility",
+   "locator": "deliverable-v1:523-530"
+  },
+  {
+   "capabilities": [],
+   "identifiers": [
+    "R-010",
+    "R-011",
+    "R-012",
+    "R-013",
+    "R-014",
+    "R-015",
+    "R-020",
+    "R-030",
+    "R-031",
+    "R-040",
+    "R-041",
+    "R-050",
+    "R-051",
+    "R-070",
+    "R-080"
+   ],
+   "deferred": [],
+   "evidence_claims": [
+    {
+     "claim": "Requirement R-010 is addressed in Section 4",
+     "points_to": "Section 4"
+    },
+    {
+     "claim": "Requirement R-011 is addressed in Sections 6.4, 7.4, 8.5, 11.2",
+     "points_to": "Sections 6.4, 7.4, 8.5, 11.2"
+    },
+    {
+     "claim": "Requirement R-012 is addressed in Sections 5 to 11",
+     "points_to": "Sections 5 to 11"
+    },
+    {
+     "claim": "Requirement R-013 is addressed in Sections 5.2, 8.4",
+     "points_to": "Sections 5.2, 8.4"
+    },
+    {
+     "claim": "Requirement R-014 is addressed in Section 5.3",
+     "points_to": "Section 5.3"
+    },
+    {
+     "claim": "Requirement R-015 is addressed in Section 8.2",
+     "points_to": "Section 8.2"
+    },
+    {
+     "claim": "Requirement R-020 is addressed in Sections 5.5, 6.5, 7.5, 8.6, 10.4, 11.3",
+     "points_to": "Sections 5.5, 6.5, 7.5, 8.6, 10.4, 11.3"
+    },
+    {
+     "claim": "Requirement R-030 is addressed in Section 10",
+     "points_to": "Section 10"
+    },
+    {
+     "claim": "Requirement R-031 is addressed in Section 8",
+     "points_to": "Section 8"
+    },
+    {
+     "claim": "Requirement R-040 is addressed in This document",
+     "points_to": "This document"
+    },
+    {
+     "claim": "Requirement R-041 is addressed in Appendix A",
+     "points_to": "Appendix A"
+    },
+    {
+     "claim": "Requirement R-050 is addressed in Section 21",
+     "points_to": "Section 21"
+    },
+    {
+     "claim": "Requirement R-051 is addressed in Section 21",
+     "points_to": "Section 21"
+    },
+    {
+     "claim": "Requirement R-070 is addressed in Section 18",
+     "points_to": "Section 18"
+    },
+    {
+     "claim": "Requirement R-080 is addressed in Section 17",
+     "points_to": "Section 17"
+    }
+   ],
+   "authority": [],
+   "defers_to": [],
+   "consumes": [],
+   "produces": [],
+   "heading": "Appendix A \u2014 Requirement mapping",
+   "locator": "deliverable-v1:531-550"
+  },
+  {
+   "capabilities": [],
+   "identifiers": [
+    "RSK-01",
+    "RSK-02",
+    "RSK-03",
+    "RSK-04",
+    "RSK-05"
+   ],
+   "deferred": [
+    {
+     "item": "Operator agreements not executed before build",
+     "id": "RSK-01",
+     "owner": "Authority"
+    },
+    {
+     "item": "Historical archive insufficient for calibration",
+     "id": "RSK-02",
+     "owner": "CP lead"
+    },
+    {
+     "item": "Solver selection slips beyond design freeze",
+     "id": "RSK-03",
+     "owner": "HM lead"
+    },
+    {
+     "item": "Tick budget exceeded under peak load",
+     "id": "RSK-04",
+     "owner": "RO lead"
+    },
+    {
+     "item": "Threshold values not agreed in time",
+     "id": "RSK-05",
+     "owner": "Authority"
+    },
+    {
+     "item": "Operator agreements",
+     "id": "RSK-01",
+     "owner": "Authority"
+    },
+    {
+     "item": "Historical archive sufficiency for calibration",
+     "id": "RSK-02",
+     "owner": "CP lead"
+    },
+    {
+     "item": "Solver selection",
+     "id": "RSK-03",
+     "owner": "HM lead"
+    },
+    {
+     "item": "Tick budget under peak load",
+     "id": "RSK-04",
+     "owner": "RO lead"
+    },
+    {
+     "item": "Threshold values",
+     "id": "RSK-05",
+     "owner": "Authority"
+    }
+   ],
+   "evidence_claims": [],
+   "authority": [],
+   "defers_to": [],
+   "consumes": [],
+   "produces": [],
+   "heading": "Appendix B \u2014 Risk register",
+   "locator": "deliverable-v1:551-560"
+  },
+  {
+   "capabilities": [
+    {
+     "name": "tick advancement signal publication",
+     "quote": "IF-RO-001 is the tick advancement signal published by the Runtime Orchestrator to all components"
+    },
+    {
+     "name": "state commit notification",
+     "quote": "IF-RO-002 is the state commit notification"
+    },
+    {
+     "name": "Publish tick advancement signal",
+     "quote": "IF-RO-001 is the tick advancement signal published by the Runtime Orchestrator to all components"
+    },
+    {
+     "name": "Publish state commit notification",
+     "quote": "IF-RO-002 is the state commit notification"
+    }
+   ],
+   "identifiers": [
+    "IF-SF-001",
+    "IF-SF-002",
+    "IF-SF-003",
+    "IF-SF-004",
+    "IF-HM-001",
+    "IF-HM-002",
+    "IF-HM-003",
+    "IF-AS-001",
+    "IF-AS-002",
+    "IF-RO-001",
+    "IF-RO-002",
+    "IF-PA-001",
+    "IF-PA-002",
+    "IF-PA-003"
+   ],
+   "deferred": [],
+   "evidence_claims": [],
+   "authority": [
+    {
+     "capability": "Publish tick advancement signal",
+     "action": "publishes",
+     "owner": "Runtime Orchestrator",
+     "polarity": "owns",
+     "quote": "IF-RO-001 is the tick advancement signal published by the Runtime Orchestrator to all components"
+    },
+    {
+     "capability": "tick advancement signal publication",
+     "action": "published by",
+     "owner": "Runtime Orchestrator",
+     "polarity": "owns",
+     "quote": "IF-RO-001 is the tick advancement signal published by the Runtime Orchestrator to all components"
+    }
+   ],
+   "defers_to": [],
+   "consumes": [],
+   "produces": [
+    "tick advancement signal",
+    "state commit notification"
+   ],
+   "heading": "Appendix C \u2014 Consolidated interface catalogue",
+   "locator": "deliverable-v1:561-568"
+  },
+  {
+   "capabilities": [],
+   "identifiers": [],
+   "deferred": [],
+   "evidence_claims": [
+    {
+     "claim": "Trade-off analyses for each subsystem are recorded",
+     "points_to": "Appendix C"
+    },
+    {
+     "claim": "Retention periods for every store are recorded",
+     "points_to": "Section 21"
+    },
+    {
+     "claim": "Component maturity assessments are recorded",
+     "points_to": "Section 9"
+    },
+    {
+     "claim": "Open gaps are recorded",
+     "points_to": "the per-component registers"
+    },
+    {
+     "claim": "Risks are recorded",
+     "points_to": "Appendix B"
+    }
+   ],
+   "authority": [],
+   "defers_to": [],
+   "consumes": [],
+   "produces": [],
+   "heading": "Appendix D \u2014 Evidence locations",
+   "locator": "deliverable-v1:569-574"
+  }
+ ]
+}

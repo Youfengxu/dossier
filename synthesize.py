@@ -377,6 +377,29 @@ def main():
                         help="normalise owner strings onto the document's named "
                              "components; without it, 240 free-text owners make "
                              "the pair space unsearchable")
+    # Four decisions below (DESIGN 3.24, 3.26, 3.28, 3.30) were each argued in
+    # DESIGN with a number, and none of those numbers could be re-derived: the
+    # scorer that produced them has been deleted for measuring nothing, and the
+    # behaviour they describe was unconditional, so there was no second arm to
+    # compare against. A claim with no way to switch it off is an assertion, not
+    # a measurement. Each flag below restores the behaviour that preceded the
+    # decision, so DESIGN can state what flipping it costs.
+    parser.add_argument("--no-normalise", action="store_true",
+                        help="DESIGN 3.24 off: compare owner strings as free "
+                             "text instead of resolving them onto the "
+                             "document's component vocabulary")
+    parser.add_argument("--no-polarity", action="store_true",
+                        help="DESIGN 3.26 off: count 'Does not own' entries as "
+                             "ownership claims, which is what the pipeline did "
+                             "before polarity was recorded")
+    parser.add_argument("--object-identity", action="store_true",
+                        help="DESIGN 3.28 off: a capability is its object "
+                             "alone, so different verbs on one artefact are one "
+                             "slot again")
+    parser.add_argument("--authority-as-dataflow", action="store_true",
+                        help="DESIGN 3.30 off: re-admit produces/consumes as "
+                             "ownership claims, where data-flow sentences sat "
+                             "before they were routed out of authority")
     parser.add_argument("--cap", type=int, default=900,
                         help="maximum pairs to adjudicate per class")
     parser.add_argument("--embed-url",
@@ -387,6 +410,9 @@ def main():
     project = os.path.abspath(os.path.expanduser(args.project))
     data = json.load(open(os.path.join(project, args.inventory), encoding="utf-8"))
     sections = [s for s in data["sections"] if s and "error" not in s]
+    # Needed by D6, and by --authority-as-dataflow to attribute a produces entry
+    # to somebody, so it is resolved once here rather than at either use.
+    owners_by_section = section_owner_map(sections)
 
     def flatten(key):
         out = []
@@ -406,18 +432,72 @@ def main():
     # disclaimer as a claim inverts the meaning and manufactures conflicts: on a
     # real architecture the strongest-looking dual binding was Population's
     # explicit exclusion of node_id creation, which Network legitimately owns.
-    authority = [e for e in authority_all
-                 if (e.get("polarity") or "owns") != "excludes"]
-    excluded_claims = [e for e in authority_all
-                       if e.get("polarity") == "excludes"]
+    #
+    # --no-polarity is the pipeline before that: both sub-lists flattened into
+    # one pool, disclaimers indistinguishable from claims. The inventory still
+    # records the field, so the ablation ignores it rather than re-extracting —
+    # extraction is held constant across every arm or the comparison means
+    # nothing.
+    if args.no_polarity:
+        authority, excluded_claims = list(authority_all), []
+    else:
+        authority = [e for e in authority_all
+                     if (e.get("polarity") or "owns") != "excludes"]
+        excluded_claims = [e for e in authority_all
+                           if e.get("polarity") == "excludes"]
     defers = flatten("defers_to")
     produces = flatten("produces")
     consumes = flatten("consumes")
     claims = flatten("evidence_claims")
 
-    if excluded_claims:
+    # --authority-as-dataflow. The 3.30 fix itself lives in the extraction
+    # prompt — "X returns Y" goes to produces/consumes, not to authority — and
+    # that file is held constant here, so the restoration has to happen
+    # downstream: fold produces/consumes back into the ownership pool, which is
+    # where a data-flow sentence sat before the split.
+    #
+    # One thing genuinely cannot be restored. The old extractor read the owner
+    # off the sentence; produces/consumes are bare noun phrases with no owner at
+    # all, so the component the section is about is the only attribution left.
+    # Entries in a section that names no component are dropped rather than given
+    # an empty owner, which would collide with every other empty one and invent
+    # conflicts this flag is not meant to test. Produces/consumes are left in
+    # place for D8: 3.30 moved data flow OUT of authority, it did not move the
+    # inputs and outputs list anywhere.
+    folded = []
+    if args.authority_as_dataflow:
+        for verb, entries in (("produces", produces), ("consumes", consumes)):
+            for entry in entries:
+                who = defer_source(entry, owners_by_section)
+                value = (entry.get("value") or entry.get("name") or "").strip()
+                if not who or not value:
+                    continue
+                item = dict(entry)
+                item.update({"capability": value, "action": verb, "owner": who,
+                             "polarity": "owns", "_dataflow": True})
+                folded.append(item)
+        authority = authority + folded
+
+    ablations = [name for name, on in (
+        ("--no-normalise", args.no_normalise),
+        ("--no-polarity", args.no_polarity),
+        ("--object-identity", args.object_identity),
+        ("--authority-as-dataflow", args.authority_as_dataflow)) if on]
+    if ablations:
+        print("ablation:  " + "  ".join(ablations) +
+              "\n           this run restores older behaviour and is NOT the "
+              "shipped configuration")
+    if args.no_polarity:
+        disclaimers = sum(1 for e in authority_all
+                          if e.get("polarity") == "excludes")
+        print(f"           {disclaimers} explicit exclusions counted AS "
+              f"ownership claims")
+    elif excluded_claims:
         print(f"           {len(excluded_claims)} explicit exclusions dropped "
               f"from the ownership comparison")
+    if folded:
+        print(f"           {len(folded)} produces/consumes entries re-admitted "
+              f"as ownership claims")
     print(f"inventory: {len(sections)} sections, {len(authority)} authority "
           f"assertions, {len(defers)} deferrals,\n"
           f"           {len(produces)} produces / {len(consumes)} consumes, "
@@ -432,7 +512,11 @@ def main():
                   file=sys.stderr)
             embedder = None
 
-    comps, excluded = load_components(os.path.join(project, args.components))
+    # --no-normalise is simply not having the vocabulary. Without it the owner
+    # key falls back to the free text the document happens to use, which is the
+    # state DESIGN 3.24 was written against.
+    comps, excluded = ({}, set()) if args.no_normalise else \
+        load_components(os.path.join(project, args.components))
     if comps:
         kept = 0
         for entry in authority:
@@ -453,7 +537,16 @@ def main():
     # the object grouping rather than a second tuned one.
     owner_key = "_component" if comps else "owner"
     for group in group_by_concept(authority, "capability", embedder):
-        for sub in group_by_concept(group["members"], "action", embedder):
+        # --object-identity collapses the action grouping to a single bucket, so
+        # a capability is its object again. This also readmits entries the
+        # action grouping drops on the floor — group_by_concept keeps only
+        # members whose key field has words in it, and an authority entry with
+        # no action verb has none — which is part of the older behaviour rather
+        # than a side effect of the flag.
+        subgroups = ([{"members": group["members"], "label": ""}]
+                     if args.object_identity
+                     else group_by_concept(group["members"], "action", embedder))
+        for sub in subgroups:
             owners = {}
             for entry in sub["members"]:
                 who = entry.get(owner_key) if comps else norm(entry.get("owner", ""))
@@ -476,7 +569,6 @@ def main():
     #
     # The weak shape is deferred-and-never-owned, kept as a fallback for when
     # only part of a chain was captured.
-    owners_by_section = section_owner_map(sections)
     owned_vectors = None
     if embedder is not None and authority:
         owned_vectors = embedder.embed([e.get("capability", "") for e in authority])

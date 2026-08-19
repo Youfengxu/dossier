@@ -27,8 +27,14 @@ import sys
 
 # A reference counts only when DESIGN is named: "DESIGN §3.4", "DESIGN.md §4a",
 # "design 3.11". A bare "§13" is a document section, not a claim about this repo.
-CITATION = re.compile(r"\bDESIGN(?:\.md)?\s*(?:§\s*)?([0-9]+(?:\.[0-9]+)*[a-z]?)\b"
-                      r"|\bDESIGN(?:\.md)?\s*§\s*([A-Z])\b", re.I)
+# The backtick is why ARCHITECTURE.md was invisible. It writes every citation as
+# `DESIGN` §3.4 — markdown code style — and a pattern that ran DESIGN straight
+# into the section number matched none of its eighteen references, including a
+# deliberately planted dangling one. The document with no automated checking was
+# the document the checker could not see, which is the worst way to not have a
+# check: it looks like you have one.
+CITATION = re.compile(r"\bDESIGN(?:\.md)?[`\s]*(?:§\s*)?([0-9]+(?:\.[0-9]+)*[a-z]?)\b"
+                      r"|\bDESIGN(?:\.md)?[`\s]*§\s*([A-Z])\b", re.I)
 HEADING = re.compile(r"^#{2,4}\s+(§?\s*)?([0-9]+(?:\.[0-9]+)*[a-z]?|[A-Z])\b", re.M)
 
 
@@ -42,6 +48,7 @@ def main():
 
     dangling = []
     for path in sorted(root.glob("*.py")) + [root / "DESIGN.md", root / "README.md",
+                                             root / "ARCHITECTURE.md",
                                              root / "dossier"]:
         # This file quotes the dangling references it was written to catch, so
         # scanning itself reports them forever. The scrub checker needed the

@@ -14,6 +14,11 @@ inventory*.json
 # the check the README tells a newcomer to run first.
 !fixtures/*/obligations.yaml
 !fixtures/*/obligations-baseline.yaml
+# The inventory behind DESIGN §3.24-§3.30's ablation table. Extraction is the
+# slow, model-dependent stage, so the arms are only comparable if they share one
+# inventory — and if it is not committed, not a single row of that table can be
+# reproduced from a clone. Same reason the two files above are negated.
+!fixtures/floodtwin/inv-ablation.json
 
 # Working documents that name client identifiers by location. This repository is
 # the one that gets published, so anything naming the engagement lives here and

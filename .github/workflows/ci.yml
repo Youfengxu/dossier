@@ -34,6 +34,15 @@ jobs:
         # nothing was pointing it here.
         run: python3 check-refs.py
 
+      - name: unit tests
+        run: python3 run-tests.py
+
+      - name: the tests actually catch breakage
+        # Mutates each covered function, confirms the named tests fail, restores.
+        # A suite that passes against broken code is the failure mode worth
+        # hunting, and it is the one that looks like success.
+        run: python3 run-tests.py --mutate
+
       - name: every tool loads and answers --help
         run: |
           fail=0
