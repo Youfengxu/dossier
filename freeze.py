@@ -242,7 +242,7 @@ def main():
         previous = {d["slug"]: d for d in json.load(open(manifest_path))["documents"]}
 
     os.makedirs(parsed_dir, exist_ok=True)
-    entries, drift, wrote = [], [], []
+    entries, drift, wrote, invalidated = [], [], [], []
 
     for doc in documents:
         relpath, slug = doc["path"], doc["slug"]
@@ -278,6 +278,22 @@ def main():
                     drift.append(f"{slug}: FROZEN TEXT edited since freeze")
         else:
             text = extract(project, extractor, relpath)
+            # A re-freeze does not MOVE locators, it invalidates them, and until
+            # now it said so only in --help. The moment it happens is the moment
+            # the operator needs to know: source_sha256 is unchanged, so anything
+            # pinned to the SOURCE still validates, and every later --check
+            # reports clean. "Every citation in this project is off by one" was
+            # observationally identical to "nothing happened".
+            if args.refreeze and frozen and prior:
+                was = len(open(out_path, "rb").read().decode(
+                    "utf-8", "replace").splitlines())
+                now = len(text.decode("utf-8", "replace").splitlines())
+                new_hash = sha256_bytes(text)
+                if new_hash != prior.get("text_sha256"):
+                    invalidated.append(
+                        f"{slug}: {prior.get('text_sha256','?')[:12]} -> "
+                        f"{new_hash[:12]}, {was} lines -> {now}"
+                        f"{'' if was == now else '  (EVERY LOCATOR SHIFTS)'}")
             with open(out_path, "wb") as handle:
                 handle.write(text)
             text_hash = sha256_bytes(text)
@@ -322,6 +338,16 @@ def main():
     # rests on — that a locator points into text derived from a known source —
     # and left no trace that it had happened. Refuse instead, and make the
     # operator say --refreeze, which already warns that it invalidates locators.
+    if invalidated:
+        print("\nRE-FROZEN — existing locators into these documents are now void:",
+              file=sys.stderr)
+        for item in invalidated:
+            print("  " + item, file=sys.stderr)
+        print("\nAnything that cited these documents must be RE-RUN, not re-read:\n"
+              "citations record a line number, and the lines have moved. Note that\n"
+              "source_sha256 is unchanged, so a --check will report clean from here.",
+              file=sys.stderr)
+
     if drift:
         print("\nDRIFT — manifest NOT updated:", file=sys.stderr)
         for item in drift:

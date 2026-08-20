@@ -10,6 +10,7 @@ review machine. Handles typical vendor deliverables well enough for grep and rea
 Tables come out as sequential paragraph text (cell structure is lost but content
 is preserved), which is fine for searching and quoting.
 """
+import os
 import sys, zipfile, re
 from xml.etree import ElementTree as ET
 
@@ -91,8 +92,11 @@ def main(path):
     try:
         z = zipfile.ZipFile(path)
     except Exception as e:
-        print('CANNOT OPEN %s: %s' % (path, e))
-        return
+        # stderr, not stdout: stdout IS the document as far as freeze.py is
+        # concerned, so an error written there becomes the text of the deliverable.
+        print('CANNOT OPEN %s: %s' % (os.path.basename(path), e),
+              file=sys.stderr)
+        return False
     low = path.lower()
     if low.endswith(('.docx', '.dotx')):
         print(docx(z))
@@ -105,6 +109,19 @@ def main(path):
 
 
 if __name__ == '__main__':
+    failed = 0
     for p in sys.argv[1:]:
-        print('\n########## %s ##########' % p)
-        main(p)
+        # BASENAME, not the full path. The banner is provenance for a human
+        # reading the parsed text, and it is inside the bytes that get hashed —
+        # so an absolute path made text_sha256 machine-dependent (the same
+        # document froze to two different hashes on two machines) and wrote the
+        # source filename, which on a real engagement is client-identifying,
+        # into a file that gets quoted into reports.
+        print('\n########## %s ##########' % os.path.basename(p))
+        if main(p) is False:
+            failed = 1
+    # BUG: this used to exit 0 whatever happened. An unreadable source printed a
+    # message that freeze.py then hashed AS THE DOCUMENT, and every tool
+    # afterwards reported everything ABSENT with full confidence. A parser that
+    # cannot represent its input must fail, not return prose about failing.
+    sys.exit(failed)

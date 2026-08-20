@@ -47,6 +47,15 @@ jobs:
         run: |
           fail=0
           test -f denylist.txt || { echo "denylist.txt missing — the scrub cannot run"; exit 1; }
+          # The .docx path had never run in CI: every fixture document is
+          # Markdown, which takes freeze.py's plain-text fast path. Two bugs
+          # survived in that gap. Exercise the real extractor, and assert it
+          # writes no absolute path into the text it freezes.
+          out=$(python3 extract.py fixtures/floodtwin/extractor-smoke.docx)
+          echo "$out" | grep -q "Extractor smoke fixture" || { echo "FAIL: extractor produced no text"; exit 1; }
+          echo "$out" | grep -q "$(pwd)" && { echo "FAIL: absolute path in extracted text"; exit 1; }
+          python3 extract.py fixtures/floodtwin/README.md >/dev/null 2>&1 && { echo "FAIL: unreadable source exited 0"; exit 1; }
+          echo "extractor: text produced, no absolute path, unreadable source refused"
           for f in *.py dossier; do
             python3 "$f" --help >/dev/null 2>&1 || { echo "FAIL: $f"; fail=1; }
           done
