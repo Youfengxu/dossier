@@ -5,6 +5,11 @@ obligations.yaml
 obligations-baseline.yaml
 coverage.csv
 cov-*.csv
+# ...except the one CI scores against. The gate is called "scorer reproduces
+# the committed reference run", and it cannot do that if the reference is not
+# committed: the file existed locally, was ignored by the line above, and the
+# gate failed on every run from the day it was added.
+!fixtures/floodtwin/cov-embed-12.csv
 candidates.csv
 inv-*.json
 inventory*.json
