@@ -91,8 +91,20 @@ def validate(obj):
     return None
 
 
+ROW_KEY = "__row__"
+
+
 def read_sheet(path, sheet_name):
-    """Return [{col_letter: value}] for the named sheet. Stdlib only."""
+    """Return [{col_letter: value}] for the named sheet. Stdlib only.
+
+    Each row carries its PHYSICAL sheet row under `__row__`. Without it a caller
+    cannot recover which Excel row a dict came from — blank rows are skipped here,
+    so list position and sheet row diverge the moment a workbook has a gap, and
+    every write after that gap lands one row too high. The workbook still opens
+    cleanly, which is what makes it dangerous: evidence sits against the wrong
+    comment and nothing says so.
+
+    The key is dunder-flanked so it cannot collide with a column letter."""
     z = zipfile.ZipFile(path)
     shared = []
     try:
@@ -133,6 +145,10 @@ def read_sheet(path, sheet_name):
         for cell in row.findall("m:c", NS):
             cells[re.sub(r"\d", "", cell.get("r"))] = value(cell)
         if any(v.strip() for v in cells.values()):
+            try:
+                cells[ROW_KEY] = int(row.get("r"))
+            except (TypeError, ValueError):
+                cells[ROW_KEY] = len(rows) + 1      # sheet omitted r=, fall back
             rows.append(cells)
     return rows
 

@@ -200,7 +200,11 @@ def main():
     # Excel row numbers, not list positions — read_sheet drops blank rows, so
     # the two diverge and writing to the wrong row is silent and catastrophic.
     values, table, unmapped = {}, [], []
-    for position, row in enumerate(rows[1:], start=2):
+    # The row's own number, not its position in a list the reader compacted.
+    # enumerate() was correct only for gapless sheets; one deleted row in Excel
+    # and every value after it wrote one row high, into the wrong comment.
+    for position, row in ((row.get("__row__", n), row)
+                          for n, row in enumerate(rows[1:], start=2)):
         rid = row.get(args.id_col, "").strip()
         if not rid:
             continue

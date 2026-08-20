@@ -37,7 +37,8 @@ class ReadSheet(unittest.TestCase):
         path = self.write([(1, {"A": "ID", "D": "Comment"}),
                            (2, {"A": "C-001", "D": "Section 9 is not assessed"})])
         rows = matrix.read_sheet(path, "Comments")
-        self.assertEqual(rows[0], {"A": "ID", "D": "Comment"})
+        self.assertEqual({k: v for k, v in rows[0].items() if k != matrix.ROW_KEY},
+                         {"A": "ID", "D": "Comment"})
         self.assertEqual(rows[1]["A"], "C-001")
 
     def test_multi_letter_columns_survive(self):
@@ -46,7 +47,9 @@ class ReadSheet(unittest.TestCase):
         # the adjudication column defaults to I and the client inputs column
         # sits further right.
         path = self.write([(7, {"AA": "far right"})])
-        self.assertEqual(matrix.read_sheet(path, "Comments")[0], {"AA": "far right"})
+        row = matrix.read_sheet(path, "Comments")[0]
+        self.assertEqual({k: v for k, v in row.items() if k != matrix.ROW_KEY},
+                         {"AA": "far right"})
 
     def test_shared_strings_are_resolved(self):
         path = self.write([(1, {"A": 0}), (2, {"A": 1})],
@@ -107,24 +110,31 @@ class BlankRows(unittest.TestCase):
         rows = matrix.read_sheet(self.path, "Comments")
         self.assertNotIn("   ", [r.get("D") for r in rows])
 
-    def test_the_returned_rows_carry_no_row_number(self):
-        # The load-bearing assertion. Nothing in the output records which sheet
-        # row a dict came from, so a caller CANNOT recover the Excel row number
-        # — it is not merely inconvenient to do so, the information is gone.
+    def test_every_row_carries_its_physical_sheet_row(self):
+        # This assertion used to say the opposite, and called itself load-bearing
+        # for it: the row number was gone and a caller could not recover it. That
+        # was a defect characterised rather than fixed, and it stayed a defect
+        # until an adapter-contract review traced what it does to a client
+        # workbook. It is now carried under a dunder-flanked key that cannot
+        # collide with a column letter.
         for row in matrix.read_sheet(self.path, "Comments"):
-            self.assertEqual(set(row), set(row) - {"r", "row", "_row"})
-            self.assertTrue(all(isinstance(v, str) for v in row.values()))
+            self.assertIn(matrix.ROW_KEY, row)
+            self.assertIsInstance(row[matrix.ROW_KEY], int)
+            self.assertTrue(all(isinstance(v, str)
+                                for k, v in row.items() if k != matrix.ROW_KEY))
 
-    def test_list_position_and_sheet_row_diverge_after_a_blank(self):
-        # Spelled out as the arithmetic the caller performs. C-002 lives in
-        # Excel row 4; the position-derived number is 3 — the blank row. An
-        # evidence cell written there lands one row above the comment it
-        # describes, and the workbook still opens cleanly.
+    def test_list_position_still_diverges_but_the_row_key_does_not(self):
+        # Both halves matter. Position-derived numbering is STILL wrong after a
+        # blank — that arithmetic has not become safe, and any caller doing it is
+        # still broken. What changed is that the correct answer is now available,
+        # so writeback no longer has to derive it.
         rows = matrix.read_sheet(self.path, "Comments")
         derived = {row["A"]: number
                    for number, row in enumerate(rows[1:], start=2)}
-        self.assertEqual(derived["C-001"], 2)          # correct, by luck
         self.assertEqual(derived["C-002"], 3)          # wrong: C-002 is row 4
+        carried = {row["A"]: row[matrix.ROW_KEY] for row in rows[1:]}
+        self.assertEqual(carried["C-001"], 2)
+        self.assertEqual(carried["C-002"], 4)          # right, and not derived
 
     def test_a_row_absent_from_the_xml_shifts_everything_the_same_way(self):
         # Excel omits never-touched rows entirely rather than writing an empty
