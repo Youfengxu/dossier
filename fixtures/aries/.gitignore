@@ -1,0 +1,5 @@
+# Fetched on demand against a pinned digest. ODC-By permits redistribution, but
+# vendoring pins this repository to one snapshot of someone else's corpus and
+# hides upstream change behind our own copy.
+comments.csv
+labels.json
