@@ -36,6 +36,7 @@ import urllib.error
 import urllib.request
 
 sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
+import llm
 from llm import load_doc                                       # noqa: E402
 
 SYSTEM = """You are reading one engineering document in full. Answer the question
@@ -118,29 +119,9 @@ def endpoint_limit(chat_url, model):
 
 
 def ask(url, model, system, user, max_tokens, timeout):
-    payload = {"model": model, "temperature": 0, "max_tokens": max_tokens,
-               "response_format": {"type": "json_object"},
-               # Inherited server-side penalties wreck structured output: every
-               # JSON object repeats the same keys, so penalising seen tokens
-               # pushes the model off "quotes" and "answer" exactly when it needs
-               # them again. The Mac serves gemma with --presence-penalty 1.5 and
-               # this run produced 63,961 characters of degenerate JSON for a
-               # question bounded at 350 words. llm.py has always overridden
-               # these; sending them is not optional.
-               "presence_penalty": 0.0,
-               "frequency_penalty": 0.0,
-               "messages": [{"role": "system", "content": system},
-                            {"role": "user", "content": user}]}
-    req = urllib.request.Request(
-        url, json.dumps(payload).encode(), {"Content-Type": "application/json"})
-    with urllib.request.urlopen(req, timeout=timeout) as f:
-        body = json.load(f)
-    choice = body["choices"][0]
-    msg = choice["message"]
-    return ((msg.get("content") or "").strip(),
-            (msg.get("reasoning_content") or "").strip(),
-            choice.get("finish_reason") or "")
-
+    """Delegates to the shared client; the guards live there, not here."""
+    return llm.chat(url, model, system, user,
+                    max_tokens=max_tokens, timeout=timeout)
 
 def parse(raw):
     m = re.search(r"\{.*\}", raw, re.S)

@@ -36,6 +36,7 @@ import time
 import urllib.request
 
 sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
+import llm
 from llm import load_doc                                       # noqa: E402
 
 CONTEXT_LINES = 12
@@ -60,16 +61,12 @@ collectively do not settle the question, say that."""
 
 
 def ask(url, model, system, user, max_tokens, timeout):
-    payload = {"model": model, "temperature": 0, "max_tokens": max_tokens,
-               "messages": [{"role": "system", "content": system},
-                            {"role": "user", "content": user}]}
-    req = urllib.request.Request(
-        url, json.dumps(payload).encode(), {"Content-Type": "application/json"})
-    with urllib.request.urlopen(req, timeout=timeout) as f:
-        body = json.load(f)
-    choice = body["choices"][0]
-    return ((choice["message"].get("content") or "").strip(),
-            choice.get("finish_reason") or "")
+    """Delegates to the shared client. This function used to build its own
+    request and was missing response_format and the penalty overrides — it
+    worked only because the model it happened to meet complied."""
+    content, _reasoning, stop = llm.chat(url, model, system, user,
+                                         max_tokens=max_tokens, timeout=timeout)
+    return content, stop
 
 
 def windows(lines, quotes):

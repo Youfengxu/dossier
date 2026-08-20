@@ -71,6 +71,71 @@ CACHE_DIR = ".dossier-cache"
 LOG_FILE = ".dossier-log.jsonl"
 
 
+def chat(url, model, system=None, user=None, *, messages=None, max_tokens=1200,
+         temperature=0.0, timeout=300, json_object=True, reasoning_effort=None):
+    """The one place a chat request is built. Returns (content, reasoning, stop).
+
+    Every guard this project has paid for lives here, and nowhere else. That is
+    the point of the function, not a side effect of it: the guards below were
+    each learned from a failure, and a guard that lives in six copies is not a
+    guard, it is a coincidence. One tool was found carrying four of them and
+    another carrying two, identical in every other respect.
+
+      response_format   Asking for JSON in the prompt is a request; this is a
+                        constraint. One model read the same instruction another
+                        obeyed and returned markdown with finish_reason "stop" —
+                        a failure invisible to any caller checking for errors,
+                        because there was no error.
+
+      penalties at 0    Server-side sampling penalties wreck structured output:
+                        every JSON object repeats its keys, so penalising seen
+                        tokens pushes the model off "quotes" and "answer"
+                        exactly when it needs them again. One endpoint serves a
+                        presence penalty of 1.5 by default and produced 63,961
+                        characters of degenerate JSON for a bounded question.
+
+      stop returned     A reply cut at the token limit arrives NON-EMPTY with
+                        its JSON unterminated, so "did it say anything" is the
+                        wrong test. Callers need the stop reason to tell a
+                        finished answer from a severed one.
+
+      reasoning         Reasoning models spend the budget before they answer and
+                        can return empty content beside a full reasoning
+                        channel. That is a budget problem, not a refusal, and
+                        the caller can only tell if it is handed both.
+    """
+    if messages is None:
+        messages = []
+        if system:
+            messages.append({"role": "system", "content": system})
+        messages.append({"role": "user", "content": user or ""})
+
+    payload = {
+        "model": model,
+        "temperature": temperature,
+        "max_tokens": max_tokens,
+        "messages": messages,
+        "presence_penalty": 0.0,
+        "frequency_penalty": 0.0,
+    }
+    if json_object:
+        payload["response_format"] = {"type": "json_object"}
+    effort = reasoning_effort or os.environ.get("DOSSIER_REASONING_EFFORT")
+    if effort:
+        payload["reasoning_effort"] = effort
+
+    request = urllib.request.Request(
+        url, data=json.dumps(payload).encode(),
+        headers={"Content-Type": "application/json"})
+    with urllib.request.urlopen(request, timeout=timeout) as response:
+        body = json.load(response)
+    choice = body["choices"][0]
+    message = choice.get("message") or {}
+    return ((message.get("content") or "").strip(),
+            (message.get("reasoning_content") or message.get("reasoning") or "").strip(),
+            choice.get("finish_reason") or "")
+
+
 class LLMError(RuntimeError):
     pass
 

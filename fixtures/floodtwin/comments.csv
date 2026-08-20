@@ -1,0 +1,15 @@
+id,section_ref,comment,vendor_action
+FT-001,6.3,"Where two sensors disagree the deliverable must say which reading wins and on what basis. State the precedence rule explicitly.",
+FT-002,5.3,"The tick duration is referred to throughout but never given a value. Provide the numeric tick budget.",Will be provided once load testing completes.
+FT-003,5.5,"This section is titled Risks and open decisions but its content is a gap register. The section should address implementation constraints and dependencies, which are not covered anywhere in the deliverable.",Section retitled to Implementation constraints and dependencies.
+FT-004,6.5,"The constraints listed for the Sensor Fabric have owners but no closure dates. Add a target date to each row.",Updated.
+FT-005,7.5,"Hydrology Model constraints must be enumerated individually rather than referenced in aggregate.",Revised in the new document.
+FT-006,Appendix B,"Each risk in the register needs a mitigation owner and a review date. Owners are present; dates are not.",Risk register updated.
+FT-007,14,"The not-defined register lists six open items. Confirm which have been closed since the last revision.",Register reviewed and addressed.
+FT-008,Appendix D,"Evidence locations are listed but several point at documents not yet produced. Confirm availability.",
+FT-009,1,"Document control cross-references status definitions to Section 14. Confirm that target still exists and resolves.",
+FT-010,8.2,"Alert thresholds must be stated with units. Confirm the deliverable does so.",
+FT-011,5.2,"Scheduling authority must be assigned to exactly one component. Confirm no ambiguity remains.",
+FT-012,7.3,"The estimation method must name the residual normalisation denominator, which is currently undefined.",Denominator to be confirmed with the modelling team.
+FT-013,9,"Deployment topology must state the failure domain for each node class.",Addressed in the revision.
+FT-014,10.2,"The calibration method must state the revalidation window.",

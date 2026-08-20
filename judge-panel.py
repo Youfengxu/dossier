@@ -33,6 +33,7 @@ import time
 import urllib.request
 
 sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
+import llm
 from llm import load_doc                                       # noqa: E402
 
 SYSTEM = """You are grading how well a reader answered a question about an
@@ -61,17 +62,9 @@ that fills the space."""
 
 
 def ask(url, model, system, user, max_tokens, timeout):
-    payload = {"model": model, "temperature": 0, "max_tokens": max_tokens,
-               "response_format": {"type": "json_object"},
-               "presence_penalty": 0.0, "frequency_penalty": 0.0,
-               "messages": [{"role": "system", "content": system},
-                            {"role": "user", "content": user}]}
-    req = urllib.request.Request(
-        url, json.dumps(payload).encode(), {"Content-Type": "application/json"})
-    with urllib.request.urlopen(req, timeout=timeout) as f:
-        body = json.load(f)
-    c = body["choices"][0]
-    return (c["message"].get("content") or "").strip(), c.get("finish_reason") or ""
+    content, _reasoning, stop = llm.chat(url, model, system, user,
+                                         max_tokens=max_tokens, timeout=timeout)
+    return content, stop
 
 
 CONTEXT = 10
