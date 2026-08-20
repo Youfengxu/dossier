@@ -185,6 +185,84 @@ class HeadingDetection(unittest.TestCase):
         self.assertEqual(head, "ARCHITECTURE POSITION")
 
 
+class StaleLocators(unittest.TestCase):
+    """An address that no longer resolves must fail, not improvise.
+
+    Both of these shipped. An adversarial review found them by tracing what a
+    reviewer actually sees when a locator goes stale, which is the question the
+    code never asked itself."""
+
+    def setUp(self):
+        self.converse = load("converse_mod3", "converse.py")
+        self.render = load("render_mod", "render-assess.py")
+        self.lines = ["intro"] * 99 + ["Appendix C Deployment Topology"] + ["body"] * 10
+
+    def test_address_past_the_end_has_no_heading(self):
+        """It used to clamp, so an address up to 400 lines past the document
+        returned the LAST heading and an empty search phrase. The delivered
+        report read: search for "" — no error, no warning, exit 0."""
+        for beyond in (len(self.lines), len(self.lines) + 200):
+            with self.subTest(n=beyond):
+                self.assertIsNone(self.render.nearest_heading(self.lines, beyond))
+                self.assertEqual(self.converse.nearest_heading(self.lines, beyond),
+                                 (None, None))
+
+    def test_negative_address_has_no_heading(self):
+        self.assertIsNone(self.render.nearest_heading(self.lines, -1))
+        self.assertEqual(self.converse.nearest_heading(self.lines, -5), (None, None))
+
+    def test_the_two_implementations_agree(self):
+        for n in (0, 50, 99, 105, 300):
+            with self.subTest(n=n):
+                self.assertEqual(self.render.nearest_heading(self.lines, n),
+                                 self.converse.nearest_heading(self.lines, n)[0])
+
+
+class FrozenTextPin(unittest.TestCase):
+    """The pin has to be checked at load, or it is a comment.
+
+    text_sha256 was written by freeze.py and read by exactly one place —
+    freeze.py --check. Every adjudicator, renderer and repairer loaded the file
+    and trusted it, so a hand-edited or re-frozen document produced citations
+    indistinguishable from sound ones."""
+
+    def setUp(self):
+        import hashlib, json, tempfile
+        self.tmp = tempfile.mkdtemp()
+        os.makedirs(os.path.join(self.tmp, "parsed"))
+        self.doc = os.path.join(self.tmp, "parsed", "d.txt")
+        with open(self.doc, "w") as handle:
+            handle.write("line one\nline two\n")
+        digest = hashlib.sha256(open(self.doc, "rb").read()).hexdigest()
+        json.dump({"documents": [{"slug": "d", "parsed": "parsed/d.txt",
+                                  "role": "draft", "text_sha256": digest}]},
+                  open(os.path.join(self.tmp, "parsed", "MANIFEST.json"), "w"))
+
+    def tearDown(self):
+        import shutil
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def test_matching_text_loads(self):
+        import llm
+        _meta, lines = llm.load_doc(self.tmp, "d")
+        self.assertEqual(len(lines), 2)
+
+    def test_edited_text_is_refused(self):
+        import llm
+        with open(self.doc, "a") as handle:
+            handle.write("line three inserted by hand\n")
+        with self.assertRaises(llm.LLMError):
+            llm.load_doc(self.tmp, "d")
+
+    def test_verification_can_be_waived_explicitly(self):
+        """Escape hatch, but it must be asked for by name."""
+        import llm
+        with open(self.doc, "a") as handle:
+            handle.write("line three\n")
+        _meta, lines = llm.load_doc(self.tmp, "d", verify=False)
+        self.assertEqual(len(lines), 3)
+
+
 class TrailingBracketStripping(unittest.TestCase):
     """The locator bracket an adjudicator appends, removed for a human column."""
 

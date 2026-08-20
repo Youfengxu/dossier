@@ -493,9 +493,19 @@ def content_lines(lines):
     return [l for l in lines if not l.lstrip().startswith(BANNER)]
 
 
-def load_doc(project, slug):
+def load_doc(project, slug, verify=True):
     """Read a frozen document. Refuses unfrozen corpora — a locator into text
-    that can still move is not a locator."""
+    that can still move is not a locator.
+
+    AND VERIFIES THE TEXT AGAINST ITS PIN, which it did not for a long time. The
+    manifest recorded text_sha256 and exactly one place ever read it: freeze.py
+    --check. Every other tool — every adjudicator, every renderer, every
+    repairer — loaded the file and trusted it. A hand-edited frozen document, a
+    truncated write, or a re-freeze that shifted every line all loaded silently
+    and produced citations that looked identical to sound ones.
+
+    The pin exists to make "this is the text the model was shown" checkable. A
+    pin nobody checks is a comment."""
     manifest_path = os.path.join(project, "parsed", "MANIFEST.json")
     if not os.path.exists(manifest_path):
         raise LLMError("corpus not frozen — run freeze.py first")
@@ -503,7 +513,20 @@ def load_doc(project, slug):
     for doc in manifest["documents"]:
         if doc["slug"] == slug:
             path = os.path.join(project, doc["parsed"])
-            text = open(path, encoding="utf-8", errors="replace").read()
-            return doc, text.splitlines()
+            raw = open(path, "rb").read()
+            pinned = doc.get("text_sha256")
+            if verify and pinned:
+                actual = hashlib.sha256(raw).hexdigest()
+                if actual != pinned:
+                    raise LLMError(
+                        f"{doc['parsed']} does not match its pin.\n"
+                        f"  manifest {pinned[:16]}\n"
+                        f"  on disk  {actual[:16]}\n\n"
+                        f"Every locator into this document is now suspect: the text a "
+                        f"citation was checked against is not the text on disk. Either "
+                        f"restore the file, or re-freeze and RE-RUN anything that "
+                        f"produced citations against it — freeze.py --refreeze does not "
+                        f"move locators, it invalidates them.")
+            return doc, raw.decode("utf-8", errors="replace").splitlines()
     raise LLMError(f"no document {slug!r}; have: "
                    + ", ".join(d["slug"] for d in manifest["documents"]))

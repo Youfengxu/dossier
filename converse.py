@@ -128,8 +128,14 @@ def busy(chat_url, model):
 
 
 def nearest_heading(lines, n):
-    """The closest plausible heading at or above line n, for navigation."""
-    for i in range(min(n, len(lines) - 1), max(-1, n - 400), -1):
+    """The closest plausible heading at or above line n, for navigation.
+
+    No clamping: an address past the end of the document has no nearest heading,
+    and pretending otherwise returns the document's last heading beside an empty
+    search phrase — a stale locator presenting as a finding."""
+    if not 0 <= n < len(lines):
+        return None, None
+    for i in range(n, max(-1, n - 400), -1):
         line = lines[i].strip()
         if not line or len(line) > 80:
             continue

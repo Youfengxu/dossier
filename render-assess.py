@@ -52,7 +52,13 @@ BLURB = {
 
 
 def nearest_heading(lines, n):
-    for i in range(min(n, len(lines) - 1), max(-1, n - 400), -1):
+    # No clamping. min(n, len(lines)-1) meant a locator up to 400 lines PAST the
+    # end of the document returned the document's last heading and an empty
+    # search phrase, and the report read: search for "". No error, no warning,
+    # exit 0 — a stale locator presenting as a finding.
+    if not 0 <= n < len(lines):
+        return None
+    for i in range(n, max(-1, n - 400), -1):
         line = lines[i].strip()
         if not line or len(line) > 80:
             continue
