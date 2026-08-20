@@ -233,15 +233,24 @@ silent fall back to prose.
    wall-clock or timezone, no locale-dependent formatting, no unordered-container
    iteration, no environment variables, no network. *(Revision 1 named only
    absolute paths — one instance of the rule, patching the known bug and leaving
-   the class open. `extract.py` still writes an absolute path into frozen text,
-   which is why `text_sha256` is machine-dependent. **Still open.**)*
+   the class open. `extract.py` now writes only the basename: the same bytes frozen
+   from two different directories produce the same `text_sha256`, where they
+   previously did not. The wider class — clocks, locales, unordered iteration — is
+   stated but not yet enforced by anything.)*
 2. **`parse` raises on a source it cannot faithfully represent.** Empty output is
-   never a valid parse of a non-empty source. Today `extract.py` on an unreadable
-   PDF prints an error and **exits 0**; `freeze.py` hashes that as the document,
-   and every tool then reports ABSENT for everything with full confidence.
+   never a valid parse of a non-empty source. *(Implemented: `extract.py` writes
+   the error to stderr — stdout IS the document as far as `freeze.py` is concerned
+   — and exits non-zero, which `freeze.py` already checked. It previously printed
+   the error to stdout and exited 0, so `freeze.py` hashed the words "CANNOT OPEN"
+   as the deliverable and every tool then reported ABSENT for everything with full
+   confidence.)*
 3. **`locate` never invents.** Inferred resolutions set `exact=False` and carry a
    note; unresolvable returns `None`.
 4. **`records` returns names, never letters**, and every record carries `__row__`.
+   *(Partial: `__row__` is carried, and `matrix.columns()` now answers "which
+   columns are these" in one place so the bookkeeping key stops leaking into
+   consumers that enumerate keys — `to-html.py` did, and crashed on every input
+   for as long as `__row__` existed. Letters-to-names remains unscheduled.)*
 5. **Adapters declare fidelity** (below) — replacing revision 1's unenforceable
    ban on calling models.
 6. **An address is meaningful only against `(adapter_id, adapter_version,
@@ -326,12 +335,25 @@ because a review traced what a reviewer actually sees today:
 
 ## Still open
 
-- **`extract.py` writes absolute paths into frozen text.** Invariant 1 forbids
-  it; the code still does it, and it makes `text_sha256` machine-dependent.
-- **`--refreeze` invalidates every locator, exits 0, and says nothing** at the
-  moment it happens. It should print the old and new hash and the line-count
-  delta, and refuse without an explicit flag.
-- **No CI gate has ever executed `extract.py`** — `fixtures/floodtwin` is all
-  `.md`, which takes the plain-text fast path. The extractor is untested in CI,
-  which is how the `exit 0` in invariant 2 survived.
 - **The letters-to-names migration** across fourteen consumers is unscheduled.
+- **The conformance harness** described above is specified but not implemented.
+  Nothing currently checks that an adapter satisfies the invariants; they are
+  prose, and prose is what the four items below this line used to be.
+- **The wider determinism class in invariant 1** — clocks, locales, unordered
+  iteration — is stated and unenforced. Absolute paths were caught because someone
+  went looking, not because anything would have failed.
+- **A delimited register is read and written, but `.docx` tables are not.** A
+  comment matrix pasted into Word is a shape the toolkit still cannot take.
+
+*Closed since revision 2, listed because the entries above are worth reading
+against how these went:*
+
+- ~~`extract.py` writes absolute paths into frozen text.~~ Now the basename.
+- ~~`--refreeze` invalidates every locator, exits 0, and says nothing.~~ It now
+  prints each document's old and new hash, the line-count delta, and that every
+  locator shifts. It was already gated behind an explicit flag.
+- ~~No CI gate has ever executed `extract.py`.~~ `fixtures/floodtwin/extractor-
+  smoke.docx` exists and CI asserts the extractor produces text, writes no
+  absolute path, and refuses an unreadable source. All fixture documents were
+  `.md`, which takes the plain-text fast path, which is how two bugs survived in
+  a repository with a mutation-checked test suite.
