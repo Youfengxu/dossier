@@ -28,3 +28,6 @@ inventory*.json
 # Compiled bytecode. Committed by an early "git add ." and caught later.
 __pycache__/
 *.pyc
+
+# macOS writes these into every directory it browses.
+.DS_Store
