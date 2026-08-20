@@ -31,12 +31,11 @@ import re
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
+import vocabulary                                          # noqa: E402
 import matrix as matrix_reader                               # noqa: E402
 from llm import load_doc                                     # noqa: E402
 
-WORD = {"addressed": "Addressed", "partial": "Partial",
-        "not_addressed": "Unaddressed", "unclear": "Unclear"}
-RANK = {"not_addressed": 0, "partial": 1, "addressed": 2, "unclear": -1}
+VOCAB = vocabulary.load()          # replaced per-project in main()
 HEADING = re.compile(r"^\s*(?:\d+(?:\.\d+)*\.?\s+)?[A-Z][^.!?]{2,78}$")
 
 BLURB = {
@@ -85,6 +84,8 @@ def main():
     args = p.parse_args()
 
     project = os.path.abspath(os.path.expanduser(args.project))
+    global VOCAB
+    VOCAB = vocabulary.load(project)
     _meta, lines = load_doc(project, args.doc)
     xlsx = args.xlsx if os.path.isabs(args.xlsx) else os.path.join(project, args.xlsx)
     rows = {}
@@ -104,12 +105,13 @@ def main():
     buckets = {"SPLIT": [], "DIFFER": [], "AGREE": []}
     for rid in ids:
         vs = [d[rid]["verdict"] for _n, d in readers]
-        if len(set(vs)) == 1:
-            buckets["AGREE"].append(rid)
-        elif max(RANK.get(v, 0) for v in vs) - min(RANK.get(v, 0) for v in vs) <= 1:
-            buckets["DIFFER"].append(rid)
-        else:
-            buckets["SPLIT"].append(rid)
+        # UNRANKABLE lands with the splits on purpose: if a reader returned a
+        # verdict off the scale, nobody can say how far apart these readings are,
+        # and "we cannot tell" belongs in front of a person, not filed under
+        # agreement.
+        buckets[{"AGREE": "AGREE", "ADJACENT": "DIFFER",
+                 "DISAGREE": "SPLIT", "UNRANKABLE": "SPLIT"}[
+                     VOCAB.agreement(vs)]].append(rid)
 
     out = [f"# {args.title}", ""]
     if args.preamble:
@@ -143,7 +145,7 @@ def main():
             heads, finds = [], []
             for name, data in readers:
                 r = data[rid]
-                out += [f"**{name} — {WORD.get(r['verdict'], r['verdict'])}.** "
+                out += [f"**{name} — {VOCAB.label(r['verdict'])}.** "
                         + (r.get("rationale") or "*no reasoning given*"), ""]
                 for c in r.get("cites", []):
                     try:

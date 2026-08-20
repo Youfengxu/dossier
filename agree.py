@@ -17,6 +17,10 @@ O/P take judge B's. Q is the flag a reviewer sorts on:
     ADJACENT        addressed vs partial, or partial vs not_addressed — a
                     difference of degree, not of direction
     ONE JUDGE ONLY  only one model returned a verdict for this row
+    UNRANKABLE      a verdict sits off the scale, so how far apart the two
+                    readings are cannot be stated — grouped with the
+                    disagreements, because "we cannot tell" belongs in front of
+                    a person rather than filed under agreement
 
 ADJACENT exists because the ordinal scale is not flat. addressed/not_addressed
 is a contradiction; partial/not_addressed is two readers drawing the same line
@@ -29,23 +33,26 @@ import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
+import vocabulary                                          # noqa: E402
 import matrix as matrix_reader                              # noqa: E402
 import writeback                                            # noqa: E402
 
 # Ordered weakest to strongest. Neighbours differ by degree; distance 2+ is a
 # real conflict. "unclear" is off the scale — it is not a weaker "addressed",
 # it is a refusal to answer, so any pairing with it is flagged outright.
-SCALE = ["not_addressed", "partial", "addressed"]
+VOCAB = vocabulary.load()
 
 
 def classify(a, b):
+    """AGREE / ADJACENT / DISAGREE, or a note that only one judge answered.
+
+    The ordering comes from the project's declared scale rather than from a list
+    compiled in here, so an audit or a conformance review gets the same
+    adjacency logic under its own words.
+    """
     if not a or not b:
         return "ONE JUDGE ONLY"
-    if a == b:
-        return "AGREE"
-    if a in SCALE and b in SCALE and abs(SCALE.index(a) - SCALE.index(b)) == 1:
-        return "ADJACENT"
-    return "DISAGREE"
+    return VOCAB.agreement([a, b])
 
 
 def main():
@@ -105,14 +112,15 @@ def main():
     print(f"{args.label_b}: {args.b}")
     print(f"\n{sum(counts.values())} row(s) with at least one verdict\n")
     print("=" * 74)
-    for flag in ("DISAGREE", "ADJACENT", "ONE JUDGE ONLY", "AGREE"):
+    for flag in ("DISAGREE", "UNRANKABLE", "ADJACENT", "ONE JUDGE ONLY", "AGREE"):
         if counts.get(flag):
             print(f"  {flag:<16} {counts[flag]}")
 
     if conflicts:
         print(f"\n-- rows a human should read first --")
         print(f"  {'row':<9} {args.label_a[:16]:<17} {args.label_b[:16]:<17} flag")
-        order = {"DISAGREE": 0, "ONE JUDGE ONLY": 1, "ADJACENT": 2}
+        order = {"DISAGREE": 0, "UNRANKABLE": 1, "ONE JUDGE ONLY": 2,
+                 "ADJACENT": 3}
         for rid, a, b, flag in sorted(conflicts, key=lambda c: (order[c[3]], c[0])):
             print(f"  {rid:<9} {a:<17} {b:<17} {flag}")
 

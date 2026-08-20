@@ -23,11 +23,11 @@ import re
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
+import vocabulary                                          # noqa: E402
 import matrix as matrix_reader                               # noqa: E402
 import writeback                                             # noqa: E402
 
-WORD = {"addressed": "Addressed", "partial": "Partial",
-        "not_addressed": "Unaddressed", "unclear": "Unclear"}
+VOCAB = vocabulary.load()
 
 # The bracket the adjudicator appends: section locators, or a note that the
 # reference could not be resolved. Useful in the working file, noise in a column
@@ -105,7 +105,7 @@ def main():
             if not verdict:
                 continue
             text = rationale if args.keep_locator else TRAIL.sub("", rationale)
-            head = WORD.get(verdict, verdict)
+            head = VOCAB.label(verdict)
             values[str(position)] = f"{head}. {text.strip()}" if text.strip() else head
         # Header goes in row 1, alongside the verdicts.
         values["1"] = name

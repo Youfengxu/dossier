@@ -21,11 +21,11 @@ import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
+import vocabulary                                          # noqa: E402
 import writeback                                              # noqa: E402
 import matrix as matrix_reader                                # noqa: E402
 
-WORD = {"addressed": "Addressed", "partial": "Partial",
-        "not_addressed": "Unaddressed", "unclear": "Unclear"}
+VOCAB = vocabulary.load()
 
 
 def col_num(s):
@@ -75,7 +75,7 @@ def main():
             r = by_id.get(rid)
             if not r:
                 continue
-            head = WORD.get(r["verdict"], r["verdict"])
+            head = VOCAB.label(r["verdict"])
             text = (r.get("rationale") or "").strip()
             cell = f"{head}. {text}" if text else head
             if r.get("cites") and not args.no_locators:

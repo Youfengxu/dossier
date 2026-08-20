@@ -25,14 +25,14 @@ import sys
 from concurrent.futures import ThreadPoolExecutor
 
 sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
+import vocabulary                                          # noqa: E402
 from llm import Client, LLMError                             # noqa: E402
 import matrix as matrix_reader                               # noqa: E402
 import writeback                                             # noqa: E402
 
 PROMPT_VERSION = "inputs-1"
 
-WORD = {"not_addressed": "Unaddressed", "partial": "Partial",
-        "addressed": "Addressed", "unclear": "Unclear"}
+VOCAB = vocabulary.load()
 
 SYSTEM = """You rewrite one review note so it reads as though a person wrote it
 while working through a spreadsheet.
@@ -129,7 +129,7 @@ def main():
           f"to 'Addressed', {len(work)} rewritten")
     for position, rid, source, verdict, slot in plan:
         if source.endswith("(default)") or source == "reviewer":
-            print(f"  {rid:8} {WORD.get(verdict, verdict):<12} <- {source}")
+            print(f"  {rid:8} {VOCAB.label(verdict):<12} <- {source}")
 
     if args.dry_run:
         return 0
@@ -158,7 +158,7 @@ def main():
 
     values, by = {}, {}
     for position, rid, source, verdict, slot in plan:
-        word = WORD.get(verdict, verdict)
+        word = VOCAB.label(verdict)
         if slot is None:
             values[str(position)] = "Addressed"
         else:

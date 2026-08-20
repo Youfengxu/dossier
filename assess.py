@@ -40,6 +40,7 @@ import time
 import urllib.request
 
 sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
+import vocabulary                                          # noqa: E402
 import llm
 from llm import load_doc                                       # noqa: E402
 
@@ -71,7 +72,7 @@ than filling the space.
 %s
 === END DOCUMENT ==="""
 
-VERDICTS = {"addressed", "partial", "not_addressed", "unclear"}
+VOCAB = vocabulary.load()          # replaced per-project in main()
 RANGE = re.compile(r"^\s*(\d+)\s*(?:[-:\u2013\u2014]\s*(\d+))?\s*$")
 ESCALATION = 3
 
@@ -87,7 +88,7 @@ def parse(raw):
         try:
             o = json.loads(m.group(0))
             v = (o.get("verdict") or "").strip().lower()
-            return {"verdict": v if v in VERDICTS else "unclear",
+            return {"verdict": VOCAB.coerce(v),
                     "rationale": (o.get("rationale") or "").strip(),
                     "cites": [c for c in (o.get("cites") or []) if isinstance(c, str)],
                     "unparsed": False}
@@ -95,8 +96,7 @@ def parse(raw):
             pass
     hit = re.search(r'"rationale"\s*:\s*"((?:[^"\\]|\\.)*)"', raw, re.S)
     v = re.search(r'"verdict"\s*:\s*"(\w+)"', raw)
-    return {"verdict": (v.group(1).lower() if v and v.group(1).lower() in VERDICTS
-                        else "unclear"),
+    return {"verdict": VOCAB.coerce(v.group(1) if v else ""),
             "rationale": (json.loads('"' + hit.group(1) + '"') if hit else raw)[:1500],
             "cites": re.findall(r'"(\d+\s*-\s*\d+)"', raw), "unparsed": True}
 
@@ -140,6 +140,8 @@ def main():
 
     import matrix as matrix_reader
     project = os.path.abspath(os.path.expanduser(args.project))
+    global VOCAB
+    VOCAB = vocabulary.load(project)
     _meta, lines = load_doc(project, args.doc)
     system = SYSTEM % "\n".join(f"{i:>5} | {l}" for i, l in enumerate(lines))
     label = args.label or args.model
