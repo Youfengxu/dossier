@@ -13,12 +13,31 @@
     dossier inventory <project> --doc DOC   [--vllm]
     dossier status   <project>
 
+Working from a comment matrix rather than a requirements document:
+
+    dossier assess    judge each row against the whole current document
+    dossier action    test the vendor's claim of what changed against the diff
+    dossier combine   put several evaluators side by side, one column each
+    dossier render    turn the result into prose for reading away from a screen
+
+Open questions over one document, and the interactive form:
+
+    dossier panel     put the same questions to several models
+    dossier judge     grade the answers blind, on a local model
+    dossier merge     synthesize the answers, keeping the disagreements
+    dossier chat      ask questions interactively, one document held in context
+
+Each forwards its arguments untouched, so `dossier assess --help` is the tool's
+own help. Registering them here rather than duplicating their flags is the same
+rule the transport follows: one definition, no copies to drift.
+
 `review` is the one to reach for when a revision lands: it runs every
 deterministic check in order and tells you what to start next. Nothing in it
 needs a model, so it finishes in seconds.
 
-Endpoints default to this homelab (GX10 for chat, k11 for embeddings). Override
-with DOSSIER_CHAT_URL / DOSSIER_EMBED_URL, or --vllm for the concurrent path.
+Endpoints default to Ollama on localhost:11434, so a fresh machine needs no
+configuration. Override with DOSSIER_CHAT_URL / DOSSIER_EMBED_URL / DOSSIER_MODEL,
+or put them in ~/.config/dossier/config. --vllm switches to the concurrent path.
 """
 
 import argparse
@@ -252,7 +271,33 @@ def cmd_status(args):
     return run("freeze.py", "--project", project, "--check", quiet=True)
 
 
+# Ten tools were reachable only by knowing their filenames, so `dossier --help`
+# showed none of the newest work. They forward argv rather than re-declaring it:
+# a second copy of a flag is a second thing to drift, which is the failure this
+# repository has now fixed twice elsewhere.
+PASSTHROUGH = {
+    "assess":  ("assess.py", "judge each matrix row against the whole document"),
+    "action":  ("action-check.py", "test a claimed change against the diff, no model"),
+    "combine": ("combine-evaluators.py", "one column per evaluator, side by side"),
+    "column":  ("assess-to-matrix.py", "write assess results into the matrix"),
+    "insert":  ("insert-column.py", "insert a column, shifting the rest right"),
+    "render":  ("render-assess.py", "assess results as prose for an e-reader"),
+    "panel":   ("panel.py", "put open questions to a model over one document"),
+    "judge":   ("judge-panel.py", "grade panel answers blind, on a local model"),
+    "merge":   ("synthesize-panel.py", "synthesize answers, keeping disagreements"),
+    "chat":    ("converse.py", "interactive questions, one document held in context"),
+    "repair":  ("repair-cites.py", "recover locators a strict grammar discarded"),
+}
+
+
 def main():
+    # Dispatch passthrough commands BEFORE argparse sees them. REMAINDER does not
+    # capture a leading optional, so `dossier assess --help` had --help eaten by
+    # this parser and died with "unrecognized arguments" instead of showing the
+    # tool's help. They are still registered below so they appear in `--help`.
+    if len(sys.argv) > 1 and sys.argv[1] in PASSTHROUGH:
+        return run(PASSTHROUGH[sys.argv[1]][0], *sys.argv[2:], quiet=True)
+
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = parser.add_subparsers(dest="cmd", required=True)
@@ -338,6 +383,12 @@ def main():
 
     p = sub.add_parser("status"); p.add_argument("project")
     p.set_defaults(fn=cmd_status)
+
+    for name, (script, blurb) in PASSTHROUGH.items():
+        # add_help=False so --help reaches the tool rather than being eaten here.
+        p = sub.add_parser(name, help=blurb, add_help=False)
+        p.add_argument("rest", nargs=argparse.REMAINDER)
+        p.set_defaults(fn=lambda a, s=script: run(s, *a.rest))
 
     args = parser.parse_args()
     return args.fn(args)

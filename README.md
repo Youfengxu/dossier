@@ -8,9 +8,11 @@ model. The naive approach — hand the whole document to a long-context model an
 ask what is missing — was tried first and measured: **153 minutes, 496,949 input
 tokens, zero findings.** Everything here is the reaction to that.
 
-**No dependencies beyond Python and PyYAML.** The toolkit reads and writes
-`.docx` and `.xlsx` by hand, because `openpyxl` would not install on the review
-machine. It runs on a locked-down laptop.
+**One dependency: PyYAML.** (`pypdf` too, and only if you ingest PDFs — the
+earlier version of this line said PyYAML alone, which was wrong.) The toolkit
+reads and writes `.docx` and `.xlsx` by hand, because `openpyxl` would not
+install on the review machine. That constraint is why it runs on a locked-down
+laptop, so it stayed after the constraint lifted.
 
 ## Try it in thirty seconds, with no model and no configuration
 

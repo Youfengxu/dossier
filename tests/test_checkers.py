@@ -115,8 +115,10 @@ class QuoteVerification(unittest.TestCase):
         """Real output contained U+202F between words. If str.split() did not
         treat it as whitespace, every quote containing one would fail to match
         and the model would be blamed for it."""
-        self.assertEqual(self.flat("Exposure & Attention"),
-                         self.flat("Exposure & Attention"))
+        narrow = "Sensor\u202fFabric"          # narrow no-break space
+        nbsp = "Sensor\u00a0Fabric"            # ordinary non-breaking space
+        self.assertEqual(self.flat(narrow), self.flat("Sensor Fabric"))
+        self.assertEqual(self.flat(nbsp), self.flat("Sensor Fabric"))
 
     def test_punctuation_is_NOT_normalised_and_that_was_measured(self):
         """Smart quotes and non-breaking hyphens survive normalisation, so a
@@ -128,10 +130,10 @@ class QuoteVerification(unittest.TestCase):
         a strict matcher. The behaviour is pinned here so the finding is not
         quietly undone by someone 'fixing' it later.
         """
-        self.assertNotEqual(self.flat("attended‑exposure"),
-                            self.flat("attended-exposure"))
-        self.assertNotEqual(self.flat("“viewport”"),
-                            self.flat('"viewport"'))
+        self.assertNotEqual(self.flat("tick‑budget"),
+                            self.flat("tick-budget"))
+        self.assertNotEqual(self.flat("“telemetry”"),
+                            self.flat('"telemetry"'))
 
     def test_empty_quote_never_matches(self):
         """An empty string is a substring of everything. Without a guard, a model

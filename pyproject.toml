@@ -1,0 +1,42 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dossier"
+version = "0.1.0"
+description = "Review a large document against its requirements, or against the comments raised on it, using models you run yourself."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "Apache-2.0" }
+keywords = ["document-review", "REDACTED-39", "local-llm", "verification"]
+
+# Deliberately close to nothing. The toolkit reads and writes .docx and .xlsx by
+# hand rather than depending on openpyxl, because the review machine this was
+# built for could not install it. That constraint produced a tool that runs on a
+# locked-down laptop, which turned out to be the point rather than a limitation.
+#
+# pypdf is genuinely optional: only freeze.py imports it, and only to ingest PDF
+# sources. The README claimed for a while that PyYAML was the sole dependency,
+# which was wrong — the claim is now here where it can be checked.
+dependencies = ["PyYAML>=5.1"]
+
+[project.optional-dependencies]
+pdf = ["pypdf>=3.0"]
+
+[project.scripts]
+dossier = "dossier_cli:main"
+
+[tool.setuptools]
+# Every tool is a top-level script that also runs directly — `./assess.py` and
+# `dossier assess` are the same code path. Listing them as modules keeps that
+# true after an install instead of quietly making the CLI the only entry point.
+py-modules = [
+    "dossier_cli", "adjudicate", "agree", "assess", "bundle", "claim", "closure",
+    "cluster-findings", "compare-coverage", "converse", "diagnose-retrieval",
+    "doctor", "extract", "freeze", "inventory", "inputs-column", "insert-column",
+    "llm", "matrix", "obligations", "panel", "register", "render", "repair-cites",
+    "repair-panel", "score", "score-claims", "score-register", "supervise",
+    "sweep", "synthesize", "trace", "undefined", "verify", "vocabulary",
+    "writeback",
+]

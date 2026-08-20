@@ -1,0 +1,31 @@
+#!/bin/sh
+# Refuse a commit that would publish engagement vocabulary.
+#
+# This exists because the gate was run by hand and therefore sometimes was not.
+# A test file carrying a client defined term was committed and pushed with the
+# unit tests passing, because the tests were run and the scrub was not. The
+# check takes 40ms; the failure it prevents is not recoverable by fixing forward,
+# since git keeps what you pushed.
+root=$(git rev-parse --show-toplevel)
+cd "$root" || exit 1
+
+if ! python3 check-clean.py >/tmp/dossier-scrub.$$ 2>&1; then
+    echo "pre-commit: REFUSING — engagement vocabulary found"
+    cat /tmp/dossier-scrub.$$
+    rm -f /tmp/dossier-scrub.$$
+    echo
+    echo "Re-ground the example in fixtures/floodtwin, which has its own"
+    echo "invented vocabulary for exactly this purpose."
+    exit 1
+fi
+rm -f /tmp/dossier-scrub.$$
+echo "pre-commit: no engagement vocabulary"
+
+if ! python3 run-tests.py >/tmp/dossier-tests.$$ 2>&1; then
+    echo "pre-commit: REFUSING — tests failing"
+    tail -12 /tmp/dossier-tests.$$
+    rm -f /tmp/dossier-tests.$$
+    exit 1
+fi
+tail -1 /tmp/dossier-tests.$$ | sed 's/^ */pre-commit: /'
+rm -f /tmp/dossier-tests.$$
