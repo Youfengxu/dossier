@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Interactive querying of one frozen document, against two models at once.
 
-    ./converse.py --project . --doc arch-v8-1 \
+    ./converse.py --project . --doc deliverable-v2 \
         --node "coder=Qwen3-Coder-Next-UD-Q4_K_M@http://192.168.100.148:8085/v1/chat/completions" \
         --node "qwen=qwen3.6-35b-a3b@http://localhost:8085/v1/chat/completions"
 
@@ -21,13 +21,33 @@ on immediately instead of discovering later.
 
 CITATION BY LOCATOR, NOT BY REPRODUCTION. Models asked to reproduce quotations
 fabricated half of them here — 33 of 65 verbatim across four families, and
-punctuation folding recovered none of the rest. So this asks for LINE RANGES and
+punctuation folding recovered none of the rest. So this asks for LINE MARKERS and
 renders the text from the frozen file itself. A model cannot fabricate a span it
-does not write: the worst case is a wrong range, which is visible the moment the
-rendered lines do not match the claim. That is how the hosted notebook tools get
-high citation accuracy — they cite what they retrieved rather than what they
-remember — and the corpus here is already built for it, with hash-pinned text and
-stable slug:line locators.
+does not write: the worst case is a wrong marker, visible the moment the rendered
+lines do not match the claim. That is how the hosted notebook tools reach high
+citation accuracy — they cite what they retrieved rather than what they remember.
+
+MARK SPARSELY. Numbering every line of a 6,000-line document costs 35,653 tokens,
+36% of the prompt, and pushes it past a 131k window. A marker every ten lines
+costs 3,518 — a tenth of that — and the model cites the marker at or above what
+it means, so the block it heads renders instead of a single line. Compacting the
+format is the obvious idea and barely helps (127k, still over): the cost is
+having a number on every line at all, not how it is padded. Sparse marking is
+what makes a second reader possible on a 36 GB machine, so it is not a tuning
+knob, it is the difference between one opinion and two.
+
+A LOCATOR IS NOT A WAY TO FIND ANYTHING. This was got wrong first time round.
+`deliverable-v2:4880` proves a passage exists; it appears nowhere in the .docx a
+reviewer is actually reading, because Word shows no line numbers and the parse
+flattens tables. Nor can a page number stand in — a .docx contains no pagination
+at all, since Word computes it at render time from fonts and margins. So every
+citation prints three things: the locator for verification, the nearest heading
+for the navigation pane, and a phrase to search for. They answer different
+questions and conflating them helps nobody.
+
+The search phrase comes from parsed text, so a passage inside a table may be
+joined differently than Word displays it. If a search fails, shorten it before
+concluding the citation is wrong.
 
 /where is the other half. It counts literal occurrences with no model involved.
 It exists because a synonym sweep run against the QUESTION's vocabulary reported
@@ -55,9 +75,8 @@ Reply with JSON only: {"answer": "...", "cites": ["4818-4830", "912-915"]}
   - "answer": at most 300 words. Specific. Name the document's own defined terms
     and mechanisms. Say plainly when the document does not address something, and
     say where you looked.
-  - "cites": line ranges supporting your answer, from the numbers in the margin.
-    Do NOT quote text — the ranges are rendered from the document itself. Three
-    to six ranges, each under 20 lines.
+  - "cites": locators supporting your answer. __HOWTO__ Do NOT quote text — the
+    document renders itself from what you cite. Three to six of them.
 
 Answer only from this document. If it does not say, say so.
 
@@ -65,7 +84,35 @@ Answer only from this document. If it does not say, say so.
 %s
 === END DOCUMENT ==="""
 
-RANGE = re.compile(r"^\s*(\d+)\s*[-:]\s*(\d+)\s*$")
+RANGE = re.compile(r"^\s*(\d+)\s*(?:[-:\u2013\u2014]\s*(\d+))?\s*$")
+
+# A line number in parsed text appears NOWHERE in the .docx the reviewer is
+# reading. Word shows no line numbers, the parse flattens tables, and a page
+# number does not exist in the file at all — Word computes pagination at render
+# time. So a locator proves the model did not invent the passage, and does
+# nothing to help anyone find it. Every citation therefore also carries the
+# nearest heading above it and a phrase to search for.
+HEADING = re.compile(r"^\s*(?:\d+(?:\.\d+)*\.?\s+)?[A-Z][^.!?]{2,78}$")
+
+
+def nearest_heading(lines, n):
+    """The closest plausible heading at or above line n, for navigation."""
+    for i in range(min(n, len(lines) - 1), max(-1, n - 400), -1):
+        line = lines[i].strip()
+        if not line or len(line) > 80:
+            continue
+        if HEADING.match(line) and not line.endswith((",", ";", ":")):
+            words = line.split()
+            if 1 < len(words) < 14:
+                return line, i
+    return None, None
+
+
+def searchable(text, words=9):
+    """A phrase distinctive enough to Ctrl-F in the source document."""
+    flat = " ".join(text.split())
+    picked = flat.split(" ")[:words]
+    return " ".join(picked).strip(" ,;:.")
 
 
 def ask(url, model, messages, max_tokens, timeout):
@@ -99,19 +146,24 @@ def parse(raw):
     return raw, []
 
 
-def render(lines, cites, doc):
-    """Turn claimed ranges into real document text. Bad ranges say so."""
+def render(lines, cites, doc, every=1):
+    """Turn claimed locators into real document text. Bad ones say so.
+
+    A bare marker cites the block it heads, so it renders that whole block
+    rather than the single line the number sits on."""
     out = []
     for c in cites:
         m = RANGE.match(c)
         if not m:
-            out.append((c, None, "not a line range"))
+            out.append((c, None, "not a line locator"))
             continue
-        a, b = int(m.group(1)), int(m.group(2))
+        a = int(m.group(1))
+        b = int(m.group(2)) if m.group(2) else min(a + max(every - 1, 0),
+                                                   len(lines) - 1)
         if a < 0 or b >= len(lines) or a > b:
             out.append((c, None, f"outside the document (0-{len(lines)-1})"))
             continue
-        if b - a > 40:
+        if b - a > max(40, every * 4):
             out.append((c, None, f"range too wide ({b-a} lines)"))
             continue
         out.append((f"{doc}:{a}-{b}", "\n".join(lines[a:b + 1]), None))
@@ -121,21 +173,50 @@ def render(lines, cites, doc):
 def main():
     p = argparse.ArgumentParser(description=__doc__,
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("--project", required=True)
-    p.add_argument("--doc", required=True)
+    p.add_argument("--project", required=True,
+                   help="review directory holding parsed/MANIFEST.json")
+    p.add_argument("--doc", required=True,
+                   help="slug of the frozen document to load, e.g. deliverable-v2")
     p.add_argument("--node", action="append", required=True,
-                   metavar="NAME=MODEL@URL")
-    p.add_argument("--max-tokens", type=int, default=3000)
-    p.add_argument("--timeout", type=int, default=1800)
-    p.add_argument("--transcript", default="")
+                   metavar="NAME=MODEL@URL",
+                   help="repeatable. Each node keeps its own history and cache "
+                        "and answers concurrently; give two to see where they "
+                        "disagree, which is the only thing agreement cannot "
+                        "tell you")
+    p.add_argument("--mark-every", type=int, default=10,
+                   help="line-number marker interval; 0 numbers every line. "
+                        "Numbering every line of a 6,000-line document costs "
+                        "35,653 tokens (36%% of the prompt) and pushes it past a "
+                        "131k window; a marker every 10 lines costs 3,518 and "
+                        "fits, which is the difference between one reader and two")
+    p.add_argument("--max-tokens", type=int, default=3000,
+                   help="reply budget. Reasoning models spend it before they "
+                        "answer, so raise it for those rather than reading an "
+                        "empty reply as a refusal")
+    p.add_argument("--timeout", type=int, default=1800,
+                   help="seconds per request; the first turn prefills the whole "
+                        "document and is minutes, not seconds")
+    p.add_argument("--transcript", default="",
+                   help="write the session here as JSON on /quit")
     p.add_argument("--seed-panel", action="append", default=[],
-                   help="panel jsonl to show as prior context on start")
+                   help="panel.py jsonl whose answer count is reported at start, "
+                        "so a follow-up session knows what has already been asked")
     args = p.parse_args()
 
     project = os.path.abspath(os.path.expanduser(args.project))
     _meta, lines = load_doc(project, args.doc)
-    numbered = "\n".join(f"{i:>5} | {l}" for i, l in enumerate(lines))
-    system = SYSTEM % numbered
+    if args.mark_every and args.mark_every > 1:
+        every = args.mark_every
+        body = "\n".join((f"[{i}]\n{l}" if i % every == 0 else l)
+                         for i, l in enumerate(lines))
+        howto = (f"Every {every}th line carries a marker like [120]. Cite the "
+                 f"marker at or before the text you mean; the {every} lines it "
+                 f"heads are rendered from the document for the reader.")
+    else:
+        every = 1
+        body = "\n".join(f"{i:>5} | {l}" for i, l in enumerate(lines))
+        howto = "Every line is numbered in the margin. Cite those numbers."
+    system = (SYSTEM % body).replace("__HOWTO__", howto)
 
     nodes = []
     for spec in args.node:
@@ -182,7 +263,8 @@ def main():
             if not m:
                 print("    usage: /show 4818-4830")
                 continue
-            a, b = int(m.group(1)), min(int(m.group(2)), len(lines) - 1)
+            a = int(m.group(1))
+            b = min(int(m.group(2)) if m.group(2) else a, len(lines) - 1)
             for i in range(a, b + 1):
                 print(f"    {i:>5} | {lines[i]}")
             continue
@@ -213,16 +295,19 @@ def main():
                 continue
             answers[n["name"]] = answer
             print("   ", (answer or "(empty)").replace("\n", "\n    "))
-            shown = render(lines, cites, args.doc)
+            shown = render(lines, cites, args.doc, every)
             if shown:
                 print("\n    Cited, rendered from the frozen document:")
             for loc, text, problem in shown:
                 if problem:
                     print(f"      [{loc}] REJECTED — {problem}")
-                else:
-                    first = text.split("\n")[0][:96]
-                    print(f"      [{loc}] {first}"
-                          + (" ..." if len(text.split("\n")) > 1 else ""))
+                    continue
+                start = int(loc.rsplit(":", 1)[1].split("-")[0])
+                head, hline = nearest_heading(lines, start)
+                print(f"      [{loc}] {text.split(chr(10))[0][:92]}")
+                if head:
+                    print(f"          under: {head}")
+                print(f"          find it: search for \"{searchable(text)}\"")
         if len(answers) > 1:
             terms = {k: set(re.findall(r"\b(?:[A-Z][a-z]+)(?:\s+[A-Z][a-z]+){1,3}\b", v))
                      for k, v in answers.items()}
