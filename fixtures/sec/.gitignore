@@ -1,0 +1,5 @@
+# Fetched on demand against a pinned digest, never vendored. Search ranking moves
+# and adjudications are live records; mirroring would hide both behind our copy.
+comments.csv
+labels.json
+raw/
