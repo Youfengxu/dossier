@@ -1,0 +1,7 @@
+# Fetched on demand against a pinned digest, never vendored. Mirroring someone
+# else's corpus pins this repository to one snapshot of it and hides upstream
+# change behind our own copy; fetching keeps the provenance visible, and these
+# adjudications genuinely move as recommendations are reconsidered.
+recommendations.csv
+labels.json
+raw/
