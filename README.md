@@ -135,7 +135,12 @@ ln -s <repo>/tools/dossier/dossier ~/.local/bin/dossier
 ```
 
 `.docx`, `.pptx` and `.xlsx` need nothing — `extract.py` reads them with the
-standard library. Point the tools at your own inference with `DOSSIER_CHAT_URL`,
+standard library. A comment register may be `.xlsx`, `.csv` or `.tsv`; the tools
+address its columns by letter either way, so nothing downstream changes with the
+format. Delimiter and encoding are detected, which matters more than it sounds:
+a semicolon-separated European export otherwise reads as one column per row, and
+an Excel CSV carries a byte-order mark that turns the first header cell into
+`﻿id` and makes every lookup by name miss without saying so. Point the tools at your own inference with `DOSSIER_CHAT_URL`,
 `DOSSIER_MODEL`, `DOSSIER_EMBED_URL` and `DOSSIER_EMBED_MODEL`; the defaults are
 this homelab's GX10 and Mac.
 
@@ -234,13 +239,15 @@ lead with.
 It degrades: run it without a coverage file and you get the closure half alone.
 
 **If the engagement has an agreed comment matrix**, put it at
-`source/feedback-matrix.xlsx` and `report` finds it automatically. Build the
+`source/feedback-matrix.xlsx` (or `.csv`) and `report` finds it automatically. Build the
 register map from it rather than hand-writing one — its IDs are the ones the
 client and vendor both use, and a map keyed on anything else has to be
 translated by hand before it can be sent:
 
 ```sh
-dossier matrix . --xlsx source/feedback-matrix.xlsx --sheet "Comments" --doc deliverable-v1
+dossier matrix . --matrix source/feedback-matrix.xlsx --sheet "Comments" --doc deliverable-v1
+# --matrix accepts .xlsx, .csv or .tsv. --xlsx is still accepted as the old spelling.
+# A .csv has no sheets, so --sheet is ignored for one.
 ```
 
 The report then leads with an **adjudication check** instead of the closure

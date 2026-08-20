@@ -27,6 +27,7 @@ Every case here is drawn from something that actually appeared in a run.
 import importlib.util
 import os
 import re
+import sys
 import unittest
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -280,6 +281,145 @@ class TrailingBracketStripping(unittest.TestCase):
     def test_leaves_brackets_that_are_part_of_the_sentence(self):
         text = "Unaddressed. The register [sic] was deleted."
         self.assertEqual(self.trail.sub("", text), text)
+
+
+class RepairIsVersionAware(unittest.TestCase):
+    """Recovering a rejected citation is only sound against the same text.
+
+    repair-cites.py promotes a locator on the strength of it falling inside the
+    document. After a refreeze it still does — and points at different text. The
+    frozen document verifies against its own manifest, so nothing raised; the
+    citation arrived in the report indistinguishable from one that had been
+    checked."""
+
+    def setUp(self):
+        import hashlib, json, subprocess, tempfile
+        self.subprocess, self.json = subprocess, json
+        self.tmp = tempfile.mkdtemp()
+        os.makedirs(os.path.join(self.tmp, "parsed"))
+        self.doc = os.path.join(self.tmp, "parsed", "d.txt")
+        self.manifest = os.path.join(self.tmp, "parsed", "MANIFEST.json")
+        self.write_doc("\n".join(f"line {n}" for n in range(80)) + "\n")
+
+    def tearDown(self):
+        import shutil
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def write_doc(self, text):
+        import hashlib, json
+        with open(self.doc, "w") as handle:
+            handle.write(text)
+        digest = hashlib.sha256(open(self.doc, "rb").read()).hexdigest()
+        json.dump({"documents": [{"slug": "d", "parsed": "parsed/d.txt",
+                                  "role": "draft", "text_sha256": digest}]},
+                  open(self.manifest, "w"))
+        return digest
+
+    def run_repair(self, stamp, *extra):
+        rows = os.path.join(self.tmp, "out.jsonl")
+        record = {"id": "C-1", "cites": [], "cites_rejected": ["67"]}
+        if stamp is not None:
+            record["doc_sha256"] = stamp
+        with open(rows, "w") as handle:
+            handle.write(self.json.dumps(record) + "\n")
+        done = self.subprocess.run(
+            [sys.executable, os.path.join(ROOT, "repair-cites.py"),
+             "--project", self.tmp, "--doc", "d", rows, *extra],
+            capture_output=True, text=True)
+        after = self.json.loads(open(rows).readline())
+        return done.stdout + done.stderr, after
+
+    def test_a_matching_stamp_repairs(self):
+        digest = self.write_doc(open(self.doc).read())
+        out, after = self.run_repair(digest)
+        self.assertEqual(after["cites"], ["d:67-67"])
+        self.assertIn("1 citation(s) recovered", out)
+
+    def test_a_stamp_from_before_a_refreeze_refuses(self):
+        """The failure this exists for. Line 67 is still inside the document, so
+        every check the tool had passed."""
+        old = self.write_doc(open(self.doc).read())
+        self.write_doc("prepended\n" + open(self.doc).read())   # every line shifts
+        out, after = self.run_repair(old)
+        self.assertEqual(after["cites"], [])
+        self.assertEqual(after["cites_rejected"], ["67"])
+        self.assertIn("SKIPPED", out)
+        self.assertIn("re-run rather than repair", out)
+
+    def test_an_unstamped_row_is_not_guessed_about(self):
+        """Runs predating the stamp. Unknown is not the same as fine."""
+        out, after = self.run_repair(None)
+        self.assertEqual(after["cites"], [])
+        self.assertIn("no version stamp", out)
+
+    def test_an_unstamped_row_can_be_repaired_on_an_explicit_promise(self):
+        out, after = self.run_repair(None, "--assume-same-text")
+        self.assertEqual(after["cites"], ["d:67-67"])
+
+
+class EvidenceReachesTheReviewer(unittest.TestCase):
+    """The deliverable has to carry the evidence, not directions to it.
+
+    render-assess.py printed each reader's verdict and reasoning, then a "where to
+    look" line — a heading and a search phrase. A reviewer could FIND the cited
+    passage but could not judge whether it said what the reader claimed without
+    opening the document. And a reader whose locators all failed read exactly like
+    one whose locators held: same verdict, same confident prose. That difference
+    existed only in the JSONL, which is the artifact a reviewer never opens."""
+
+    def render(self, readers):
+        import hashlib, json, subprocess, tempfile
+        tmp = tempfile.mkdtemp()
+        os.makedirs(os.path.join(tmp, "parsed"))
+        doc = os.path.join(tmp, "parsed", "d.txt")
+        body = ["Preface"] + [f"filler {n}" for n in range(1, 20)]
+        body[10] = "Sensor precedence"
+        body[11] = "Where two readings disagree the higher-confidence sensor wins."
+        open(doc, "w").write("\n".join(body) + "\n")
+        json.dump({"documents": [{"slug": "d", "parsed": "parsed/d.txt",
+                                  "role": "draft",
+                                  "text_sha256": hashlib.sha256(
+                                      open(doc, "rb").read()).hexdigest()}]},
+                  open(os.path.join(tmp, "parsed", "MANIFEST.json"), "w"))
+        args = []
+        for name, record in readers.items():
+            path = os.path.join(tmp, name + ".jsonl")
+            open(path, "w").write(json.dumps(dict(
+                {"id": "FT-001", "row": 2, "verdict": "addressed"}, **record)) + "\n")
+            args += ["--reader", f"{name}={path}"]
+        out = os.path.join(tmp, "review.md")
+        subprocess.run(
+            [sys.executable, os.path.join(ROOT, "render-assess.py"),
+             "--project", tmp, "--doc", "d", "--matrix",
+             os.path.join(ROOT, "fixtures/floodtwin/comments.csv"),
+             "--sheet", "Comments", "--title", "T", "--out", out] + args,
+            capture_output=True, text=True, cwd=ROOT)
+        return open(out, encoding="utf-8").read()
+
+    def test_the_cited_text_is_reproduced_in_the_deliverable(self):
+        text = self.render({"solid": {"rationale": "Stated.",
+                                      "cites": ["d:11-11"], "cites_rejected": []}})
+        self.assertIn("higher-confidence sensor wins", text)
+        self.assertIn("**d:11**", text)
+
+    def test_a_reader_with_no_resolving_citation_says_so(self):
+        text = self.render({"hollow": {"rationale": "Clearly stated.", "cites": [],
+                                       "cites_rejected": ["section 6.3 (not a locator)"]}})
+        self.assertIn("no checkable evidence", text)
+
+    def test_partial_rejection_is_reported_without_crying_wolf(self):
+        """Some citations resolving and some not is ordinary, and must not be
+        described in the same terms as a verdict resting on nothing."""
+        text = self.render({"mixed": {"rationale": "Stated.", "cites": ["d:11-11"],
+                                      "cites_rejected": ["999 (outside)"]}})
+        self.assertIn("1 further citation(s) did not resolve", text)
+        self.assertNotIn("no checkable evidence", text)
+
+    def test_quoting_is_capped_so_the_review_is_not_a_second_copy(self):
+        text = self.render({"chatty": {"rationale": "Stated.",
+                                       "cites": ["d:1-1", "d:2-2", "d:3-3", "d:11-11"],
+                                       "cites_rejected": []}})
+        self.assertEqual(text.count("> **d:"), 2)      # MAX_QUOTED
 
 
 if __name__ == "__main__":

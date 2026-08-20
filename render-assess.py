@@ -51,6 +51,13 @@ BLURB = {
 }
 
 
+# How much cited text to reproduce. Enough to judge the claim, not so much that
+# the deliverable becomes a second copy of the document.
+MAX_QUOTED = 2
+QUOTE_LINES = 6
+QUOTE_CHARS = 400
+
+
 def nearest_heading(lines, n):
     # No clamping. min(n, len(lines)-1) meant a locator up to 400 lines PAST the
     # end of the document returned the document's last heading and an empty
@@ -153,15 +160,47 @@ def main():
                 r = data[rid]
                 out += [f"**{name} — {VOCAB.label(r['verdict'])}.** "
                         + (r.get("rationale") or "*no reasoning given*"), ""]
+                shown = 0
                 for c in r.get("cites", []):
                     try:
                         a = int(c.rsplit(":", 1)[1].split("-")[0])
+                        b = int(c.rsplit(":", 1)[1].split("-")[-1])
                     except (IndexError, ValueError):
                         continue
+                    # Reproduce the cited text, not merely a route to it.
+                    # Navigation and verification are different jobs: "search for
+                    # X under heading Y" lets a reviewer FIND the passage, but
+                    # leaves them unable to judge whether it says what the reader
+                    # claimed without opening the document and reading it. The
+                    # rationale and its evidence belong on the same page, or the
+                    # evidence is decorative.
+                    if shown < MAX_QUOTED:
+                        body = [ln.strip() for ln in lines[a:min(b, a + QUOTE_LINES) + 1]
+                                if ln.strip()]
+                        if body:
+                            quoted = " ".join(body)
+                            if len(quoted) > QUOTE_CHARS:
+                                quoted = quoted[:QUOTE_CHARS].rstrip() + " …"
+                            out += [f"> **{args.doc}:{a}"
+                                    + (f"-{b}" if b != a else "") + "** "
+                                    + quoted, ""]
+                            shown += 1
                     h = nearest_heading(lines, a)
                     if h and h not in heads:
                         heads.append(h)
                         finds.append(searchable("\n".join(lines[a:a + 10])))
+                # A reader whose locators all failed to resolve reads exactly like
+                # one whose locators held: same verdict, same confident prose, no
+                # evidence either way. That asymmetry was visible only in the
+                # JSONL, which is the one artifact a reviewer never opens.
+                rejected = r.get("cites_rejected") or []
+                if rejected and not r.get("cites"):
+                    out += [f"> *Cited {len(rejected)} passage(s), none of which "
+                            f"resolved against the document — this verdict rests "
+                            f"on no checkable evidence.*", ""]
+                elif rejected:
+                    out += [f"> *{len(rejected)} further citation(s) did not "
+                            f"resolve.*", ""]
             if heads:
                 out += ["**Where to look.**", ""]
                 for h, f in list(zip(heads, finds))[:4]:

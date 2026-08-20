@@ -142,7 +142,7 @@ def main():
     project = os.path.abspath(os.path.expanduser(args.project))
     global VOCAB
     VOCAB = vocabulary.load(project)
-    _meta, lines = load_doc(project, args.doc)
+    meta, lines = load_doc(project, args.doc)
     system = SYSTEM % "\n".join(f"{i:>5} | {l}" for i, l in enumerate(lines))
     label = args.label or args.model
 
@@ -202,7 +202,14 @@ def main():
 
         obj = parse(content)
         good, bad = check(lines, obj["cites"])
+        # Stamp the exact text this answer was produced against. Locators are
+        # line numbers, so they mean nothing without the version they index into:
+        # after a refreeze the document still verifies against its own manifest,
+        # the citations still fall inside it, and every one of them now points at
+        # different text. Nothing downstream could detect that, because nothing
+        # upstream recorded it.
         rec = {"id": rid, "row": pos, "model": label, "verdict": obj["verdict"],
+               "doc": args.doc, "doc_sha256": meta.get("text_sha256"),
                "rationale": obj["rationale"],
                "cites": [f"{args.doc}:{a}-{b}" for a, b in good],
                "cites_rejected": [f"{c} ({why})" for c, why in bad],

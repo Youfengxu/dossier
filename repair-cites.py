@@ -34,20 +34,38 @@ def main():
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--project", required=True)
     p.add_argument("--doc", required=True)
+    p.add_argument("--assume-same-text", action="store_true",
+                   help="repair rows that predate version stamping. Only correct "
+                        "if the document has not been re-frozen since the run.")
     p.add_argument("files", nargs="+")
     args = p.parse_args()
 
-    _meta, lines = load_doc(os.path.abspath(os.path.expanduser(args.project)),
-                            args.doc)
+    meta, lines = load_doc(os.path.abspath(os.path.expanduser(args.project)),
+                           args.doc)
     last = len(lines) - 1
+    current = meta.get("text_sha256")
 
     for path in args.files:
         if not os.path.exists(path):
             print(f"  {path}: missing"); continue
         rows = [json.loads(l) for l in open(path, encoding="utf-8")]
         moved = touched = 0
+        stale = unstamped = 0
         for r in rows:
             if r.get("cites_repaired") or not r.get("cites_rejected"):
+                continue
+            # A locator is a line number, and a line number means nothing without
+            # the version it indexes into. This tool promotes a rejected citation
+            # on the strength of it falling inside the document -- which it still
+            # does after a refreeze, pointing at entirely different text. Promoting
+            # on that basis manufactures a citation that was never checked, and
+            # stamps it as one that was.
+            was = r.get("doc_sha256")
+            if was and current and was != current:
+                stale += 1
+                continue
+            if not was and not args.assume_same_text:
+                unstamped += 1
                 continue
             keep, recovered = [], []
             for entry in r["cites_rejected"]:
@@ -78,6 +96,14 @@ def main():
                   f"across {touched} row(s)")
         else:
             print(f"  {os.path.basename(path)}: nothing to repair")
+        if stale:
+            print(f"      {stale} row(s) SKIPPED — written against an earlier "
+                  f"version of {args.doc}. Their line numbers no longer mean what "
+                  f"they meant; re-run rather than repair.")
+        if unstamped:
+            print(f"      {unstamped} row(s) skipped — no version stamp, so "
+                  f"whether they match this text is unknown. Pass "
+                  f"--assume-same-text if the document has not been re-frozen.")
     return 0
 
 
