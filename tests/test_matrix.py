@@ -166,5 +166,84 @@ class BlankRows(unittest.TestCase):
         self.assertEqual(rows[1]["A"], "ID")
 
 
+class DelimitedFiles(unittest.TestCase):
+    """A comment register that arrives as CSV rather than .xlsx.
+
+    Every case here is a way real exports differ from the tidy file you write when
+    testing by hand. Before this existed the toolkit met all of them with
+    `BadZipFile: File is not a zip file`."""
+
+    def write(self, text, suffix=".csv"):
+        path = os.path.join(tempfile.mkdtemp(), "m" + suffix)
+        with open(path, "w", newline="", encoding="utf-8") as handle:
+            handle.write(text)
+        return path
+
+    def test_columns_are_addressed_by_letter_like_a_sheet(self):
+        """The whole point: 13 callers index rows by letter and must not care
+        which format the register arrived in."""
+        rows = matrix.read_sheet(self.write("id,ref,comment\nC-1,6.3,precedence\n"), "any")
+        self.assertEqual(rows[1]["A"], "C-1")
+        self.assertEqual(rows[1]["C"], "precedence")
+
+    def test_excel_byte_order_mark_is_stripped(self):
+        """Excel writes a BOM on CSV export. Read as plain utf-8 the first header
+        cell is '\ufeffid', so every lookup by header name misses and the failure
+        looks like a missing column rather than an encoding."""
+        rows = matrix.read_sheet(self.write("\ufeffid,ref\nC-1,6.3\n"), "any")
+        self.assertEqual(rows[0]["A"], "id")
+
+    def test_semicolon_export_is_not_read_as_one_column(self):
+        """The European Excel default. Assumed comma, the entire row lands in A."""
+        rows = matrix.read_sheet(self.write("id;ref;comment\nC-1;6.3;precedence\n"), "any")
+        self.assertEqual(rows[1]["B"], "6.3")
+
+    def test_a_newline_inside_a_quoted_comment_does_not_shift_the_row(self):
+        """Comment text routinely contains line breaks. Counting lines rather than
+        records numbers every row after one of them wrongly, and the writeback
+        then files answers against the wrong comment."""
+        rows = matrix.read_sheet(self.write(
+            'id,comment\nC-1,"two\nlines"\nC-2,plain\n'), "any")
+        self.assertEqual(rows[1]["comment" and "B"], "two\nlines")
+        self.assertEqual((rows[2]["A"], rows[2][matrix.ROW_KEY]), ("C-2", 3))
+
+    def test_blank_rows_are_dropped_reading_and_kept_writing(self):
+        """The round trip, which is where an off-by-one becomes silent corruption.
+        The reader skips the gap so callers never see an empty dict; the writer
+        must keep it so record N in is record N out."""
+        import writeback
+        src = self.write("id,ref\nC-1,6.3\n,\nC-2,7.1\n")
+        rows = matrix.read_sheet(src, "any")
+        self.assertEqual([r["A"] for r in rows], ["id", "C-1", "C-2"])
+        self.assertEqual(rows[2][matrix.ROW_KEY], 4)          # not 3
+
+        dst = os.path.join(os.path.dirname(src), "out.csv")
+        writeback.annotate(src, dst, "any", {"4": "verdict for C-2"}, "C", True)
+        back = matrix.read_sheet(dst, "any")
+        landed = [r for r in back if r["A"] == "C-2"][0]
+        self.assertEqual(landed["C"], "verdict for C-2")
+        self.assertEqual(len(open(dst, encoding="utf-8").read().splitlines()), 4)
+
+    def test_writing_past_the_last_column_widens_the_row(self):
+        import writeback
+        src = self.write("id\nC-1\n")
+        dst = os.path.join(os.path.dirname(src), "out.csv")
+        writeback.annotate(src, dst, "any", {"2": "late"}, "D", True)
+        self.assertEqual(matrix.read_sheet(dst, "any")[1]["D"], "late")
+
+    def test_a_populated_cell_survives_unless_overwrite_is_asked_for(self):
+        import writeback
+        src = self.write("id,verdict\nC-1,already there\n")
+        dst = os.path.join(os.path.dirname(src), "out.csv")
+        written, skipped = writeback.annotate(src, dst, "any",
+                                              {"2": "new"}, "B", False)
+        self.assertEqual((written, skipped), (0, 1))
+        self.assertEqual(matrix.read_sheet(dst, "any")[1]["B"], "already there")
+
+    def test_tab_separated_is_read_too(self):
+        rows = matrix.read_sheet(self.write("id\tref\nC-1\t6.3\n", ".tsv"), "any")
+        self.assertEqual(rows[1]["B"], "6.3")
+
+
 if __name__ == "__main__":
     unittest.main()

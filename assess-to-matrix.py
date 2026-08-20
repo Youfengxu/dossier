@@ -46,7 +46,7 @@ def col_name(n):
 def main():
     p = argparse.ArgumentParser(description=__doc__,
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("--xlsx", required=True)
+    p.add_argument("--xlsx", "--matrix", required=True)
     p.add_argument("--sheet", required=True)
     p.add_argument("--eval", action="append", required=True, metavar="NAME=FILE")
     p.add_argument("--first-col", required=True)

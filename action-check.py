@@ -85,7 +85,7 @@ def main():
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--project", required=True)
-    parser.add_argument("--xlsx", required=True)
+    parser.add_argument("--xlsx", "--matrix", required=True)
     parser.add_argument("--sheet", required=True)
     parser.add_argument("--from", dest="old", required=True)
     parser.add_argument("--to", dest="new", required=True)

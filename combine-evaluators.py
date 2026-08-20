@@ -62,7 +62,7 @@ def main():
     parser = argparse.ArgumentParser(
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--xlsx", required=True, help="matrix to write into")
+    parser.add_argument("--xlsx", "--matrix", required=True, help="matrix to write into")
     parser.add_argument("--sheet", required=True)
     parser.add_argument("--eval", action="append", required=True,
                         metavar="NAME=FILE",

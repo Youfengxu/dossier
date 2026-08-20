@@ -81,6 +81,48 @@ def evidence(row, old_slug, new_slug, locators):
     return text
 
 
+def annotate_csv(src, dst, values, col_letter, overwrite):
+    """Set one column of a delimited file, preserving everything else.
+
+    EVERY physical record is rewritten, including the blank ones the reader drops.
+    The reader skips blanks so callers are not handed empty dicts; the writer must
+    keep them so record N in equals record N out. Dropping them here would shift
+    every row below a gap upward by one and silently file each answer against the
+    wrong comment — the same defect `__row__` exists to prevent, reintroduced at
+    the other end of the round trip.
+    """
+    with open(src, newline="", encoding="utf-8-sig") as handle:
+        sample = handle.read(8192)
+        handle.seek(0)
+        try:
+            dialect = csv.Sniffer().sniff(sample, delimiters=",;\t|")
+        except csv.Error:
+            dialect = csv.excel
+        rows = list(csv.reader(handle, dialect))
+
+    index = matrix_reader.col_num(col_letter) - 1
+    written = skipped = 0
+    for record, fields in enumerate(rows, start=1):
+        text = values.get(str(record))
+        if text is None:
+            continue
+        while len(fields) <= index:
+            fields.append("")
+        if fields[index].strip() and not overwrite:
+            skipped += 1
+            continue
+        fields[index] = text
+        written += 1
+
+    width = max((len(f) for f in rows), default=0)
+    with open(dst, "w", newline="", encoding="utf-8") as handle:
+        out = csv.writer(handle, delimiter=dialect.delimiter,
+                         quoting=csv.QUOTE_MINIMAL)
+        for fields in rows:
+            out.writerow(fields + [""] * (width - len(fields)))
+    return written, skipped
+
+
 def annotate(src, dst, sheet_name, values, col_letter, overwrite):
     """Copy the workbook, setting one column of one sheet. Inline strings only.
 
@@ -88,6 +130,8 @@ def annotate(src, dst, sheet_name, values, col_letter, overwrite):
     sharedStrings.xml means rewriting every index that follows, and one slip
     there rewrites unrelated cells into the wrong text.
     """
+    if src.lower().endswith(matrix_reader.CSV_SUFFIXES):
+        return annotate_csv(src, dst, values, col_letter, overwrite)
     zin = zipfile.ZipFile(src)
     book = ET.fromstring(zin.read("xl/workbook.xml"))
     rels = ET.fromstring(zin.read("xl/_rels/workbook.xml.rels"))
@@ -151,7 +195,7 @@ def main():
     parser.add_argument("--project", required=True)
     parser.add_argument("--from", dest="old", required=True)
     parser.add_argument("--to", dest="new", required=True)
-    parser.add_argument("--xlsx", required=True)
+    parser.add_argument("--xlsx", "--matrix", required=True)
     parser.add_argument("--sheet", default="Comments")
     parser.add_argument("--col", default="I",
                         help="column to fill (default I, 'How/where comment "

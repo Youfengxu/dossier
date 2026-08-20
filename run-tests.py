@@ -96,8 +96,15 @@ MUTATIONS = [
                "then read as UNCAUGHT rather than as a broken name — so a rename "
                "can quietly disarm a mutation. If you rename a test, grep here.",
         "module": "matrix",
-        "old": "        if any(v.strip() for v in cells.values()):",
-        "new": "        if True:",
+        # Anchored on the line above it as well. The bare `if any(...)` line
+        # appeared verbatim in read_csv once delimited input landed, and a
+        # substring patch then rewrote BOTH -- breaking the indentation of the
+        # other and turning a mutation into an import error, which reads as
+        # UNCAUGHT rather than as the harness misfiring.
+        "old": ('            cells[re.sub(r"\\d", "", cell.get("r"))] = value(cell)\n'
+                '        if any(v.strip() for v in cells.values()):'),
+        "new": ('            cells[re.sub(r"\\d", "", cell.get("r"))] = value(cell)\n'
+                '        if True:'),
         "tests": [
             "tests.test_matrix.BlankRows.test_a_row_of_empty_cells_is_dropped",
             "tests.test_matrix.BlankRows.test_list_position_still_diverges_but_the_row_key_does_not",
@@ -244,7 +251,7 @@ def mutate():
             print(f"\n  STALE  {mutation['what']}")
             print(f"         the line it patches is no longer in "
                   f"{mutation['module']}.py — update or drop this mutation")
-            missed.append(mutation["what"])
+            missed.append(("STALE ANCHOR", mutation["what"]))
             continue
 
         module = __import__(mutation["module"])
@@ -286,16 +293,27 @@ def mutate():
         if status == "caught":
             caught += 1
         else:
-            missed.append(mutation["what"])
+            missed.append((status, mutation["what"]))
 
     print("\n" + "=" * 74)
     print(f"  {caught}/{len(MUTATIONS)} mutations caught")
-    for what in missed:
-        print(f"  UNCAUGHT  {what}")
-    if missed:
+    # The summary used to print every miss as UNCAUGHT, including the ones the
+    # per-mutation line had correctly called STALE ANCHOR or BROKEN TEST NAME.
+    # Those are opposite diagnoses — "nothing pins this behaviour" versus "the
+    # harness cannot find the thing that does" — and they call for opposite
+    # actions. Reading only the summary sent this session down the wrong path
+    # twice in one night, which is a good argument for a summary that does not
+    # discard the distinction it was handed.
+    for status, what in missed:
+        print(f"  {status:>16}  {what}")
+    if any(s == "NOT CAUGHT" for s, _ in missed):
         print("\n  A test that passes against broken code is worse than no "
               "test: it turns\n  an absence of checking into a claim of "
               "checking. Fix the test, not this file.")
+    if any(s != "NOT CAUGHT" for s, _ in missed):
+        print("\n  A mutation the harness could not apply or could not find "
+              "tests for is\n  not a passing mutation. Repair the entry — the "
+              "behaviour it names is\n  currently unchecked either way.")
     return not missed
 
 

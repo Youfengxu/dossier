@@ -47,7 +47,7 @@ def main():
     parser = argparse.ArgumentParser(
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--xlsx", required=True)
+    parser.add_argument("--xlsx", "--matrix", required=True)
     parser.add_argument("--sheet", required=True)
     parser.add_argument("--cols", help="comma-separated column letters")
     parser.add_argument("--headers", help="comma-separated display names")
@@ -57,7 +57,7 @@ def main():
 
     rows = matrix_reader.read_sheet(args.xlsx, args.sheet)
     cols = [c.strip().upper() for c in args.cols.split(",")] if args.cols \
-        else sorted({k for r in rows for k in r}, key=lambda x: (len(x), x))
+        else matrix_reader.columns(rows)
     if args.headers:
         names = [h.strip() for h in args.headers.split(",")]
     else:

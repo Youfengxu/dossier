@@ -32,6 +32,7 @@ command line and nowhere else.
 """
 
 import argparse
+import csv
 import json
 import os
 import re
@@ -93,6 +94,73 @@ def validate(obj):
 
 ROW_KEY = "__row__"
 
+CSV_SUFFIXES = (".csv", ".tsv")
+
+
+def columns(rows):
+    """The column letters present, in sheet order, without the bookkeeping key.
+
+    `__row__` is dunder-flanked so it cannot collide with a letter, but that only
+    protects lookups BY letter. A caller asking a row what keys it has gets the
+    bookkeeping key too, and to-html.py did exactly that: it built its column list
+    from every key it saw, then called .strip() on the header cell of each --
+    landing on an int and crashing on every input, .xlsx included. Ask here
+    instead of enumerating keys by hand."""
+    seen = {k for row in rows for k in row if k != ROW_KEY}
+    return sorted(seen, key=lambda letter: (len(letter), letter))
+
+
+def col_letters(index):
+    """0-based column index to its spreadsheet letter. 0 -> A, 26 -> AA."""
+    out = ""
+    index += 1
+    while index:
+        index, rem = divmod(index - 1, 26)
+        out = chr(65 + rem) + out
+    return out
+
+
+def col_num(letters):
+    """Inverse of col_letters. A -> 1, AA -> 27."""
+    n = 0
+    for ch in letters.upper():
+        n = n * 26 + (ord(ch) - 64)
+    return n
+
+
+def read_csv(path):
+    """A delimited file, addressed by column letter exactly like a worksheet.
+
+    Comment registers arrive as CSV at least as often as .xlsx — exported from a
+    tracker, or written by hand by someone without Excel. Until this existed the
+    toolkit answered such a file with `BadZipFile: File is not a zip file`, which
+    names the implementation rather than the problem.
+
+    Three details are not decoration:
+
+      utf-8-sig    Excel writes a BOM, and without this the first header cell is
+                   \ufeffid, so every lookup of column A's name silently misses.
+      sniffing     semicolon-delimited exports are the European Excel default and
+                   are otherwise read as one column per row.
+      record index not line number. A quoted field may contain newlines, so the
+                   two diverge, and the record index is what Excel shows in its row
+                   gutter and what a writer must address.
+    """
+    with open(path, newline="", encoding="utf-8-sig") as handle:
+        sample = handle.read(8192)
+        handle.seek(0)
+        try:
+            dialect = csv.Sniffer().sniff(sample, delimiters=",;\t|")
+        except csv.Error:
+            dialect = csv.excel                      # one column, or empty
+        rows = []
+        for record, fields in enumerate(csv.reader(handle, dialect), start=1):
+            cells = {col_letters(i): (v or "") for i, v in enumerate(fields)}
+            if any(v.strip() for v in cells.values()):
+                cells[ROW_KEY] = record
+                rows.append(cells)
+    return rows
+
 
 def read_sheet(path, sheet_name):
     """Return [{col_letter: value}] for the named sheet. Stdlib only.
@@ -104,7 +172,13 @@ def read_sheet(path, sheet_name):
     cleanly, which is what makes it dangerous: evidence sits against the wrong
     comment and nothing says so.
 
-    The key is dunder-flanked so it cannot collide with a column letter."""
+    The key is dunder-flanked so it cannot collide with a column letter.
+
+    Dispatches on extension: a .csv or .tsv has no sheets, so `sheet_name` is
+    accepted and ignored rather than made a different call, which keeps every one
+    of the callers below indifferent to which format it was handed."""
+    if path.lower().endswith(CSV_SUFFIXES):
+        return read_csv(path)
     z = zipfile.ZipFile(path)
     shared = []
     try:
@@ -162,7 +236,7 @@ def main():
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--project", required=True)
-    parser.add_argument("--xlsx", required=True)
+    parser.add_argument("--xlsx", "--matrix", required=True)
     parser.add_argument("--sheet", required=True)
     parser.add_argument("--doc", required=True,
                         help="frozen slug to validate candidate terms against")

@@ -72,7 +72,7 @@ def main():
     parser = argparse.ArgumentParser(
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--xlsx", required=True)
+    parser.add_argument("--xlsx", "--matrix", required=True)
     parser.add_argument("--sheet", required=True)
     parser.add_argument("--out", required=True)
     parser.add_argument("--id-col", default="A")

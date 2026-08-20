@@ -123,7 +123,7 @@ def main():
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--project", required=True)
     p.add_argument("--doc", required=True)
-    p.add_argument("--xlsx", required=True)
+    p.add_argument("--xlsx", "--matrix", required=True)
     p.add_argument("--sheet", required=True)
     p.add_argument("--model", required=True)
     p.add_argument("--url", required=True)

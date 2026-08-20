@@ -56,6 +56,17 @@ jobs:
           echo "$out" | grep -q "$(pwd)" && { echo "FAIL: absolute path in extracted text"; exit 1; }
           python3 extract.py fixtures/floodtwin/README.md >/dev/null 2>&1 && { echo "FAIL: unreadable source exited 0"; exit 1; }
           echo "extractor: text produced, no absolute path, unreadable source refused"
+          # --help is not exercise. to-html.py crashed on EVERY input from the
+          # moment rows started carrying __row__ -- it built its column list from
+          # whatever keys it saw and called .strip() on an int -- and the gate
+          # above reported it healthy for as long as that was true, because it
+          # only ever asked the tool to describe itself. Run one consumer against
+          # real data, in both formats it accepts.
+          python3 to-html.py --matrix fixtures/floodtwin/comments.csv \
+            --sheet Comments --out /tmp/ft.html
+          grep -q "FT-003" /tmp/ft.html || { echo "FAIL: no rows rendered"; exit 1; }
+          grep -q "__row__" /tmp/ft.html && { echo "FAIL: bookkeeping key rendered as a column"; exit 1; }
+          echo "consumer: delimited register read, rendered, no bookkeeping leak"
           # This loop used to check only the exit status, so a tool "answered"
           # --help by ignoring it, running, and exiting 0. Four did: two ran their
           # gate instead of describing it, and two are libraries with no CLI at
