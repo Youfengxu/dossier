@@ -108,7 +108,20 @@ def main(path):
         print('unknown type: ' + path)
 
 
+USAGE = 'usage: extract.py FILE [FILE ...]   (.docx / .pptx / .xlsx -> text on stdout)'
+
+
 if __name__ == '__main__':
+    # --help has to be answered deliberately. It used to be handled by accident:
+    # '--help' fell through as a filename, ZipFile refused it, and the tool exited
+    # 0 -- so CI's "every tool answers --help" gate passed on a tool that had never
+    # answered anything. Making the unreadable-source exit honest is what revealed
+    # it. A gate that cannot fail is not a gate.
+    if len(sys.argv) < 2 or sys.argv[1] in ('-h', '--help'):
+        wanted_help = len(sys.argv) > 1
+        print(__doc__.strip() if wanted_help else USAGE,
+              file=sys.stdout if wanted_help else sys.stderr)
+        sys.exit(0 if wanted_help else 2)
     failed = 0
     for p in sys.argv[1:]:
         # BASENAME, not the full path. The banner is provenance for a human

@@ -56,8 +56,22 @@ jobs:
           echo "$out" | grep -q "$(pwd)" && { echo "FAIL: absolute path in extracted text"; exit 1; }
           python3 extract.py fixtures/floodtwin/README.md >/dev/null 2>&1 && { echo "FAIL: unreadable source exited 0"; exit 1; }
           echo "extractor: text produced, no absolute path, unreadable source refused"
+          # This loop used to check only the exit status, so a tool "answered"
+          # --help by ignoring it, running, and exiting 0. Four did: two ran their
+          # gate instead of describing it, and two are libraries with no CLI at
+          # all. Require actual help text from anything that claims to be a tool,
+          # and check the libraries by importing them, which is the only claim
+          # they make.
+          for f in llm.py vocabulary.py; do
+            python3 -c "import importlib.util,sys
+spec=importlib.util.spec_from_file_location('m','$f')
+m=importlib.util.module_from_spec(spec); spec.loader.exec_module(m)" \
+              || { echo "FAIL: $f does not import"; fail=1; }
+          done
           for f in *.py dossier; do
-            python3 "$f" --help >/dev/null 2>&1 || { echo "FAIL: $f"; fail=1; }
+            case "$f" in llm.py|vocabulary.py) continue ;; esac
+            out=$(python3 "$f" --help 2>&1) || { echo "FAIL: $f --help exited non-zero"; fail=1; continue; }
+            [ ${#out} -ge 40 ] || { echo "FAIL: $f --help printed ${#out} chars, not help"; fail=1; }
           done
           exit $fail
 
