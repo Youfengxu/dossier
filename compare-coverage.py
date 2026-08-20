@@ -20,8 +20,15 @@ import csv
 import os
 import sys
 
-SCALE = {"unmet": 0, "partial": 1, "unverifiable": 2, "met": 3,
-         "not_applicable": 4}
+sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
+import vocabulary                                          # noqa: E402
+
+# The scale comes from the project's declared vocabulary rather than from a dict
+# here. The dict that used to sit in this file ranked "unverifiable" BETWEEN
+# partial and met, which made "we could not check" score one step better than
+# "partly done" — an artefact of listing the values alphabetically-ish rather
+# than a judgement anyone made.
+VOCAB = vocabulary.load(name="coverage")
 
 
 def load(path):
@@ -36,9 +43,15 @@ def load(path):
 
 def severity(a, b):
     """How alarming is this move? Distance on the scale, with the ends worst."""
-    if a not in SCALE or b not in SCALE:
+    if a not in VOCAB.values or b not in VOCAB.values:
         return 9
-    return abs(SCALE[a] - SCALE[b])
+    # distance() is None when either side is off-scale — unverifiable and
+    # not_applicable are not degrees of coverage, and giving them a position
+    # invents a comparison. An unrankable move still sorts to the top, because
+    # "this went from partly done to uncheckable" is exactly what a reviewer
+    # should see first.
+    steps = VOCAB.distance(a, b)
+    return 9 if steps is None else steps
 
 
 def main():

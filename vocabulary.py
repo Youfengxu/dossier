@@ -49,12 +49,18 @@ DEFAULTS = {
     },
     "coverage": {
         "scale": ["unmet", "partial", "met"],
-        "unknown": "unverifiable",
+        # TWO values sit off this scale, not one. "unverifiable" means the
+        # evidence could not be reached; "not_applicable" means the obligation
+        # does not bind. Neither is a degree of coverage, and an earlier version
+        # of compare-coverage.py ranked unverifiable BETWEEN partial and met —
+        # which made "we could not check" one step better than "partly done".
+        "off_scale": ["unverifiable", "not_applicable"],
         "labels": {
             "unmet": "Unmet",
             "partial": "Partial",
             "met": "Met",
             "unverifiable": "Unverifiable",
+            "not_applicable": "Not applicable",
         },
     },
 }
@@ -66,17 +72,24 @@ class Vocabulary:
         base = DEFAULTS.get(name, DEFAULT)
         spec = dict(base if not spec else {**base, **spec})
         self.scale = list(spec["scale"])
-        self.unknown = spec.get("unknown") or DEFAULT["unknown"]
+        # `unknown` is the singular form kept for projects that declare one;
+        # `off_scale` is the general case. The first off-scale value is what a
+        # coercion falls back to.
+        off = spec.get("off_scale")
+        if not off:
+            off = [spec.get("unknown") or DEFAULT["unknown"]]
+        self.off_scale = list(off)
+        self.unknown = self.off_scale[0]
         labels = dict(spec.get("labels") or {})
         # A project may declare a scale and no labels; fall back to the value
         # itself rather than printing an empty cell.
         self.labels = {v: labels.get(v, v.replace("_", " ").capitalize())
-                       for v in self.scale + [self.unknown]}
+                       for v in self.scale + self.off_scale}
 
     # -- membership --------------------------------------------------------
     @property
     def values(self):
-        return set(self.scale) | {self.unknown}
+        return set(self.scale) | set(self.off_scale)
 
     def valid(self, verdict):
         return verdict in self.values
