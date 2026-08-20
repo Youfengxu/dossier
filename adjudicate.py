@@ -160,6 +160,46 @@ def pick(index, number, want_title=None):
     return max(candidates, key=lambda c: c[2] - c[1])
 
 
+def follow(old_index, new_index, number):
+    """Resolve a reference written against the OLD revision into the new one.
+
+    Returns (hit, note). `hit` is (title, start, end) in the new document, or
+    None when the section cannot be located honestly.
+
+    A matrix cites the numbering of the document the reviewer read. Resolving the
+    same number in both revisions assumes the numbering survived, and on a
+    restructured document it does not: across one review tab, 15 of 38 references
+    pointed at a different section in the new revision — a component chapter under
+    one number in the old draft, an unrelated validation chapter under the same
+    number in the new one. Comparing those pairs produces a verdict about two
+    unrelated sections, and nothing in the output says so.
+
+    The heading is the stable identifier, not the number. So: take the title from
+    the old revision, and find THAT in the new one wherever it now sits. Only
+    when the title has genuinely gone does this give up — and giving up is the
+    right answer, because the alternative is a confident comparison of the wrong
+    text.
+    """
+    old = pick(old_index, number)
+    if not old:
+        return None, f"§{number} is not in the older revision either"
+    wanted = normalise_title(old[0])
+
+    here = pick(new_index, number)
+    if here and normalise_title(here[0]) == wanted:
+        return here, ""
+
+    for num, entries in sorted(new_index.items()):
+        for title, start, end in entries:
+            if normalise_title(title) == wanted and not TOC_TITLE.search(title.strip()):
+                if num != number:
+                    return (title, start, end), f"§{number} is now §{num}"
+                return (title, start, end), ""
+
+    return None, (f"§{number} named the section {old[0].strip()[:40]!r}, which is "
+                  f"not in the new revision under that number or any other")
+
+
 def section_refs(cell):
     """Section numbers a matrix cell names. '§3.3, Table' -> ['3.3']."""
     return re.findall(r"§\s*(\d+(?:\.\d+)*)", cell or "")
@@ -278,11 +318,18 @@ def main():
     print(f"{len(work)} row(s) carry a section reference; "
           f"{len(wide)} without one; {len(skipped)} skipped\n")
 
+    wide_one = None
+
     def one(item):
         position, rid, refs, comment = item
-        pieces, missing = [], []
+        pieces, missing, renumbered = [], [], []
         for ref in refs:
-            old_hit, new_hit = pick(old_index, ref), pick(new_index, ref)
+            # Follow the heading, not the number — the matrix cites the old
+            # revision's numbering and a restructured document renumbers.
+            old_hit = pick(old_index, ref)
+            new_hit, moved = follow(old_index, new_index, ref)
+            if moved:
+                renumbered.append(moved)
             if not new_hit:
                 missing.append(ref)
                 continue
@@ -291,6 +338,24 @@ def main():
             pieces.append((ref, old_hit, new_hit, old_body, new_body))
 
         if not pieces:
+            # The reference cannot be resolved into the new revision — the
+            # heading is gone, or the extraction lost the numbering it was
+            # written against. Word auto-numbering is the usual cause: the
+            # contents page carries "12Analytics…195" while the body heading
+            # extracts as bare text, so no number in the body can be matched at
+            # all.
+            #
+            # "unclear" was the old answer and it throws the row away. The row
+            # is not unjudgeable, it is merely unlocatable, which is exactly the
+            # condition the unreferenced path already handles — so hand it over
+            # rather than reporting a non-verdict.
+            if wide_one is not None:
+                out = wide_one((position, rid, [], comment))
+                return (out[0], out[1], out[2],
+                        out[3] + f"  [§{', §'.join(missing)} could not be located "
+                                 f"in {args.new}; judged against the wider "
+                                 f"change set instead]",
+                        out[4], out[5] + "+UNLOCATABLE")
             return position, rid, "unclear", (
                 f"section {', '.join(missing)} named by the comment does not "
                 f"exist in {args.new}"), "", "MISSING SECTION"
@@ -340,6 +405,8 @@ def main():
 
         where = ", ".join(f"§{r} ({args.new}:{nh[1]}-{nh[2]})"
                           for r, _, nh, _, _ in pieces)
+        if renumbered:
+            where += "; " + "; ".join(renumbered)
         return (position, rid, reply["verdict"],
                 reply["rationale"] + f"  [{where}]", reply.get("quote", ""),
                 escalated or "DIFF")
@@ -359,7 +426,13 @@ def main():
     # summary counts the two modes separately. A reviewer can then tell "the
     # document does not address this" from "the parts I looked at did not".
     changed = []
-    if wide:
+    # Prepared whenever there is any work at all, not only when a row arrived
+    # without a section reference. A row WITH a reference can still fail to
+    # resolve — the heading may be gone, or the extraction may have lost the
+    # numbering — and it then falls through to this machinery. Building it only
+    # for `wide` left those rows raising NameError on a variable that was never
+    # set, on exactly the documents most likely to need it.
+    if wide or work:
         for number, entries in sorted(new_index.items()):
             for title, start, end in entries:
                 new_body = "\n".join(new_lines[start:end])
