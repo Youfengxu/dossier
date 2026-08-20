@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Did the new revision address each comment? Scoped to the section it names.
 
-An adjudication matrix already carries the answer to the hardest question in
+A comment matrix already carries the answer to the hardest question in
 this whole toolkit: WHERE is this comment about. Every other tool in here works
 that out from scratch — deriving distinctive terms per finding, checking them
 against the corpus, discarding the ones too common or too rare to carry signal.

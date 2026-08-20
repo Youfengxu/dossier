@@ -8,7 +8,7 @@ page, not across one. So: no tables, one section per row, the two judgements as
 sentences, and the rows that need a human first.
 
     ./render.py --xlsx out/D2-dual-judge.xlsx --sheet "Comments" \
-                --title "D2 Architecture" --out out/D2-dual-judge.md
+                --title "Deliverable v2" --out out/dual-judge.md
 
 Ordering is deliberate. Contradictions lead, then near-misses, then agreement,
 because a reviewer who stops halfway should have spent that half on the rows

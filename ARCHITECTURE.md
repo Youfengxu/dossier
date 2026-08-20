@@ -33,7 +33,7 @@ orchestrator, and deliberately so (`DESIGN` §3.22).
 Four of the eight construct neither a `Client` nor an `Embedder`: `freeze.py`,
 `sweep.py`, `closure.py`, `register.py`. That is checkable rather than claimed —
 `grep -c 'Client(\|Embedder(' freeze.py sweep.py closure.py register.py` returns
-zero for each. `register.py` will read an `.xlsx` adjudication matrix, but it
+zero for each. `register.py` will read an `.xlsx` comment matrix, but it
 does so through `matrix.read_sheet`, which is hand-rolled OOXML over `zipfile`
 and `xml.etree` and never calls a model.
 

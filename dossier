@@ -210,7 +210,7 @@ def cmd_report(args):
         print(f"note: no {coverage} — findings closure only, no RFO coverage "
               f"section.\n      Run `dossier coverage` first for the full "
               f"report.\n")
-    # The adjudication matrix, if the project keeps one where freeze.py puts
+    # The comment matrix, if the project keeps one where freeze.py puts
     # sources. Its presence changes what the report leads with: not "what did
     # they change" but "what did they claim, and does the document support it".
     matrix = args.matrix or "source/feedback-matrix.xlsx"

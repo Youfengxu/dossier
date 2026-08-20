@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Write closure evidence back into the adjudication matrix.
+"""Write closure evidence back into the comment matrix.
 
 The matrix has a column for how and where each comment was adjudicated. Filling
 it by hand is the last manual step in the loop: the evidence already exists as

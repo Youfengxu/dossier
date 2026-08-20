@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build a register-map from an adjudication matrix spreadsheet.
+"""Build a register-map from a comment matrix spreadsheet.
 
 When the client and the vendor agree a feedback matrix, its IDs become the only
 ones that matter — they are what the vendor writes against and what the status

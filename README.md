@@ -233,7 +233,7 @@ lead with.
 
 It degrades: run it without a coverage file and you get the closure half alone.
 
-**If the engagement has an agreed adjudication matrix**, put it at
+**If the engagement has an agreed comment matrix**, put it at
 `source/feedback-matrix.xlsx` and `report` finds it automatically. Build the
 register map from it rather than hand-writing one — its IDs are the ones the
 client and vendor both use, and a map keyed on anything else has to be
@@ -320,7 +320,7 @@ They report `STILL ABSENT` while nothing appears, and `ADDED` the moment it
 does. The register has to declare this — zero and zero mean opposite things for
 an absence finding and a mistyped term, and nothing in the counts distinguishes
 them. Where the finding also names things that *do* exist and would have to
-change, list those too: B7 is about an unspecified content-inject interface, and
+change, list those too: B7 is about an unspecified telemetry-ingest interface, and
 naming the narrative inject contracts alongside turns a permanent `ABSENT` into
 an `UNCHANGED` that proves those contracts were not extended either.
 

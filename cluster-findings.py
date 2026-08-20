@@ -8,7 +8,7 @@ verdicts themselves, but the triage burden they impose.
 The one signal that measurably works is CONVERGENCE. When six obligations
 independently report the same gap, that gap is real far more often than a lone
 verdict is — on a live corpus, six obligations converged on a missing community
-component and three on a missing content-inject interface, and both were findings
+component and three on a missing telemetry-ingest interface, and both were findings
 a human reviewer had already made. A lone verdict on a long document is where the
 false positives live (DESIGN 3.18).
 

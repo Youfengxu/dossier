@@ -46,6 +46,7 @@ jobs:
       - name: every tool loads and answers --help
         run: |
           fail=0
+          test -f denylist.txt || { echo "denylist.txt missing — the scrub cannot run"; exit 1; }
           for f in *.py dossier; do
             python3 "$f" --help >/dev/null 2>&1 || { echo "FAIL: $f"; fail=1; }
           done

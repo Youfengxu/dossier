@@ -20,40 +20,65 @@ Adding a term here is cheap. Removing one needs a reason, because every entry is
 here as a result of a real audit finding.
 """
 
+import hashlib
 import os
 import re
 import sys
 
-# Whole words only: short acronyms appear inside ordinary words. "REDACTED-04" lives
-# inside "encoding", which is how a first audit of this tree produced 28 false
-# positives and nearly buried the 2 real ones.
-IDENTIFIERS = [
-    "REDACTED-01", "REDACTED-02", "REDACTED-03", "REDACTED-04", "REDACTED-05", "REDACTED-06", "REDACTED-07",
-]
+# THE TERMS ARE STORED AS DIGESTS, NOT WORDS.
+#
+# This file screens a public repository for a client's vocabulary. Listing that
+# vocabulary in the file that screens for it publishes exactly what it protects —
+# a lock whose key is taped to the door. So denylist.txt holds sha256 of each
+# normalised term with its word count, and the plaintext lives in .private/,
+# which is gitignored.
+#
+# The cost is that a hit cannot name the term it matched. It names the file, the
+# line, the category and the matched span, which is enough to fix and not enough
+# to leak. Regenerate with ./make-denylist.py after editing the private source.
+DENYLIST = os.path.join(os.path.dirname(os.path.abspath(__file__)), "denylist.txt")
 
-# Substring, case-insensitive. Phrases coined by the engagement; none of them
-# appears in the synthetic fixture, which is what makes them identifying.
-VOCABULARY = [
-    "REDACTED-08", "REDACTED-09", "REDACTED-10",
-    "REDACTED-11", "REDACTED-12", "REDACTED-13", "REDACTED-14",
-    "REDACTED-15", "REDACTED-16", "REDACTED-17",
-    "REDACTED-18", "REDACTED-19", "REDACTED-20",
-]
 
-# Document slugs and artefact names, including the ones that are argument
-# DEFAULTS rather than comments — a client workbook's sheet name baked into the
-# public entry point is a leak that no amount of comment-reading finds.
-ARTEFACTS = [
-    "REDACTED-21" "REDACTED-22", "REDACTED-21" "REDACTED-23", "REDACTED-21" "REDACTED-24", "REDACTED-21" "REDACTED-25", "REDACTED-21" "REDACTED-26",
-    "REDACTED-27" "REDACTED-23", "REDACTED-27" "REDACTED-24", "REDACTED-28" "REDACTED-29", "REDACTED-28" "REDACTED-30", "REDACTED-31" "REDACTED-32",
-    "REDACTED-33" "REDACTED-34", "REDACTED-35" "REDACTED-36", "REDACTED-37" "REDACTED-38",
-    "REDACTED-39" "REDACTED-40", "REDACTED-41" "REDACTED-42",
-    "REDACTED-43" "REDACTED-44",
-]
+def normalise(text):
+    return re.sub(r"[^a-z0-9]+", " ", text.lower()).strip()
 
-# Real people. A default signature on client-facing output is not a comment and
-# will not be found by reading prose.
-PEOPLE = ["REDACTED-45"]
+
+def load_denylist(path=DENYLIST):
+    """{word_count: {digest: category}} — grouped by length so the scanner knows
+    which window sizes to hash."""
+    by_length = {}
+    if not os.path.exists(path):
+        sys.exit(f"{path} is missing. Regenerate it with ./make-denylist.py")
+    for line in open(path, encoding="utf-8"):
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        category, count, digest = line.split("\t")
+        by_length.setdefault(int(count), {})[digest] = category
+    return by_length
+
+
+def hits_in(text, by_length):
+    """Every denied term in `text`, as (category, matched span).
+
+    Windows of normalised words are hashed and compared. A phrase of N words is
+    only ever compared against N-word windows, so the cost is one pass per
+    distinct term length rather than one per term.
+    """
+    found = []
+    for line_no, line in enumerate(text.splitlines(), 1):
+        words = normalise(line).split()
+        if not words:
+            continue
+        for size, digests in by_length.items():
+            for i in range(len(words) - size + 1):
+                window = " ".join(words[i:i + size])
+                digest = hashlib.sha256(window.encode()).hexdigest()
+                category = digests.get(digest)
+                if category:
+                    found.append((line_no, category, window))
+    return found
+
 
 SKIP_DIRS = {".git", ".private", "__pycache__", "source", "parsed",
              ".dossier-cache"}
@@ -73,27 +98,20 @@ def files(root):
 
 def main():
     root = os.path.dirname(os.path.realpath(__file__))
-    word = re.compile(r"\b(" + "|".join(map(re.escape, IDENTIFIERS)) + r")\b")
-    people = re.compile(r"\b(" + "|".join(map(re.escape, PEOPLE)) + r")\b")
-    phrases = [(t, re.compile(re.escape(t), re.I))
-               for t in VOCABULARY + ARTEFACTS]
+    by_length = load_denylist()
+    label = {"IDENTIFIERS": "IDENTIFIER", "PEOPLE": "PERSON",
+             "ARTEFACTS": "ARTEFACT", "VOCABULARY": "VOCABULARY"}
 
     hits = []
     for path in files(root):
         try:
-            lines = open(path, encoding="utf-8", errors="replace").read().splitlines()
+            text = open(path, encoding="utf-8", errors="replace").read()
         except OSError:
             continue
         rel = os.path.relpath(path, root)
-        for number, line in enumerate(lines, 1):
-            for match in word.finditer(line):
-                hits.append((rel, number, "IDENTIFIER", match.group(1), line))
-            for match in people.finditer(line):
-                hits.append((rel, number, "PERSON", match.group(1), line))
-            for term, pattern in phrases:
-                if pattern.search(line):
-                    kind = "ARTEFACT" if term in ARTEFACTS else "VOCABULARY"
-                    hits.append((rel, number, kind, term, line))
+        for number, category, span in hits_in(text, by_length):
+            line = text.splitlines()[number - 1]
+            hits.append((rel, number, label.get(category, category), span, line))
 
     if not hits:
         print("clean — no engagement identifiers, vocabulary or artefacts found")

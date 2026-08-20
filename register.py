@@ -168,7 +168,7 @@ def main():
     parser.add_argument("--map", default="register-map.yaml")
     parser.add_argument("--lexicon", default="lexicon.yaml")
     parser.add_argument("--matrix",
-                        help="adjudication matrix .xlsx; adds the claim check")
+                        help="comment matrix .xlsx; adds the claim check")
     parser.add_argument("--sheet", default="Comments")
     parser.add_argument("--status-col", default="H")
     parser.add_argument("--adjudicated-col", default="I")
