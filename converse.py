@@ -62,6 +62,7 @@ import re
 import sys
 import time
 import urllib.request
+import threading
 from concurrent.futures import ThreadPoolExecutor
 
 sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
@@ -74,7 +75,10 @@ Reply with JSON only: {"answer": "...", "cites": ["4818-4830", "912-915"]}
 
   - "answer": at most 300 words. Specific. Name the document's own defined terms
     and mechanisms. Say plainly when the document does not address something, and
-    say where you looked.
+    say where you looked. When you point at a passage, name the HEADING it sits
+    under — "under the Drainage Model" — and never write a line number in the prose.
+    A reader has the document open in a word processor, where your line numbers
+    do not exist; the heading is what they can actually navigate to.
   - "cites": locators supporting your answer. __HOWTO__ Do NOT quote text — the
     document renders itself from what you cite. Three to six of them.
 
@@ -95,6 +99,33 @@ RANGE = re.compile(r"^\s*(\d+)\s*(?:[-:\u2013\u2014]\s*(\d+))?\s*$")
 HEADING = re.compile(r"^\s*(?:\d+(?:\.\d+)*\.?\s+)?[A-Z][^.!?]{2,78}$")
 
 
+def busy(chat_url, model):
+    """Is another client already using this slot?
+
+    llama.cpp caches the prompt prefix PER SERVER, not per client. Two sessions
+    on one model with different documents evict each other every turn, so each
+    pays a full prefill instead of reusing one — the difference between five
+    seconds and two minutes, with no error to explain it. Worth one probe at
+    startup rather than a mystery later.
+    """
+    root = chat_url.split("/v1/")[0]
+    for path in (f"{root}/upstream/{model}/metrics", f"{root}/metrics"):
+        try:
+            with urllib.request.urlopen(path, timeout=6) as f:
+                body = f.read().decode("utf-8", "replace")
+        except Exception:
+            continue
+        live = 0
+        for line in body.splitlines():
+            if line.startswith("llamacpp:requests_processing"):
+                try:
+                    live = int(float(line.split()[-1]))
+                except ValueError:
+                    pass
+        return live
+    return None
+
+
 def nearest_heading(lines, n):
     """The closest plausible heading at or above line n, for navigation."""
     for i in range(min(n, len(lines) - 1), max(-1, n - 400), -1):
@@ -106,6 +137,16 @@ def nearest_heading(lines, n):
             if 1 < len(words) < 14:
                 return line, i
     return None, None
+
+
+def substantive(text, least=25):
+    """The first line of a block worth showing. Blocks frequently open on a
+    table cell holding one word, which identifies nothing."""
+    lines = [l.strip() for l in text.split("\n") if l.strip()]
+    for l in lines:
+        if len(l) >= least:
+            return l
+    return lines[0] if lines else ""
 
 
 def searchable(text, words=9):
@@ -229,7 +270,13 @@ def main():
     print(f"\n  document {args.doc}: {len(lines):,} lines, "
           f"{len(system):,} chars of prefix")
     for n in nodes:
-        print(f"  node {n['name']:<10} {n['model']}")
+        live = busy(n["url"], n["model"])
+        flag = ""
+        if live:
+            flag = (f"  ⚠ {live} request(s) already in flight — another client "
+                    f"shares this slot's prefix cache, so turns here will re-read "
+                    f"the document instead of reusing it")
+        print(f"  node {n['name']:<10} {n['model']}{flag}")
     for path in args.seed_panel:
         if os.path.exists(path):
             k = sum(1 for _ in open(path))
@@ -283,8 +330,36 @@ def main():
             n["messages"].append({"role": "assistant", "content": raw})
             return n, a, c, None, time.time() - t
 
-        with ThreadPoolExecutor(max_workers=len(nodes)) as pool:
-            results = list(pool.map(run, nodes))
+        # Between the question and the answer this printed nothing at all. On a
+        # warm prefix that is five seconds; on a cold one it is two minutes of
+        # blank terminal, which is indistinguishable from a hang — and gets the
+        # tool killed by a reasonable person. The slow path must not look like
+        # the broken one.
+        stop = threading.Event()
+        live = sys.stdout.isatty()
+
+        def ticker():
+            began = time.time()
+            while live and not stop.wait(1.0):
+                secs = int(time.time() - began)
+                note = " (first turn reads the whole document)" if secs > 25 \
+                    and not any(n["messages"][-1]["role"] == "assistant"
+                                for n in nodes) else ""
+                sys.stdout.write(f"\r    … waiting {secs}s{note}")
+                sys.stdout.flush()
+
+        beat = threading.Thread(target=ticker, daemon=True)
+        if live:
+            beat.start()
+        try:
+            with ThreadPoolExecutor(max_workers=len(nodes)) as pool:
+                results = list(pool.map(run, nodes))
+        finally:
+            stop.set()
+            if live:
+                beat.join(timeout=2)
+                sys.stdout.write("\r" + " " * 72 + "\r")
+                sys.stdout.flush()
 
         answers = {}
         for n, answer, cites, err, secs in results:
@@ -296,6 +371,7 @@ def main():
             answers[n["name"]] = answer
             print("   ", (answer or "(empty)").replace("\n", "\n    "))
             shown = render(lines, cites, args.doc, every)
+            seen_heads = set()
             if shown:
                 print("\n    Cited, rendered from the frozen document:")
             for loc, text, problem in shown:
@@ -303,11 +379,21 @@ def main():
                     print(f"      [{loc}] REJECTED — {problem}")
                     continue
                 start = int(loc.rsplit(":", 1)[1].split("-")[0])
-                head, hline = nearest_heading(lines, start)
-                print(f"      [{loc}] {text.split(chr(10))[0][:92]}")
-                if head:
-                    print(f"          under: {head}")
-                print(f"          find it: search for \"{searchable(text)}\"")
+                head, _hline = nearest_heading(lines, start)
+                # The heading is the identifier a reader can act on. A line
+                # number is an address into parsed text that exists nowhere in
+                # the document they have open, so printing one beside a heading
+                # only invites them to search for something that is not there.
+                # It stays in the transcript, where a locator belongs.
+                if head and head in seen_heads:
+                    head = f"{head} (again)"
+                elif head:
+                    seen_heads.add(head)
+                print(f"      ▸ {head}" if head else f"      ▸ [{loc}]")
+                body = substantive(text)
+                if body and head and body.strip() != head.strip():
+                    print(f"        {body[:96]}")
+                print(f"        find it: search for \"{searchable(text)}\"")
         if len(answers) > 1:
             terms = {k: set(re.findall(r"\b(?:[A-Z][a-z]+)(?:\s+[A-Z][a-z]+){1,3}\b", v))
                      for k, v in answers.items()}
@@ -320,7 +406,8 @@ def main():
             for k, v in only.items():
                 if v:
                     print(f"    only {k}: {', '.join(sorted(v)[:5])}")
-        transcript.append({"q": q, "answers": answers})
+        transcript.append({"q": q, "answers": answers,
+                           "cites": {n["name"]: c for n, _a, c, _e, _s in results}})
         print()
 
     if args.transcript and transcript:
