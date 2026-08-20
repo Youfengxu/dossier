@@ -62,12 +62,8 @@ jobs:
           # all. Require actual help text from anything that claims to be a tool,
           # and check the libraries by importing them, which is the only claim
           # they make.
-          for f in llm.py vocabulary.py; do
-            python3 -c "import importlib.util,sys
-spec=importlib.util.spec_from_file_location('m','$f')
-m=importlib.util.module_from_spec(spec); spec.loader.exec_module(m)" \
-              || { echo "FAIL: $f does not import"; fail=1; }
-          done
+          python3 -c "import sys; sys.path.insert(0,'.'); import llm, vocabulary" \
+            || { echo "FAIL: llm.py / vocabulary.py do not import"; fail=1; }
           for f in *.py dossier; do
             case "$f" in llm.py|vocabulary.py) continue ;; esac
             out=$(python3 "$f" --help 2>&1) || { echo "FAIL: $f --help exited non-zero"; fail=1; continue; }

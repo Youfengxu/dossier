@@ -29,3 +29,19 @@ if ! python3 run-tests.py >/tmp/dossier-tests.$$ 2>&1; then
 fi
 tail -1 /tmp/dossier-tests.$$ | sed 's/^ */pre-commit: /'
 rm -f /tmp/dossier-tests.$$
+
+# A malformed workflow fails in 0s with no log, which reads like an outage rather
+# than a syntax error. One was pushed after a multi-line `python3 -c` put
+# unindented lines inside a YAML block scalar and ended it early. Parsing costs
+# nothing and the round trip to find out otherwise costs a minute.
+for wf in .github/workflows/*.yml; do
+    [ -e "$wf" ] || continue
+    if ! python3 -c "import sys,yaml; yaml.safe_load(open(sys.argv[1]))" "$wf" 2>/tmp/dossier-yaml.$$; then
+        echo "pre-commit: REFUSING — $wf does not parse"
+        tail -4 /tmp/dossier-yaml.$$
+        rm -f /tmp/dossier-yaml.$$
+        exit 1
+    fi
+done
+rm -f /tmp/dossier-yaml.$$
+echo "pre-commit: workflows parse"
