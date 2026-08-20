@@ -91,13 +91,16 @@ MUTATIONS = [
     {
         "what": "matrix.read_sheet — blank rows no longer dropped",
         "why": "the behaviour the row-alignment defect rests on; if changing it "
-               "breaks nothing, nothing was pinning it",
+               "breaks nothing, nothing was pinning it. NOTE: this entry named a "
+               "test that was later renamed out from under it, and the mutation "
+               "then read as UNCAUGHT rather than as a broken name — so a rename "
+               "can quietly disarm a mutation. If you rename a test, grep here.",
         "module": "matrix",
         "old": "        if any(v.strip() for v in cells.values()):",
         "new": "        if True:",
         "tests": [
             "tests.test_matrix.BlankRows.test_a_row_of_empty_cells_is_dropped",
-            "tests.test_matrix.BlankRows.test_list_position_and_sheet_row_diverge_after_a_blank",
+            "tests.test_matrix.BlankRows.test_list_position_still_diverges_but_the_row_key_does_not",
         ],
     },
     {
