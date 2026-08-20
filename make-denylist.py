@@ -19,6 +19,7 @@ exact-substring matcher required the punctuation to line up and three real leaks
 survived in this tree because of it.
 """
 
+import argparse
 import hashlib
 import os
 import re
@@ -42,6 +43,14 @@ def normalise(text):
 
 
 def main():
+    # argparse so `--help` works and exits 0. CI runs --help against every tool
+    # to catch import-time breakage, and without this that check invoked the
+    # generator for real — which then correctly refused, because the private
+    # source is not in a clean checkout.
+    argparse.ArgumentParser(
+        description=__doc__,
+        formatter_class=argparse.RawDescriptionHelpFormatter).parse_args()
+
     if not os.path.exists(SOURCE):
         sys.exit(f"{SOURCE} is missing.\n\n"
                  "It is gitignored on purpose — a fresh clone has the digests but\n"
