@@ -138,7 +138,16 @@ def main():
     p.add_argument("--comment-col", default="D")
     p.add_argument("--action-col", default="")
     p.add_argument("--label", default="")
-    p.add_argument("--max-tokens", type=int, default=2000)
+    # 4000, not 2000. Every model screened on the NTSB slice returned EMPTY
+    # content at 2000 — not truncated, empty — because reasoning models spend the
+    # budget on analysis and never emit a final channel. The escalation guard
+    # catches it and doubles the budget, which is correct and expensive: each
+    # retry re-sends the whole prompt, and on a 53K-token document that is the
+    # dominant cost. Measured escalation rates at 2000: nemotron 0.4 per row,
+    # qwen3.8 0.7, qwen3-235b-thinking 0.6 — so roughly half of all rows paid
+    # twice for their input. Starting higher costs nothing when unused, because
+    # output is billed on tokens produced rather than on the ceiling requested.
+    p.add_argument("--max-tokens", type=int, default=4000)
     p.add_argument("--max-tokens-cap", type=int, default=8000)
     p.add_argument("--timeout", type=int, default=1200)
     args = p.parse_args()
