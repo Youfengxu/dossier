@@ -23,6 +23,7 @@ here as a result of a real audit finding.
 import hashlib
 import os
 import re
+import subprocess
 import sys
 
 # THE TERMS ARE STORED AS DIGESTS, NOT WORDS.
@@ -80,20 +81,51 @@ def hits_in(text, by_length):
     return found
 
 
+# Directories never scanned even when git would track them: client material and
+# derived artefacts that live beside the code.
 SKIP_DIRS = {".git", ".private", "__pycache__", "source", "parsed",
              ".dossier-cache"}
 SCAN_EXT = {".py", ".md", ".yaml", ".yml", ".txt", ".toml", ".cfg", ".json"}
 
 
+def ignored(root, paths):
+    """The subset of `paths` that git will not track, so cannot be published.
+
+    This check exists to stop the engagement's vocabulary reaching a public
+    repository. A file git ignores cannot reach one, so scanning it is not
+    protection — it is a source of refusals nothing can fix. A fixture's fetch
+    cache is the case that forced this: `fixtures/ntsb/raw/` holds real NTSB
+    correspondence naming real people, it is gitignored precisely so it is never
+    vendored, and it made every commit fail on a PERSON hit in a file that was
+    never going anywhere.
+
+    SKIP_DIRS remains for the opposite case — material that IS tracked and must
+    still never be scanned.
+    """
+    if not paths:
+        return set()
+    try:
+        done = subprocess.run(["git", "check-ignore", "--stdin"], cwd=root,
+                              input="\n".join(paths), capture_output=True,
+                              text=True, timeout=60)
+    except (OSError, subprocess.SubprocessError):
+        return set()                        # no git: scan everything, as before
+    return {line.strip() for line in done.stdout.splitlines() if line.strip()}
+
+
 def files(root):
+    candidates = []
     for base, dirs, names in os.walk(root):
         dirs[:] = [d for d in dirs if d not in SKIP_DIRS]
         for name in names:
-            path = os.path.join(base, name)
             if name == "check-clean.py":
                 continue
             if os.path.splitext(name)[1] in SCAN_EXT or name == "dossier":
-                yield path
+                candidates.append(os.path.join(base, name))
+    skip = ignored(root, [os.path.relpath(p, root) for p in candidates])
+    for path in candidates:
+        if os.path.relpath(path, root) not in skip:
+            yield path
 
 
 def main():

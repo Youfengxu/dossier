@@ -1,0 +1,146 @@
+#!/usr/bin/env python3
+"""Build a slice enriched for "Closed — Acceptable Alternate Action".
+
+    ./enrich.py --scan A-12-001:A-12-150     # fetch and cache a contiguous range
+    ./enrich.py --rate                       # status distribution over everything cached
+    ./enrich.py --build                      # write the enriched register + labels
+
+WHY. The default fixture is one issuance letter, and it happens to carry four
+alternate-action rows out of twenty-four. Four is enough to notice a blind spot and
+nowhere near enough to choose a model against it: at n=4 a model scoring 2/4
+against another's 1/4 is a coin flip, and screening six models would select noise.
+
+A probe of 28 records sampled sparsely across four years returned **zero** in 51
+labelled rows, so the Colgan letter is unrepresentative and the true rate is low.
+That is the whole reason this scans rather than samples.
+
+WHY CONTIGUOUS RANGES. Recommendations are issued in letters, and a letter's
+recommendations share an addressee, a subject and a date. Scanning a contiguous
+range therefore captures whole letters, which is what makes matched controls
+possible: for every alternate-action row, `--build` takes its letter's other
+adjudicated rows as controls. Positives and negatives then share an author and a
+topic, so a model cannot separate them on register instead of substance — the
+property the original fixture bought by using a single letter, kept here while
+drawing from many.
+
+POLITENESS. One request per recommendation, 0.4s apart, cached in raw/ so a rerun
+costs nothing. The cache is the reason this is safe to interrupt: kill it, rerun it,
+and it resumes.
+"""
+
+import argparse
+import collections
+import importlib.util
+import json
+import os
+import sys
+import time
+import urllib.request
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+RAW = os.path.join(HERE, "raw")
+API = "https://data.ntsb.gov/carol-main-public/api/Query/GetSrRecord/{}"
+UA = ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
+      "(KHTML, like Gecko) Chrome/120.0 Safari/537.36")
+TARGET = "Closed - Acceptable Alternate Action"
+
+
+def base():
+    """fetch.py's status map and verdict vocabulary, not a second copy."""
+    spec = importlib.util.spec_from_file_location("fetch", os.path.join(HERE, "fetch.py"))
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def get(srid, pause=0.4):
+    path = os.path.join(RAW, f"{srid}.json")
+    if os.path.exists(path):
+        return json.load(open(path))
+    request = urllib.request.Request(API.format(srid), headers={"User-Agent": UA})
+    try:
+        record = json.load(urllib.request.urlopen(request, timeout=45))
+    except Exception:
+        record = None                       # a gap in the numbering, cached as such
+    os.makedirs(RAW, exist_ok=True)
+    json.dump(record, open(path, "w"))
+    time.sleep(pause)
+    return record
+
+
+def expand(spec):
+    start, end = spec.split(":")
+    prefix, year, first = start.split("-")
+    last = int(end.split("-")[-1])
+    return [f"{prefix}-{year}-{n:03d}" for n in range(int(first), last + 1)]
+
+
+def rows(fetch):
+    """Every adjudicated (recommendation, addressee) pair in the cache."""
+    for name in sorted(os.listdir(RAW)):
+        record = json.load(open(os.path.join(RAW, name)))
+        if not record:
+            continue
+        names = fetch.status_names(record)
+        letter = ((record.get("Notations") or [{}])[0].get("ReportNumber") or "?")
+        for addressee in record.get("Addressees") or []:
+            status = names.get(str(addressee.get("Status")), "")
+            yield {"srid": record.get("SridCleaned") or record.get("Srid"),
+                   "letter": letter, "status": status,
+                   "verdict": fetch.VERDICT.get(status),
+                   "addressee": addressee.get("AddressAcronym") or "",
+                   "record": record, "raw_addressee": addressee}
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description=__doc__,
+        formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("--scan", action="append", default=[],
+                        metavar="A-12-001:A-12-150",
+                        help="contiguous range to fetch and cache; repeatable")
+    parser.add_argument("--rate", action="store_true",
+                        help="status distribution across everything cached")
+    parser.add_argument("--pause", type=float, default=0.4)
+    args = parser.parse_args()
+    if not (args.scan or args.rate):
+        print(__doc__.strip())
+        return 0
+
+    fetch = base()
+    for spec in args.scan:
+        ids = expand(spec)
+        fresh = [i for i in ids if not os.path.exists(os.path.join(RAW, f"{i}.json"))]
+        print(f"  {spec}: {len(ids)} ids, {len(fresh)} not yet cached")
+        for n, srid in enumerate(ids, 1):
+            get(srid, args.pause)
+            if n % 25 == 0:
+                print(f"    {n}/{len(ids)}", flush=True)
+
+    seen = collections.Counter()
+    letters = collections.defaultdict(collections.Counter)
+    for row in rows(fetch):
+        seen[row["status"]] += 1
+        letters[row["letter"]][row["status"]] += 1
+    labelled = sum(n for s, n in seen.items() if fetch.VERDICT.get(s))
+    target = seen[TARGET]
+    cached = len(os.listdir(RAW)) if os.path.isdir(RAW) else 0
+
+    print(f"\n  {cached} records cached, {sum(seen.values())} addressee rows, "
+          f"{labelled} adjudicated")
+    for status, n in seen.most_common():
+        mark = "   <-- target" if status == TARGET else ""
+        print(f"    {n:>4}  {status or '(blank)'}{mark}")
+    if labelled:
+        print(f"\n  alternate-action: {target}/{labelled} adjudicated "
+              f"= {target / labelled:.1%}")
+    usable = [l for l, c in letters.items() if c[TARGET]]
+    print(f"  letters carrying at least one: {len(usable)}")
+    if target < 30:
+        print(f"\n  {target} is not yet enough to rank models on this class. Scan "
+              f"another range;\n  the cache makes it resumable.")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
