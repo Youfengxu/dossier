@@ -53,9 +53,14 @@ Reply with JSON only:
  "rationale": "...", "cites": ["120-134", "355-360"]}
 
   - "verdict": does the document AS IT STANDS satisfy the comment?
-      addressed     the document does what the comment asks
-      partial       some of it, with a specific remainder missing
-      not_addressed the document does not do it
+      addressed     the document achieves what the comment REQUIRES. A comment
+                    usually names both an outcome and a way of reaching it; the
+                    outcome is what has to be satisfied. If the document reaches
+                    that outcome by a route other than the one named, it is
+                    addressed — say in the rationale which route it took.
+      partial       the outcome is only partly reached, and a specific piece is
+                    missing. NOT the label for "reached it, by other means".
+      not_addressed the outcome is not reached by any route
       unclear       the comment cannot be assessed against this document
     Do not consider whether anything was recently changed. You are judging the
     text in front of you, not a revision history.

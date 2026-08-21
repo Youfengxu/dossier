@@ -149,3 +149,36 @@ achieves what the comment required.
 the prompt and re-scoring against this same slice would fit the toolkit to this
 answer key and the number would stop meaning anything. The fix should be validated
 against a fixture that did not diagnose it.
+
+## Second run — prompt revised, hypothesis refuted
+
+The first run diagnosed `assess.py` as asking whether the document did *what was
+asked* rather than *what was required*, and predicted that saying so explicitly
+would recover the alternate-route class. One change was made to the verdict
+definitions and measured once. It did not.
+
+| NTSB status | qwen v1 | qwen v2 | gemma v1 | gemma v2 |
+|---|---|---|---|---|
+| Closed — Acceptable Action | 4/7 | **5/7** | 5/7 | **6/7** |
+| Closed — Acceptable **Alternate** Action | 0/4 | 0/4 | 1/4 | 1/4 |
+| Closed — Exceeds Recommended Action | 2/2 | 2/2 | 2/2 | 2/2 |
+| Closed — Unacceptable Action | 10/10 | 10/10 | 8/10 | 8/10 |
+| Open — Unacceptable Response | 1/1 | 1/1 | 1/1 | 1/1 |
+| **overall** | 17/24 | **18/24** | 17/24 | **18/24** |
+
+Both models gained exactly one row and neither lost any failure detection — qwen
+still catches 11 of 11. But the gain came from plain compliance, not from the class
+the change targeted. **The alternate-route blindness is untouched by instruction.**
+
+Three model families and two prompts now fail it the same way, Laguna S 2.1
+included at 1/4. The likelier reading is no longer "the question is worded wrong"
+but "recognising that method Y satisfies a requirement stated as method X is a
+judgement these models do not reliably make". That is a different kind of problem
+and probably needs a different technique — asking separately what outcome the
+comment requires, then whether that outcome is reached — rather than better wording
+in one call.
+
+**The revised prompt is kept**, because asking about the outcome rather than the
+method is more correct regardless of the score. It is not kept because the number
+moved: +1 of 24 is inside the noise this fixture warns about, and the change has
+not been validated anywhere else. Validate on SEC (100 rows) before believing it.
