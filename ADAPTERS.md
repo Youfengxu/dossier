@@ -287,7 +287,20 @@ rather than reported as "no drift".
 ## Conformance harness — required, not optional
 
 Without this, invariants 1 and 2 are aspirations. An adapter is registered only
-once it passes:
+once it passes. **Implemented as `conformance.py`, run in CI.** Seven checks pass;
+the two that need the unresolved `locate`/`Unit` half of the contract are reported
+as NOT IMPLEMENTED rather than omitted, because a harness that silently skips part
+of its own specification is the failure it exists to prevent.
+
+It earned its place on the first run. The committed `.xlsx` twin failed the drift
+check while its contents were byte-identical: `zipfile` stamps every entry with
+the wall clock unless told otherwise, so no `.xlsx` this toolkit produced was
+byte-reproducible — invariant 1's forbidden class, sitting in the code the whole
+time. Two builds in the same second agreed, which is why "generate twice and
+compare" had already passed. `writeback.zip_entry()` is now the one place a part
+is written from a bare name, and the check inspects the stamps rather than
+building twice and sleeping, because a test that needs a delay to fail is a test
+that gets deleted.
 
 - **Determinism**: parse the same fixture in two processes under
   `PYTHONHASHSEED=random`, from two working directories, under two locales and
@@ -303,11 +316,12 @@ once it passes:
   identical records. *This one test would have caught four of the twelve
   ambiguities a reviewer hit, mechanically, in five minutes.*
 
-The materials already exist: `tests/support.py` has byte-level `xlsx_bytes()` and
-`docx_bytes()` builders, and `fixtures/floodtwin` has `comments.csv` with a
-truth file and a verifier that re-derives its answer key on every run. The
-missing artefact is small — an `.xlsx` twin of `comments.csv` carrying the same
-fourteen rows.
+The twin now exists: `fixtures/floodtwin/comments.xlsx`, built from `comments.csv`
+by `make-xlsx-twin.py`, half its cells written as shared strings and half inline
+because Excel writes shared and `writeback.py` writes inline. It is committed
+rather than generated inside the test, because a generated twin can only agree
+with its generator; the harness compares the committed bytes against a fresh
+build, so drift is detected instead of papered over.
 
 Two CI gaps to close alongside: the "every tool answers `--help`" step loops over
 root `*.py` and would not see `adapters/`, and `--mutate` needs a generic adapter
@@ -321,27 +335,31 @@ The contract is not only about adapters. Three obligations fall on callers, each
 because a review traced what a reviewer actually sees today:
 
 1. **Render the resolved text.** No reviewer-facing artefact may present a
-   citation without the passage it resolves to. `render-assess.py` currently
-   prints rationale, heading and search phrase and **never the cited text** — the
-   verification artefact does not reach the deliverable.
+   citation without the passage it resolves to. *(Implemented: `render-assess.py`
+   reproduces the cited lines alongside the reasoning, capped at two quotes so a
+   review does not become a second copy of the deliverable. It previously printed
+   rationale, heading and search phrase — navigation, where the job is
+   verification.)*
 2. **`locate` is the only way to turn an address into a range.** No consumer may
    index units directly.
-3. **Discards are output, not log.** `cites_rejected` is currently written to
-   JSONL and read by exactly one tool — the one that un-rejects them. A row whose
-   citations were all discarded must be visually distinct from one that cited
-   nothing.
+3. **Discards are output, not log.** *(Implemented: a reader whose locators all
+   failed now says so in the deliverable, and is distinguished from one where some
+   citations merely did not resolve. `cites_rejected` was written to JSONL and read
+   by exactly one tool — the one that un-rejects them — so a verdict resting on
+   nothing read exactly like one resting on evidence.)*
 
 ---
 
 ## Still open
 
 - **The letters-to-names migration** across fourteen consumers is unscheduled.
-- **The conformance harness** described above is specified but not implemented.
-  Nothing currently checks that an adapter satisfies the invariants; they are
-  prose, and prose is what the four items below this line used to be.
-- **The wider determinism class in invariant 1** — clocks, locales, unordered
-  iteration — is stated and unenforced. Absolute paths were caught because someone
-  went looking, not because anything would have failed.
+- **`conformance.py` covers the record half of the contract, not the unit half.**
+  Address law and unit round trip need `locate`/`Unit`, which have no
+  implementation. They are named and reported, not quietly dropped.
+- **CI cannot see a contributed adapter.** The `--help` loop globs root `*.py` and
+  would miss an `adapters/` package, and `--mutate` has no generic adapter
+  mutation — so a contributed adapter sits outside the honesty gate that the
+  built-in tools are inside.
 - **A delimited register is read and written, but `.docx` tables are not.** A
   comment matrix pasted into Word is a shape the toolkit still cannot take.
 
@@ -352,6 +370,11 @@ against how these went:*
 - ~~`--refreeze` invalidates every locator, exits 0, and says nothing.~~ It now
   prints each document's old and new hash, the line-count delta, and that every
   locator shifts. It was already gated behind an explicit flag.
+- ~~The conformance harness is specified but not implemented.~~ `conformance.py`,
+  7/7, in CI. It found the wall-clock zip stamp on its first run.
+- ~~The wider determinism class in invariant 1 is stated and unenforced.~~ Now
+  enforced for what exists: readers and extractor are required to be byte-identical
+  across hash seed, locale, timezone and working directory.
 - ~~No CI gate has ever executed `extract.py`.~~ `fixtures/floodtwin/extractor-
   smoke.docx` exists and CI asserts the extractor produces text, writes no
   absolute path, and refuses an unreadable source. All fixture documents were

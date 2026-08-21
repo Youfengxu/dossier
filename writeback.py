@@ -81,6 +81,22 @@ def evidence(row, old_slug, new_slug, locators):
     return text
 
 
+# The zip epoch. zipfile stamps every entry with the wall clock unless told
+# otherwise, so a workbook built from identical content twice differs in bytes —
+# which is invariant 1's forbidden class, and made a committed .xlsx fixture
+# impossible to verify by regenerating it. The contents were identical every time;
+# only the timestamps moved. annotate() below never had the bug: it passes the
+# source ZipInfo through, so it inherits whatever the original carried.
+ZIP_EPOCH = (1980, 1, 1, 0, 0, 0)
+
+
+def zip_entry(name):
+    """A ZipInfo with a fixed stamp, for writing a part from a bare name."""
+    info = zipfile.ZipInfo(name, date_time=ZIP_EPOCH)
+    info.compress_type = zipfile.ZIP_DEFLATED
+    return info
+
+
 def annotate_csv(src, dst, values, col_letter, overwrite):
     """Set one column of a delimited file, preserving everything else.
 

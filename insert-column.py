@@ -28,6 +28,7 @@ import zipfile
 from xml.etree import ElementTree as ET
 
 sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
+import writeback  # noqa: E402
 
 NS = "http://schemas.openxmlformats.org/spreadsheetml/2006/main"
 CELL = re.compile(r'\b([A-Z]{1,3})(\d+)\b')
@@ -131,7 +132,7 @@ def main():
     members[part] = ET.tostring(root, encoding="utf-8", xml_declaration=True)
     with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as zf:
         for name, data in members.items():
-            zf.writestr(name, data)
+            zf.writestr(writeback.zip_entry(name), data)
     print(f"inserted column {num_to_col(at)} in {args.sheet!r}; "
           f"{moved} cell reference(s) shifted right")
     print(f"wrote {out}")

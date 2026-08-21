@@ -18,8 +18,13 @@ rather than because a test suite normally needs them:
 """
 
 import io
+import os
+import sys
 import types
 import zipfile
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import writeback  # noqa: E402
 
 W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 S = "http://schemas.openxmlformats.org/spreadsheetml/2006/main"
@@ -135,5 +140,7 @@ def _zip(parts):
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
         for name, text in parts.items():
-            archive.writestr(name, text)
+            # Fixed stamp: a fixture that cannot be regenerated
+            # byte-for-byte cannot be checked against its source.
+            archive.writestr(writeback.zip_entry(name), text)
     return buffer.getvalue()

@@ -98,3 +98,19 @@ jobs:
         run: |
           python3 score.py --project fixtures/floodtwin \
             --coverage cov-embed-12.csv --min 0.75
+
+      - name: adapters conform to the contract
+        # ADAPTERS.md states six invariants. Until conformance.py they were prose,
+        # and this repository has twice shown what prose is worth: two extractor
+        # bugs survived a mutation-checked suite because no gate ever ran the
+        # extractor, and four tools "answered --help" by ignoring it and exiting 0.
+        #
+        # It found one on its first run: every .xlsx this toolkit wrote carried a
+        # wall-clock zip stamp, so identical content produced different bytes and
+        # a committed fixture could not be verified by regenerating it.
+        #
+        # Two gaps the contract names and this does NOT close: the --help loop
+        # globs root *.py and would not see an adapters/ package, and --mutate has
+        # no generic adapter mutation, so a contributed adapter sits outside the
+        # honesty gate.
+        run: python3 conformance.py
