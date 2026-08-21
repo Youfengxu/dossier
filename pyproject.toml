@@ -35,7 +35,7 @@ py-modules = [
     "dossier_cli", "adjudicate", "agree", "assess", "bundle", "claim", "closure",
     "cluster-findings", "compare-coverage", "converse", "diagnose-retrieval",
     "doctor", "extract", "freeze", "inventory", "inputs-column", "insert-column",
-    "llm", "matrix", "obligations", "panel", "register", "render", "repair-cites",
+    "llm", "locate", "matrix", "obligations", "panel", "register", "render", "repair-cites",
     "repair-panel", "score", "score-claims", "score-register", "supervise",
     "sweep", "synthesize", "trace", "undefined", "verify", "vocabulary",
     "writeback",

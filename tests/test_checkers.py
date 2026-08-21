@@ -86,8 +86,11 @@ class LocatorGrammar(unittest.TestCase):
                                       else None)
 
     def test_every_grammar_agrees(self):
-        """Three copies existed and two of them disagreed. If they must be
-        duplicated, they must at least not diverge."""
+        """Three copies existed and two of them disagreed. There is now one, in
+        locate.py, and each of these names re-exports it — so this passes by
+        construction rather than by luck. Kept, because "they must at least not
+        diverge" is the weaker promise this made before the copies were removed,
+        and re-introducing a local RANGE anywhere would break it again."""
         samples = ["67", "120-134", "5:9", "8–14", "abc", ""]
         results = {where: [self.bounds(p, s) for s in samples]
                    for where, p in self.graders.items()}

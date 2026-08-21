@@ -22,9 +22,9 @@ import re
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
+from locate import RANGE  # noqa: E402,F401
 from llm import load_doc                                       # noqa: E402
 
-RANGE = re.compile(r"^\s*(\d+)\s*(?:[-:–—]\s*(\d+))?\s*$")
 WHY = re.compile(r"\s*\(([^)]*)\)\s*$")
 MAX_SPAN = 60
 

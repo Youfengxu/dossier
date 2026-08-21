@@ -31,13 +31,13 @@ import re
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
+from locate import HEADING, searchable  # noqa: E402,F401
+from locate import heading_only as nearest_heading  # noqa: E402
 import vocabulary                                          # noqa: E402
 import matrix as matrix_reader                               # noqa: E402
 from llm import load_doc                                     # noqa: E402
 
 VOCAB = vocabulary.load()          # replaced per-project in main()
-HEADING = re.compile(r"^\s*(?:\d+(?:\.\d+)*\.?\s+)?[A-Z][^.!?]{2,78}$")
-
 BLURB = {
     "SPLIT": ("The readers reached different conclusions here. These are the "
               "rows where your judgement is actually needed — nothing below "
@@ -58,25 +58,8 @@ QUOTE_LINES = 6
 QUOTE_CHARS = 400
 
 
-def nearest_heading(lines, n):
-    # No clamping. min(n, len(lines)-1) meant a locator up to 400 lines PAST the
-    # end of the document returned the document's last heading and an empty
-    # search phrase, and the report read: search for "". No error, no warning,
-    # exit 0 — a stale locator presenting as a finding.
-    if not 0 <= n < len(lines):
-        return None
-    for i in range(n, max(-1, n - 400), -1):
-        line = lines[i].strip()
-        if not line or len(line) > 80:
-            continue
-        if HEADING.match(line) and not line.endswith((",", ";", ":")):
-            if 1 < len(line.split()) < 14:
-                return line
-    return None
 
 
-def searchable(text, words=9):
-    return " ".join(" ".join(text.split()).split(" ")[:words]).strip(" ,;:.")
 
 
 def main():

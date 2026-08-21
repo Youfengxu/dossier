@@ -28,19 +28,8 @@ import matrix as matrix_reader                                # noqa: E402
 VOCAB = vocabulary.load()
 
 
-def col_num(s):
-    n = 0
-    for ch in s.upper():
-        n = n * 26 + (ord(ch) - 64)
-    return n
 
 
-def col_name(n):
-    out = ""
-    while n:
-        n, r = divmod(n - 1, 26)
-        out = chr(65 + r) + out
-    return out
 
 
 def main():
@@ -56,7 +45,7 @@ def main():
     args = p.parse_args()
 
     src, out = args.xlsx, os.path.abspath(os.path.expanduser(args.out))
-    start, current = col_num(args.first_col), args.xlsx
+    start, current = matrix_reader.col_num(args.first_col), args.xlsx
 
     for offset, spec in enumerate(args.eval):
         name, path = spec.split("=", 1)
@@ -67,7 +56,7 @@ def main():
                 by_id[r["id"]] = r
             except Exception:
                 continue
-        column = col_name(start + offset)
+        column = matrix_reader.col_letters(start + offset - 1)
         rows = matrix_reader.read_sheet(current, args.sheet)
         matrix_reader.resolve_columns(rows, args)
         values = {"1": name}

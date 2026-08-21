@@ -40,6 +40,7 @@ import time
 import urllib.request
 
 sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
+from locate import RANGE  # noqa: E402,F401
 import vocabulary                                          # noqa: E402
 import llm
 from llm import load_doc                                       # noqa: E402
@@ -73,7 +74,6 @@ than filling the space.
 === END DOCUMENT ==="""
 
 VOCAB = vocabulary.load()          # replaced per-project in main()
-RANGE = re.compile(r"^\s*(\d+)\s*(?:[-:\u2013\u2014]\s*(\d+))?\s*$")
 ESCALATION = 3
 
 

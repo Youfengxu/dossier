@@ -29,6 +29,7 @@ import sys
 import zipfile
 
 sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
+import matrix as matrix_reader
 import vocabulary  # noqa: E402
 
 # Unmet before partial before met: the order a reviewer reads in. "unverifiable"
@@ -41,12 +42,6 @@ HEADERS = ["ID", "Class", "Status", "Statement", "Locator", "Evidence",
            "Why", "Comments"]
 
 
-def col_name(index):
-    name = ""
-    while index >= 0:
-        name = chr(ord("A") + index % 26) + name
-        index = index // 26 - 1
-    return name
 
 
 def write_xlsx(path, sheet_name, headers, rows):
@@ -62,7 +57,7 @@ def write_xlsx(path, sheet_name, headers, rows):
 
     body = []
     for row_index, row in enumerate([headers] + rows, start=1):
-        cells = "".join(cell(f"{col_name(i)}{row_index}", v)
+        cells = "".join(cell(f"{matrix_reader.col_letters(i)}{row_index}", v)
                         for i, v in enumerate(row))
         body.append(f'<row r="{row_index}">{cells}</row>')
 

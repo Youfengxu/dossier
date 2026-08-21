@@ -66,6 +66,8 @@ import threading
 from concurrent.futures import ThreadPoolExecutor
 
 sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
+from locate import (HEADING, RANGE, nearest_heading,  # noqa: E402,F401
+                    searchable)
 import llm
 from llm import load_doc                                       # noqa: E402
 
@@ -89,17 +91,12 @@ Answer only from this document. If it does not say, say so.
 %s
 === END DOCUMENT ==="""
 
-RANGE = re.compile(r"^\s*(\d+)\s*(?:[-:\u2013\u2014]\s*(\d+))?\s*$")
-
 # A line number in parsed text appears NOWHERE in the .docx the reviewer is
 # reading. Word shows no line numbers, the parse flattens tables, and a page
 # number does not exist in the file at all — Word computes pagination at render
 # time. So a locator proves the model did not invent the passage, and does
 # nothing to help anyone find it. Every citation therefore also carries the
 # nearest heading above it and a phrase to search for.
-HEADING = re.compile(r"^\s*(?:\d+(?:\.\d+)*\.?\s+)?[A-Z][^.!?]{2,78}$")
-
-
 def busy(chat_url, model):
     """Is another client already using this slot?
 
@@ -127,23 +124,6 @@ def busy(chat_url, model):
     return None
 
 
-def nearest_heading(lines, n):
-    """The closest plausible heading at or above line n, for navigation.
-
-    No clamping: an address past the end of the document has no nearest heading,
-    and pretending otherwise returns the document's last heading beside an empty
-    search phrase — a stale locator presenting as a finding."""
-    if not 0 <= n < len(lines):
-        return None, None
-    for i in range(n, max(-1, n - 400), -1):
-        line = lines[i].strip()
-        if not line or len(line) > 80:
-            continue
-        if HEADING.match(line) and not line.endswith((",", ";", ":")):
-            words = line.split()
-            if 1 < len(words) < 14:
-                return line, i
-    return None, None
 
 
 def substantive(text, least=25):
@@ -156,11 +136,6 @@ def substantive(text, least=25):
     return lines[0] if lines else ""
 
 
-def searchable(text, words=9):
-    """A phrase distinctive enough to Ctrl-F in the source document."""
-    flat = " ".join(text.split())
-    picked = flat.split(" ")[:words]
-    return " ".join(picked).strip(" ,;:.")
 
 
 def ask(url, model, messages, max_tokens, timeout):

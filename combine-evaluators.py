@@ -43,19 +43,8 @@ VOCAB = vocabulary.load()
 TRAIL = re.compile(r"(?:\s*\[[^\]]{0,400}\])+\s*$")
 
 
-def col_num(letters):
-    n = 0
-    for ch in letters.upper():
-        n = n * 26 + (ord(ch) - 64)
-    return n
 
 
-def col_name(number):
-    out = ""
-    while number:
-        number, rem = divmod(number - 1, 26)
-        out = chr(65 + rem) + out
-    return out
 
 
 def main():
@@ -91,11 +80,11 @@ def main():
 
     src = args.xlsx
     out = os.path.abspath(os.path.expanduser(args.out))
-    start = col_num(args.first_col)
+    start = matrix_reader.col_num(args.first_col)
 
     current = src
     for offset, (name, data) in enumerate(evaluators):
-        column = col_name(start + offset)
+        column = matrix_reader.col_letters(start + offset - 1)
         rows = matrix_reader.read_sheet(current, args.sheet)
         values = {}
         for position, row in matrix_reader.numbered(rows):
