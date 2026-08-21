@@ -32,6 +32,7 @@ import json
 import os
 import re
 import sys
+import yaml
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
 
@@ -313,26 +314,33 @@ def absence_gate(text_lower, requirement, lexicon, min_hits=8):
 
 
 def load_obligations(path):
-    """Reads the subset of YAML that obligations.py emits."""
-    items, current = [], None
-    for raw in open(path, encoding="utf-8"):
-        line = raw.rstrip()
-        if not line.strip() or line.lstrip().startswith("#"):
-            continue
-        if line.lstrip().startswith("- id:"):
-            current = {"id": line.split(":", 1)[1].strip()}
-            items.append(current)
-        elif current is not None and ":" in line and line.startswith("    "):
-            key, value = line.strip().split(":", 1)
-            value = value.strip()
-            if value.startswith('"'):
-                try:
-                    value = json.loads(value)
-                except json.JSONDecodeError:
-                    value = value.strip('"')
-            current[key] = value
-    return items
+    """Read what obligations.py emits, with the YAML parser rather than a lookalike.
 
+    This was a hand-rolled line reader that required continuation keys to be
+    indented by exactly four spaces — the indentation obligations.py happens to
+    write. Any other valid YAML for the same data, including PyYAML's own two-space
+    output, parsed into entries carrying nothing but `id`.
+
+    It did not fail. It returned obligations with no text, and the run proceeded to
+    ask a model about nothing, at length, and write the answers to a coverage file.
+    Only passing --scope surfaced it, and then as "no obligations with scope X",
+    which names neither the file nor the cause.
+
+    PyYAML is a hard dependency of this package, so the lookalike bought nothing.
+    Verified against the live project corpus: 120 obligations, identical text and
+    scope for every entry.
+    """
+    data = yaml.safe_load(open(path, encoding="utf-8"))
+    items = data.get("obligations", []) if isinstance(data, dict) else data
+    if not items:
+        sys.exit(f"{path} lists no obligations")
+    missing = [str(o.get("id", "?")) for o in items if not str(o.get("text", "")).strip()]
+    if missing:
+        sys.exit(f"{path}: {len(missing)} obligation(s) carry no text "
+                 f"({', '.join(missing[:5])}{'...' if len(missing) > 5 else ''}) — "
+                 f"an obligation without text cannot be traced, and asking a model "
+                 f"about it produces a confident answer to no question.")
+    return items
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__,
