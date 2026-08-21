@@ -242,6 +242,94 @@ def ooxml_writes_are_reproducible():
     return "fixture and annotated copy both carry the fixed epoch"
 
 
+# ---------------------------------------------------- proving the gate bites
+#
+# `run-tests.py --mutate` exists because a test that passes against broken code
+# turns an absence of checking into a claim of checking. A conformance harness has
+# the same exposure and had no equivalent: nothing established that any of the
+# checks above could fail. These break the record adapter in ways a contributed
+# one would plausibly be broken, and require the named check to notice.
+#
+# Anchors are asserted unique before use. The mutation entry in run-tests.py was
+# silently disarmed twice tonight — once by a rename, once by a second copy of the
+# anchored line appearing elsewhere in the file — and both times the harness
+# reported "nothing pins this" when it meant "I cannot find the thing that does".
+ADAPTER_MUTATIONS = [
+    {"what": "blank rows are no longer dropped",
+     "old": "            if any(v.strip() for v in cells.values()):\n"
+            "                cells[ROW_KEY] = record",
+     "new": "            if True:\n"
+            "                cells[ROW_KEY] = record",
+     "expect": "row key across a gap"},
+    {"what": "the row key is list position, not the physical record",
+     "old": "                cells[ROW_KEY] = record",
+     "new": "                cells[ROW_KEY] = len(rows) + 1",
+     "expect": "row key across a gap"},
+    {"what": "the byte-order mark is not stripped",
+     "old": 'with open(path, newline="", encoding="utf-8-sig") as handle:',
+     "new": 'with open(path, newline="", encoding="utf-8") as handle:',
+     "expect": "nasty inputs"},
+    {"what": "the delimiter is assumed rather than sniffed",
+     "old": '            dialect = csv.Sniffer().sniff(sample, delimiters=",;\\t|")',
+     "new": "            dialect = csv.excel",
+     "expect": "nasty inputs"},
+    {"what": "the bookkeeping key leaks out of columns()",
+     "old": "    seen = {k for row in rows for k in row if k != ROW_KEY}",
+     "new": "    seen = {k for row in rows for k in row}",
+     "expect": "record model"},
+]
+
+CHECKS = None            # filled in by main(), so prove() can re-run them
+
+
+def prove():
+    """Break the adapter five ways; require the named check to catch each."""
+    path = os.path.join(ROOT, "matrix.py")
+    original = open(path, encoding="utf-8").read()
+    restore = compile(original, path, "exec")
+    caught, missed = 0, []
+
+    print("proving the checks bite — each entry breaks the record adapter")
+    print("=" * 74)
+    for mutation in ADAPTER_MUTATIONS:
+        occurrences = original.count(mutation["old"])
+        if occurrences != 1:
+            print(f"  BROKEN ANCHOR  {mutation['what']}")
+            print(f"                 patches {occurrences} places in matrix.py, "
+                  f"must be exactly 1")
+            missed.append(mutation["what"])
+            continue
+        try:
+            exec(compile(original.replace(mutation["old"], mutation["new"]),
+                         path, "exec"), matrix.__dict__)
+            results = []
+            for name, fn in CHECKS:
+                check(name, fn, results)
+        finally:
+            exec(restore, matrix.__dict__)
+
+        failed = {name for status, name, _ in results if status == "FAIL"}
+        if mutation["expect"] in failed:
+            print(f"  caught  {mutation['what']}")
+            caught += 1
+        elif failed:
+            print(f"  caught  {mutation['what']}")
+            print(f"          (by {', '.join(sorted(failed))}, not the expected "
+                  f"{mutation['expect']!r} — still caught, but the mapping is stale)")
+            caught += 1
+        else:
+            print(f"  MISSED  {mutation['what']}")
+            print(f"          every check still passed against a broken adapter")
+            missed.append(mutation["what"])
+
+    print("=" * 74)
+    print(f"  {caught}/{len(ADAPTER_MUTATIONS)} adapter mutations caught")
+    if missed:
+        print("\n  A conformance check that cannot fail is not a check. Fix the "
+              "check,\n  not this list.")
+    return 1 if missed else 0
+
+
 NOT_IMPLEMENTED = [
     ("address law", "start <= locate(address(start, end)).start <= end — needs the "
                     "Unit/locate half of the contract, which has no implementation"),
@@ -256,16 +344,22 @@ def main():
     if any(a in ("-h", "--help") for a in sys.argv[1:]):
         print(__doc__.strip())
         return 0
+    global CHECKS
+    CHECKS = (("cross-format agreement", cross_format_agreement),
+              ("record model", record_model),
+              ("row key across a gap", row_key_survives_a_gap),
+              ("nasty inputs", nasty_inputs),
+              ("determinism", determinism),
+              ("committed twin is current", twin_has_not_drifted),
+              ("ooxml writes reproducible", ooxml_writes_are_reproducible))
+
+    if any(a == "--prove" for a in sys.argv[1:]):
+        return prove()
+
     print(__doc__.strip().split("\n")[0])
     print("=" * 74)
     results = []
-    for name, fn in (("cross-format agreement", cross_format_agreement),
-                     ("record model", record_model),
-                     ("row key across a gap", row_key_survives_a_gap),
-                     ("nasty inputs", nasty_inputs),
-                     ("determinism", determinism),
-                     ("committed twin is current", twin_has_not_drifted),
-                     ("ooxml writes reproducible", ooxml_writes_are_reproducible)):
+    for name, fn in CHECKS:
         check(name, fn, results)
 
     for status, name, detail in results:

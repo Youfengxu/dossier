@@ -75,7 +75,12 @@ jobs:
           # they make.
           python3 -c "import sys; sys.path.insert(0,'.'); import llm, vocabulary" \
             || { echo "FAIL: llm.py / vocabulary.py do not import"; fail=1; }
-          for f in *.py dossier; do
+          # nullglob so adapters/*.py vanishes when empty instead of being passed
+          # through literally. The loop globbed root *.py only, so an adapters/
+          # package -- the thing the contract expects contributors to add -- would
+          # have been invisible to the gate that vouches for every tool.
+          shopt -s nullglob
+          for f in *.py adapters/*.py dossier; do
             case "$f" in llm.py|vocabulary.py) continue ;; esac
             out=$(python3 "$f" --help 2>&1) || { echo "FAIL: $f --help exited non-zero"; fail=1; continue; }
             [ ${#out} -ge 40 ] || { echo "FAIL: $f --help printed ${#out} chars, not help"; fail=1; }
@@ -113,4 +118,11 @@ jobs:
         # globs root *.py and would not see an adapters/ package, and --mutate has
         # no generic adapter mutation, so a contributed adapter sits outside the
         # honesty gate.
-        run: python3 conformance.py
+        run: |
+          python3 conformance.py
+          # And prove those checks can fail. A conformance harness has the same
+          # exposure as a test suite: nothing had established that any of its
+          # checks could ever go red. This breaks the record adapter five ways a
+          # contributed one would plausibly be broken and requires each to be
+          # caught -- the adapter equivalent of --mutate.
+          python3 conformance.py --prove
