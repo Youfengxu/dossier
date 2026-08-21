@@ -1,2 +1,0 @@
-[console_scripts]
-dossier = dossier_cli:main

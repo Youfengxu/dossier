@@ -36,3 +36,11 @@ __pycache__/
 
 # macOS writes these into every directory it browses.
 .DS_Store
+
+# setuptools build output. `pip install .` writes build/lib/ full of stale copies
+# of every tool, and a `git add -A` after testing the install committed 696K of
+# them — duplicates that then answered greps, and that check-clean.py and
+# check-refs.py would happily scan as if they were source.
+build/
+dist/
+*.egg-info/

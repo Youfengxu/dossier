@@ -51,6 +51,19 @@ class Packaging(unittest.TestCase):
         self.assertIn(target, declared_modules())
         self.assertTrue(os.path.exists(os.path.join(ROOT, target + ".py")))
 
+    def test_no_build_output_is_tracked(self):
+        """`pip install .` writes build/ and dossier.egg-info/ into the checkout,
+        and `git add -A` right after testing the install committed 696K of stale
+        duplicate modules — copies that then answered greps and that check-clean.py
+        would scan as though they were source. Ignoring them is the fix; this is
+        what notices when the ignore is not enough."""
+        import subprocess
+        tracked = subprocess.run(["git", "ls-files"], cwd=ROOT,
+                                 capture_output=True, text=True).stdout.split()
+        junk = [f for f in tracked
+                if f.startswith(("build/", "dist/")) or ".egg-info" in f]
+        self.assertEqual(junk[:5], [], f"{len(junk)} build artefacts are tracked")
+
     def test_the_dispatcher_is_the_module_not_the_script(self):
         """`dossier` is a shim over dossier_cli, not the other way round. Inverted,
         the installed command cannot find the dispatcher at all."""

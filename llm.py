@@ -159,6 +159,8 @@ class Client:
         self.stats = {"calls": 0, "cached": 0, "retries": 0, "failed": 0}
 
     # -- cache -------------------------------------------------------------
+    _last_stop = ""
+
     def _key(self, system, user):
         blob = "\x00".join([self.model, self.prompt_version,
                             str(self.temperature), system, user])
@@ -179,57 +181,37 @@ class Client:
 
     # -- transport ---------------------------------------------------------
     def _post(self, system, user):
-        payload = {
-            "model": self.model,
-            "temperature": self.temperature,
-            "messages": [{"role": "system", "content": system},
-                         {"role": "user", "content": user}],
-            "response_format": {"type": "json_object"},
-            "max_tokens": self.max_tokens,
-            # Send these explicitly rather than inheriting whatever the server
-            # was started with. A repetition penalty is poison for structured
-            # output: every element of a JSON array repeats the same keys, so
-            # penalising seen tokens pushes the model off "name" and "quote"
-            # exactly when it is emitting the second object.
-            #
-            # This is not hypothetical. GX10 serves its primary model with
-            # --presence-penalty 1.5, and an inventory run over 624 sections
-            # failed 590 of them on 'each capability needs a name' — while the
-            # same endpoint handled flat arrays of strings perfectly, because
-            # those repeat no keys.
-            "presence_penalty": 0.0,
-            "frequency_penalty": 0.0,
-        }
-        # Reasoning models default to spending tokens on analysis these tools do
-        # not read. Extraction against a schema is not a task that benefits, and
-        # on gpt-oss-120b "low" cut completion tokens from 63 to 22 for the same
-        # answer. Sent only when set, since servers differ on unknown fields.
-        if self.reasoning_effort:
-            payload["reasoning_effort"] = self.reasoning_effort
-        request = urllib.request.Request(
-            self.url, data=json.dumps(payload).encode(),
-            headers={"Content-Type": "application/json"})
-        with urllib.request.urlopen(request, timeout=self.timeout) as response:
-            body = json.load(response)
-        message = body["choices"][0]["message"]
-        content = message.get("content")
+        """Delegates to chat(). It did not, for a long time.
+
+        chat()'s own docstring calls it "the one place a chat request is built",
+        and this method sat forty lines below it building a second one — same
+        response_format, same zeroed penalties, same reasoning_effort, same
+        comments explaining the same incidents. A guard that lives in two copies
+        is not a guard, it is a coincidence, which is the argument chat() makes
+        for existing at all.
+
+        The copies had already drifted. chat() returns the finish reason; this one
+        returned content alone, so a reply severed at max_tokens arrived as
+        unterminated JSON and was reported to the operator as "not valid JSON" —
+        true, useless, and pointing at the model rather than at the token budget.
+        The stop reason is now kept for ask() to say so.
+        """
+        content, reasoning, stop = chat(
+            self.url, self.model, system, user,
+            max_tokens=self.max_tokens, temperature=self.temperature,
+            timeout=self.timeout, reasoning_effort=self.reasoning_effort)
+        self._last_stop = stop
         if content:
             return content
-        # Reasoning models can spend the whole token budget thinking and never
-        # emit a final channel, leaving content null. Falling through to
+        # Reasoning models can spend the whole budget thinking and never emit a
+        # final channel, leaving content empty. Falling through to
         # json.loads(None) raised TypeError, which is not in the caught set, so
-        # one such reply killed every worker in the pool and lost a 40-minute
-        # run. Prefer the reasoning channel if it carries the answer; otherwise
-        # fail as a normal retryable error.
-        for alternative in ("reasoning_content", "reasoning"):
-            text = message.get(alternative)
-            if isinstance(text, str) and text.strip():
-                return text
+        # one such reply killed every worker in the pool and lost a 40-minute run.
+        if reasoning:
+            return reasoning
         raise KeyError(
-            "empty content (finish_reason="
-            f"{body['choices'][0].get('finish_reason')!r}) — the model "
-            "produced no final answer, usually reasoning that ran past "
-            "max_tokens")
+            f"empty content (finish_reason={stop!r}) — the model produced no "
+            f"final answer, usually reasoning that ran past max_tokens")
 
     def _log(self, record):
         with open(self.log_path, "a") as handle:
@@ -296,6 +278,11 @@ class Client:
                 obj = json.loads(raw)
             except json.JSONDecodeError as exc:
                 obj, error = None, f"not valid JSON ({exc})"
+                # The commonest cause, and the one the message used to hide: a
+                # reply cut at the token limit is unterminated JSON, which is a
+                # budget problem wearing a parser error's clothes.
+                if getattr(self, "_last_stop", "") == "length":
+                    error += " — cut at max_tokens, so the JSON is unterminated"
             if obj is not None and validate:
                 error = validate(obj)
 
