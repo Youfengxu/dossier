@@ -99,6 +99,9 @@ CASES = [
 CANNOT_DRIVE = {
     "doctor.py": "its whole job is checking a real endpoint; under a stub the "
                  "check is vacuous, and a green result would be a lie",
+    "prefix-bench.py": "measures wall-clock against a real endpoint; under the "
+                       "stub every turn is instant and the ratio it reports is "
+                       "meaningless, which is worse than not running it",
     "supervise.py": "restarts a systemd unit and polls a real endpoint",
     "converse.py": "an interactive REPL; it reads stdin and never returns",
     "agree.py": "needs two completed evaluator workbooks, not one register",
