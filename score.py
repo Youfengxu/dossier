@@ -26,8 +26,9 @@ import os
 import re
 import sys
 from collections import Counter
+import vocabulary
 
-FLAGGED = ("unmet", "partial", "unverifiable")
+FLAGGED = vocabulary.load(name="coverage").flagged
 WORST = {"met": 0, "unverifiable": 1, "partial": 2, "unmet": 3}
 
 

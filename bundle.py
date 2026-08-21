@@ -29,10 +29,13 @@ import sys
 import zipfile
 
 sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
+import vocabulary  # noqa: E402
 
 # Unmet before partial before met: the order a reviewer reads in. "unverifiable"
-# sits above "met" because it is a request for evidence, not a pass.
-RANK = {"unmet": 0, "partial": 1, "unverifiable": 2, "met": 3}
+# sits above "met" because it is a request for evidence, not a pass. Derived from
+# the declared vocabulary rather than spelled out, because the words change per
+# project and this ordering is a property of the scale, not of these four strings.
+RANK = {v: i for i, v in enumerate(vocabulary.load(name="coverage").reading_order)}
 
 HEADERS = ["ID", "Class", "Status", "Statement", "Locator", "Evidence",
            "Why", "Comments"]

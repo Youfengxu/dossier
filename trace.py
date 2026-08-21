@@ -36,6 +36,7 @@ from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import vocabulary  # noqa: E402
 import llm                                                   # noqa: E402
 from llm import Client, Embedder, LLMError, cosine, load_doc   # noqa: E402
 
@@ -654,7 +655,8 @@ def main():
             print(f"   … {index}/{len(obligations)}")
 
     if args.unmet_only:
-        rows = [r for r in rows if r["verdict"] in ("unmet", "partial")]
+        rows = [r for r in rows
+                    if r["verdict"] in vocabulary.load(name="coverage").shortfall]
 
     out_path = os.path.join(project, args.out)
     with open(out_path, "w", newline="", encoding="utf-8") as handle:

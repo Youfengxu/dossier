@@ -30,10 +30,11 @@ import re
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import vocabulary  # noqa: E402
 import llm                                                   # noqa: E402
 from llm import Embedder, cosine                          # noqa: E402
 
-FLAGGED = ("unmet", "partial", "unverifiable")
+FLAGGED = vocabulary.load(name="coverage").flagged
 WEIGHT = {"unmet": 1.0, "partial": 0.6, "unverifiable": 0.4}
 
 

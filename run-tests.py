@@ -111,6 +111,19 @@ MUTATIONS = [
         ],
     },
     {
+        "what": "vocabulary.flagged — the unknown value dropped",
+        "why": "eight tools ask what a reviewer must look at; dropping the "
+               "unknown value silently stops flagging 'we could not verify this', "
+               "which is a request for evidence and the thing most worth reading",
+        "module": "vocabulary",
+        "old": "        return tuple(self.scale[:-1]) + (self.unknown,)",
+        "new": "        return tuple(self.scale[:-1])",
+        "tests": [
+            "tests.test_vocabulary.DerivedViews.test_the_literals_eight_files_used_are_reproduced_exactly",
+            "tests.test_vocabulary.DerivedViews.test_flagged_and_shortfall_are_not_the_same_question",
+        ],
+    },
+    {
         "what": "extract.docx — runs joined with a space",
         "why": "Word splits words across runs, so this inserts a space into the "
                "middle of every term an anchor quotes",

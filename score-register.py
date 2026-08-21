@@ -43,10 +43,11 @@ import sys
 from collections import OrderedDict, defaultdict
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import vocabulary  # noqa: E402
 import llm                                                   # noqa: E402
 from llm import Embedder, cosine                          # noqa: E402
 
-FLAGGED = ("unmet", "partial", "unverifiable")
+FLAGGED = vocabulary.load(name="coverage").flagged
 
 
 def load_map(path):

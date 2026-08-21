@@ -104,6 +104,43 @@ class Vocabulary:
         return self.labels.get(verdict, verdict)
 
     # -- ordering ----------------------------------------------------------
+    @property
+    def shortfall(self):
+        """Every value below the top of the scale — "not fully done".
+
+        Excludes the off-scale values: "we could not check" is not a degree of
+        incompleteness, and neither is "this obligation does not bind"."""
+        return tuple(self.scale[:-1])
+
+    @property
+    def flagged(self):
+        """What a reviewer must look at: short of the top, or unknown.
+
+        NOT the same as `shortfall`, and the difference is the whole reason
+        `off_scale` is a list rather than a single `unknown`. "Could not verify"
+        needs a reviewer — it is a request for evidence. "Does not apply" does
+        not — it is a scoping decision someone already made. Eight source files
+        spelled this tuple out by hand, every one of them as
+        ("unmet", "partial", "unverifiable"), which is correct for THIS scale and
+        silently wrong for any project that declares its own."""
+        return tuple(self.scale[:-1]) + (self.unknown,)
+
+    @property
+    def reading_order(self):
+        """The order a reviewer wants rows in: worst first, unknown before best.
+
+        "Unverifiable" sorts ahead of the top value because it is a request for
+        evidence rather than a pass — a reader should meet it while still in the
+        part of the report that needs decisions. Values off the scale and not
+        `unknown` sort last; they need nothing."""
+        rest = [v for v in self.off_scale if v != self.unknown]
+        return tuple(self.scale[:-1]) + (self.unknown, self.scale[-1]) + tuple(rest)
+
+    @property
+    def display_order(self):
+        """Scale first, then everything off it — for counts and summaries."""
+        return tuple(self.scale) + tuple(self.off_scale)
+
     def rank(self, verdict):
         """Position on the scale; None for `unknown`, which has no position."""
         return self.scale.index(verdict) if verdict in self.scale else None

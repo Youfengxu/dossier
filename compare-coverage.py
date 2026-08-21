@@ -106,7 +106,11 @@ def main():
             arrow = "!!" if dist >= 3 else ("!" if dist == 2 else " ")
             print(f"  {key:10} {va:<15} {vb:<15} {arrow}")
 
-    for verdict in ("unmet", "partial", "met", "unverifiable"):
+    # display_order, not a hand-written tuple: the old one omitted
+    # "not_applicable" entirely, so a run where obligations were scoped out
+    # reported nothing about them. Rows with no count on either side stay hidden
+    # by the guard below, so nothing new appears unless it happened.
+    for verdict in VOCAB.display_order:
         ca = sum(1 for r in a.values() if r.get("verdict") == verdict)
         cb = sum(1 for r in b.values() if r.get("verdict") == verdict)
         if ca or cb:

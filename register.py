@@ -34,6 +34,7 @@ import re
 import sys
 
 import closure
+import vocabulary
 
 # What the vendor claims, against what the document shows. The pairs that matter
 # are the contradictions: a row marked done whose text never moved, and a row
@@ -143,7 +144,8 @@ def corroborating(finding_terms, coverage):
     """
     hits = []
     for row in coverage:
-        if row.get("verdict", "").lower() not in ("unmet", "partial"):
+        if row.get("verdict", "").lower() not in \
+                vocabulary.load(name="coverage").shortfall:
             continue
         haystack = (row.get("requirement", "") + " " +
                     row.get("reason", "")).lower()

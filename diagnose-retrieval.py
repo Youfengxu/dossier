@@ -25,6 +25,7 @@ import sys
 from collections import Counter, defaultdict
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import vocabulary  # noqa: E402
 from trace import chunk, load_obligations                 # noqa: E402
 import llm                                                   # noqa: E402
 from llm import Embedder, cosine, load_doc                # noqa: E402
@@ -61,8 +62,8 @@ def main():
     if args.coverage:
         rows = list(csv.DictReader(open(os.path.join(project, args.coverage),
                                         encoding="utf-8")))
-        wanted = ("unmet",) if args.unmet_only else \
-                 ("unmet", "partial", "unverifiable")
+        coverage = vocabulary.load(name="coverage")
+        wanted = (coverage.scale[0],) if args.unmet_only else coverage.flagged
         keep = {r["obligation"] for r in rows if r["verdict"] in wanted}
         verdicts = {r["obligation"]: r["verdict"] for r in rows}
         obligations = [o for o in obligations if o["id"] in keep]
