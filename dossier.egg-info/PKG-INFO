@@ -1,3 +1,17 @@
+Metadata-Version: 2.4
+Name: dossier
+Version: 0.1.0
+Summary: Review a large document against its requirements, or against the comments raised on it, using models you run yourself.
+License: Apache-2.0
+Keywords: document-review,REDACTED-39,local-llm,verification
+Requires-Python: >=3.9
+Description-Content-Type: text/markdown
+License-File: LICENSE
+Requires-Dist: PyYAML>=5.1
+Provides-Extra: pdf
+Requires-Dist: pypdf>=3.0; extra == "pdf"
+Dynamic: license-file
+
 # dossier
 
 Review a large engineering deliverable against its requirements, using models you
@@ -133,18 +147,6 @@ pip3 install pyyaml                 # required
 pip3 install pypdf                  # only if a corpus holds PDFs
 ln -s <repo>/tools/dossier/dossier ~/.local/bin/dossier
 ```
-
-Or install it, which puts the same dispatcher on your PATH as `dossier`:
-
-```sh
-pip3 install .
-```
-
-Both paths run the same code — `dossier` in a clone is a four-line shim over
-`dossier_cli.py`, and the console script is an entry point onto the same module.
-CI exercises the installed one from outside the checkout, because for a long time
-it exercised only the in-tree one and the installed command was broken the whole
-time.
 
 `.docx`, `.pptx` and `.xlsx` need nothing — `extract.py` reads them with the
 standard library. A comment register may be `.xlsx`, `.csv`, `.tsv` or a table in

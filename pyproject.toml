@@ -39,4 +39,20 @@ py-modules = [
     "repair-panel", "score", "score-claims", "score-register", "supervise",
     "sweep", "synthesize", "trace", "undefined", "verify", "vocabulary",
     "writeback",
+    # Twelve of these were absent until the install was actually tested. The list
+    # was hand-maintained and every tool added since it was written was forgotten,
+    # which is what a hand-maintained list does. CI now asserts it matches the
+    # top-level scripts on disk, so forgetting is caught rather than shipped.
+    "action-check",
+    "assess-to-matrix",
+    "check-clean",
+    "check-refs",
+    "combine-evaluators",
+    "conformance",
+    "judge-panel",
+    "make-denylist",
+    "render-assess",
+    "run-tests",
+    "synthesize-panel",
+    "to-html",
 ]

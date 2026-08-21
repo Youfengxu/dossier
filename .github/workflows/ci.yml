@@ -126,3 +126,20 @@ jobs:
           # contributed one would plausibly be broken and requires each to be
           # caught -- the adapter equivalent of --mutate.
           python3 conformance.py --prove
+
+      - name: pip install . and run the installed command
+        # The README documents two ways in and CI only ever tested one. `pip
+        # install .` produced a `dossier` command that died on FileNotFoundError
+        # looking for itself inside site-packages, and twelve tools were missing
+        # from py-modules, for as long as nobody ran it. Install into a clean venv
+        # and drive the console script from OUTSIDE the checkout, so nothing in
+        # the repo can satisfy an import the install should have.
+        run: |
+          python3 -m venv /tmp/dossier-venv
+          /tmp/dossier-venv/bin/pip install --quiet .
+          mkdir -p /tmp/cold && cp -R fixtures/floodtwin /tmp/cold/project
+          cd /tmp/cold
+          /tmp/dossier-venv/bin/dossier review project \
+            --doc deliverable-v2 --against deliverable-v1 | tee out.txt
+          grep -q "no drift" out.txt || { echo "FAIL: installed CLI did no work"; exit 1; }
+          echo "installed console script ran a full review from outside the checkout"
