@@ -362,10 +362,11 @@ because a review traced what a reviewer actually sees today:
 - **`conformance.py` covers the record half of the contract, not the unit half.**
   Address law and unit round trip need `locate`/`Unit`, which have no
   implementation. They are named and reported, not quietly dropped.
-- **CI cannot see a contributed adapter.** The `--help` loop globs root `*.py` and
-  would miss an `adapters/` package, and `--mutate` has no generic adapter
-  mutation — so a contributed adapter sits outside the honesty gate that the
-  built-in tools are inside.
+- **The record adapter is one function, not a registry.** `read_sheet` dispatches
+  on extension inside `matrix.py`; a contributed adapter has nowhere to register
+  itself, so `conformance.py` names the built-in paths rather than enumerating
+  whatever is installed. The gates now reach an `adapters/` package — they just
+  have nothing to find in one.
 - **`.docx` registers are read, not written.** `writeback.annotate` handles
   `.xlsx` and delimited files; a Word table can be assessed but the verdicts
   cannot be written back into it.
@@ -384,7 +385,11 @@ against how these went:*
   rectangle and nothing exercised a merge; the awkward shapes now live in their
   own check.
 - ~~The conformance harness is specified but not implemented.~~ `conformance.py`,
-  7/7, in CI. It found the wall-clock zip stamp on its first run.
+  8/8, in CI. It found the wall-clock zip stamp on its first run.
+- ~~CI cannot see a contributed adapter.~~ The `--help` loop globs `adapters/*.py`
+  under `nullglob`, and `conformance.py --prove` breaks the record adapter six ways
+  and requires the named check to catch each — the adapter equivalent of
+  `--mutate`. It caught a real gap immediately: nothing exercised a merged cell.
 - ~~The wider determinism class in invariant 1 is stated and unenforced.~~ Now
   enforced for what exists: readers and extractor are required to be byte-identical
   across hash seed, locale, timezone and working directory.
