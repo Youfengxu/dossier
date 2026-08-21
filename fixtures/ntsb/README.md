@@ -92,3 +92,60 @@ Stated here because the numbers above get quoted elsewhere.
 - **Statuses move.** These are live records; a recommendation reconsidered next
   year changes its label. The digest is pinned so that shows up as a mismatch
   rather than as a silent shift in your results.
+
+## First run — 2026-08-21
+
+Baseline, untuned. Both readers ran `assess.py` over one document containing all
+25 claims, with the recommendations as the register, through the same pipeline the
+engagement uses. Every citation resolved: **0 of 50 verdicts rested on an
+unverified locator.**
+
+| | strict | lenient | vs baseline (54.2%) |
+|---|---|---|---|
+| qwen3.6-35b-a3b | 17/24 = 70.8% | 79.2% | +16.7 |
+| gemma-4-31b-qat | 17/24 = 70.8% | 75.0% | +16.7 |
+
+Identical accuracy, different error profiles. qwen3.6 caught **11 of 11** genuine
+failures and over-flagged 7 acceptable ones; gemma missed 2 failures and
+over-flagged 5. For a review tool the first profile is the better one — a missed
+failure costs more than an extra flag — and the two scores being equal hides that
+completely, which is the argument for reporting profiles rather than accuracy.
+
+### Disagreement did its job
+
+    where the readers AGREE (18 rows)     14/18 = 78% correct
+    where they DISAGREE  (6 rows)         6/6 had at least one correct answer
+
+In every disagreement the right answer was on the table, so a reviewer reading
+only those six rows resolves all six. That is the whole premise of putting
+verdicts side by side rather than merging them, measured rather than asserted —
+on n=6, which is encouraging and not yet evidence.
+
+### The failure the consensus cannot see
+
+Four rows had both readers agreeing and both wrong. Broken down by NTSB's own
+status, both readers pooled:
+
+| NTSB status | correct |
+|---|---|
+| Closed — Acceptable **Alternate** Action | **1/8 = 12%** |
+| Closed — Acceptable Action | 9/14 = 64% |
+| Closed — Unacceptable Action | 18/20 = 90% |
+| Open — Unacceptable Response | 2/2 = 100% |
+| Closed — Exceeds Recommended Action | 4/4 = 100% |
+
+**The tools are near-perfect at detecting failure and nearly blind to compliance
+by another route.** Note that "Exceeds Recommended Action" scores 4/4 — so this is
+not a general intolerance of deviation. It is specific to substitution of method:
+asked for X, the addressee did Y, achieved the intent, and both readers called it
+unaddressed.
+
+That is a prompt-level defect, not a model one — it shows up identically in two
+unrelated model families. `assess.py` asks whether the document does what the
+comment asked for, where the question a reviewer actually needs is whether it
+achieves what the comment required.
+
+**Not fixed here on purpose.** With 8 alternate-action rows out of 24, rewriting
+the prompt and re-scoring against this same slice would fit the toolkit to this
+answer key and the number would stop meaning anything. The fix should be validated
+against a fixture that did not diagnose it.

@@ -5,3 +5,8 @@
 recommendations.csv
 labels.json
 raw/
+claims.md
+obligations.csv
+corpus.yaml
+parsed/
+out/
