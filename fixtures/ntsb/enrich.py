@@ -26,6 +26,19 @@ drawing from many.
 POLITENESS. One request per recommendation, 0.4s apart, cached in raw/ so a rerun
 costs nothing. The cache is the reason this is safe to interrupt: kill it, rerun it,
 and it resumes.
+
+ON THE STATUSES fetch.py DOES NOT MAP. Commit d97329e claimed
+"Closed - Unacceptable Action - No Response Received" was being dropped for no
+reason but an incomplete map. That was wrong, and measuring it is what showed it:
+**32 of those 39 rows carry no claim text at all**, median zero characters. The
+addressee never responded, so there is no claim to judge and no way to be right or
+wrong about one. Excluding them is correct.
+
+"Open - Acceptable Response" is the genuinely open question — 24 rows, every one
+carrying a claim, median 1,221 characters, and NTSB has judged the response
+acceptable without closing the recommendation. That is real labelled data being
+left on the floor. It is a weaker label than a closed one, and it should be added
+deliberately or not at all, not by widening a dict without saying so.
 """
 
 import argparse
