@@ -53,6 +53,7 @@ py-modules = [
     "make-denylist",
     "render-assess",
     "run-tests",
+    "smoke",
     "synthesize-panel",
     "to-html",
 ]

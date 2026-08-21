@@ -116,6 +116,37 @@ def columns(rows):
     return sorted(seen, key=lambda letter: (len(letter), letter))
 
 
+def detect(path):
+    """"xlsx" | "docx" | "delimited", from the CONTENT rather than the name.
+
+    Dispatching on the extension is right until something writes one format under
+    another format's name, and the toolkit does exactly that: annotate() preserves
+    the source format and writes to a destination the CALLER named. adjudicate.py
+    annotates twice — verdicts, then notes — reading its own intermediate back. Ask
+    it to work from a .csv register with `--out matrix.xlsx` and the first pass
+    writes a CSV body into a .xlsx name, and the second pass opens it as a zip:
+
+        zipfile.BadZipFile: File is not a zip file
+
+    which names neither the register, nor the format, nor the tool that chose the
+    name. Both OOXML formats begin "PK"; which one is settled by the part inside,
+    because .docx and .xlsx are the same container with different contents.
+    """
+    try:
+        with open(path, "rb") as handle:
+            if handle.read(2) != b"PK":
+                return "delimited"
+    except OSError:
+        return "delimited"
+    try:
+        names = set(zipfile.ZipFile(path).namelist())
+    except zipfile.BadZipFile:
+        return "delimited"
+    if "word/document.xml" in names:
+        return "docx"
+    return "xlsx"
+
+
 def col_letters(index):
     """0-based column index to its spreadsheet letter. 0 -> A, 26 -> AA."""
     out = ""
@@ -341,9 +372,10 @@ def read_sheet(path, sheet_name):
     Dispatches on extension: a .csv or .tsv has no sheets, so `sheet_name` is
     accepted and ignored rather than made a different call, which keeps every one
     of the callers below indifferent to which format it was handed."""
-    if path.lower().endswith(CSV_SUFFIXES):
+    found = detect(path)
+    if found == "delimited":
         return read_csv(path)
-    if path.lower().endswith(DOCX_SUFFIXES):
+    if found == "docx":
         return read_docx_table(path, sheet_name)
     z = zipfile.ZipFile(path)
     shared = []
@@ -429,6 +461,12 @@ def main():
                    for k, v in (closure.load_yaml(lexicon_path) or {}).items()}
 
     rows = read_sheet(os.path.expanduser(args.xlsx), args.sheet)
+    # Resolve --*-col: a header name is as good as a letter, and a name that
+    # matches nothing is refused by name instead of quietly reading an empty
+    # column. matrix.py DEFINED resolve_columns and never called it, so
+    # `--id-col id` was read as column letter ID -- column 238 -- and the
+    # run reported '0 rows with an ID' rather than 'no column id'.
+    resolve_columns(rows, args)
     header = rows[0] if rows else {}
     # Every row that has an ID, whether or not it has comment text yet. A row
     # the client has numbered but not yet written is a row that exists; leaving
@@ -579,6 +617,12 @@ def main():
 
 findings:
 """)
+        # An empty list, explicitly. A bare `findings:` with nothing under it is
+        # valid YAML for null, and `.get("findings", [])` hands null straight back
+        # to a for-loop — which is how two downstream tools died on a map this
+        # very function had written.
+        if not entries:
+            out.write("  []\n")
         for entry in entries:
             terms = ", ".join(f'"{yaml_escape(t)}"' for t in entry["terms"])
             absence = ", absence: true" if entry["absence"] else ""

@@ -69,6 +69,7 @@ def main():
                 continue
         column = col_name(start + offset)
         rows = matrix_reader.read_sheet(current, args.sheet)
+        matrix_reader.resolve_columns(rows, args)
         values = {"1": name}
         for pos, row in matrix_reader.numbered(rows):
             rid = (row.get(args.id_col, "") or "").strip()

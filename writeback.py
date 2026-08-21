@@ -146,7 +146,10 @@ def annotate(src, dst, sheet_name, values, col_letter, overwrite):
     sharedStrings.xml means rewriting every index that follows, and one slip
     there rewrites unrelated cells into the wrong text.
     """
-    if src.lower().endswith(matrix_reader.CSV_SUFFIXES):
+    # By content, not by name: this function writes the source's format to a
+    # destination the caller named, so the name is the one thing that cannot be
+    # trusted to say what a file is.
+    if matrix_reader.detect(src) == "delimited":
         return annotate_csv(src, dst, values, col_letter, overwrite)
     zin = zipfile.ZipFile(src)
     book = ET.fromstring(zin.read("xl/workbook.xml"))
@@ -256,6 +259,7 @@ def main():
     xlsx = args.xlsx if os.path.isabs(args.xlsx) \
         else os.path.join(project, args.xlsx)
     rows = matrix_reader.read_sheet(xlsx, args.sheet)
+    matrix_reader.resolve_columns(rows, args)
 
     # Excel row numbers, not list positions — read_sheet drops blank rows, so
     # the two diverge and writing to the wrong row is silent and catastrophic.

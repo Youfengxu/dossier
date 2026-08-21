@@ -183,7 +183,16 @@ def main():
     map_path = os.path.join(project, args.map)
     if not os.path.exists(map_path):
         sys.exit(f"no {args.map} in {project} — closure needs a finding register")
-    findings = load_yaml(map_path).get("findings", [])
+    # `.get(key, [])` returns None when the key is PRESENT and null, which is
+    # what an empty `findings:` parses to — the default only covers an absent key.
+    # A register whose rows all filter out produces exactly that map, and both
+    # tools that read it died on "TypeError: 'NoneType' object is not iterable",
+    # naming neither the file nor the reason.
+    findings = load_yaml(map_path).get("findings") or []
+    if not findings:
+        sys.exit(f"{map_path} lists no findings — regenerate it with matrix.py, "
+                 f"or check the register actually has rows with an id and a "
+                 f"comment.")
 
     lexicon_path = os.path.join(project, args.lexicon)
     lexicon = {}

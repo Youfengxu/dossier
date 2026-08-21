@@ -143,3 +143,14 @@ jobs:
             --doc deliverable-v2 --against deliverable-v1 | tee out.txt
           grep -q "no drift" out.txt || { echo "FAIL: installed CLI did no work"; exit 1; }
           echo "installed console script ran a full review from outside the checkout"
+
+      - name: every tool runs against the fixture
+        # Thirty-eight of forty-nine tools had never been executed against data by
+        # any gate — CI asked each for --help and nothing more, which is how
+        # to-html.py sat crashing on EVERY input while being reported healthy.
+        # The blocker was that most tools need a model; that stopped being true
+        # when the transport became one function, so one stub covers all of them.
+        #
+        # This proves tools RUN. It proves nothing about the quality of what they
+        # say — every model answer here is a canned stub, by construction.
+        run: python3 smoke.py

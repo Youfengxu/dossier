@@ -22,6 +22,7 @@ Stdlib only. No openai package, no httpx, nothing to install on a review machine
 
 import hashlib
 import json
+import math
 import os
 import time
 import urllib.error
@@ -71,6 +72,38 @@ CACHE_DIR = ".dossier-cache"
 LOG_FILE = ".dossier-log.jsonl"
 
 
+# A canned reply, for running the tools without an endpoint.
+#
+# Thirty-eight of forty-nine tools were never executed against data by any gate —
+# only asked for --help — and to-html.py sat crashing on EVERY input for as long
+# as records carried __row__, with CI calling it healthy the whole time. The
+# blocker was that most tools need a model, and CI has none.
+#
+# It is one dict because the transport is one function. Every tool's validator
+# reads the keys it cares about and ignores the rest, so a union of the shapes
+# they ask for satisfies all of them without the stub knowing which tool called.
+# The values are deliberately useless and loudly marked: this exists to prove a
+# tool RUNS, never to stand in for what a model would have said. "partial" is the
+# verdict because it is the one value present in both declared scales.
+FAKE_REPLY = {
+    "verdict": "partial", "confidence": "low", "absence": False,
+    "class": "compliance", "refuted": False, "support": "none",
+    "agreement": "unclear", "specificity": "low", "candour": "low",
+    "title": "STUB", "name": "STUB", "answer": "STUB — no model was called",
+    "reason": "STUB — no model was called",
+    "rationale": "STUB — no model was called",
+    "text": "STUB", "quote": "", "strongest": "", "weakest": "",
+    "terms": ["stub"], "quotes": [], "cites": [], "sections": [],
+    "items": [], "capabilities": [], "obligations": [], "findings": [],
+}
+
+
+def faking():
+    """True when DOSSIER_FAKE_CHAT asks for canned replies. Opt-in only: a stub
+    that could switch itself on would eventually answer a real review."""
+    return bool(os.environ.get("DOSSIER_FAKE_CHAT"))
+
+
 def chat(url, model, system=None, user=None, *, messages=None, max_tokens=1200,
          temperature=0.0, timeout=300, json_object=True, reasoning_effort=None):
     """The one place a chat request is built. Returns (content, reasoning, stop).
@@ -104,6 +137,9 @@ def chat(url, model, system=None, user=None, *, messages=None, max_tokens=1200,
                         channel. That is a budget problem, not a refusal, and
                         the caller can only tell if it is handed both.
     """
+    if faking():
+        return json.dumps(FAKE_REPLY), "", "stop"
+
     if messages is None:
         messages = []
         if system:
@@ -364,6 +400,8 @@ class Embedder:
     def preflight(self):
         """Fail with the model name, not a 500 traceback.
 
+        Stubbed out under DOSSIER_FAKE_CHAT: there is no endpoint to check.
+
         The default embedding model is currently served by no endpoint — absent
         on the Mac, configured on k11 but failing to load — and the symptom is
         an HTTP 500 raised from deep inside a batch, after however long the run
@@ -375,6 +413,8 @@ class Embedder:
         noise. The right answer is to serve the right model; the right
         behaviour meanwhile is to say so in one line, before the work.
         """
+        if faking():
+            return True
         try:
             self.embed(["preflight"])
         except Exception as exc:                            # noqa: BLE001
@@ -394,6 +434,19 @@ class Embedder:
             return False
 
     def _post(self, texts):
+        if faking():
+            # Deterministic from the text, so a run is reproducible and two
+            # identical passages embed identically — which is what the retrieval
+            # paths actually assert. Not semantic in any way: this proves a tool
+            # runs, and any tool judged on retrieval QUALITY must be run against a
+            # real endpoint.
+            vectors = []
+            for text in texts:
+                digest = hashlib.sha256((text or "").encode()).digest()
+                raw = [b / 255.0 - 0.5 for b in digest]
+                length = math.sqrt(sum(v * v for v in raw)) or 1.0
+                vectors.append([v / length for v in raw])
+            return vectors
         payload = {"model": self.model, "input": texts}
         request = urllib.request.Request(
             self.url, data=json.dumps(payload).encode(),

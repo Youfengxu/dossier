@@ -83,6 +83,7 @@ def main():
             sys.exit(f"--eval wants NAME=FILE, got {spec!r}")
         name, path = spec.split("=", 1)
         rows = matrix_reader.read_sheet(path, args.sheet)
+        matrix_reader.resolve_columns(rows, args)
         evaluators.append((name.strip(), {
             r[args.id_col].strip(): (r.get(args.verdict_col, "").strip(),
                                      (r.get(args.rationale_col, "") or "").strip())
