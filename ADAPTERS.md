@@ -250,7 +250,12 @@ silent fall back to prose.
    *(Partial: `__row__` is carried, and `matrix.columns()` now answers "which
    columns are these" in one place so the bookkeeping key stops leaking into
    consumers that enumerate keys — `to-html.py` did, and crashed on every input
-   for as long as `__row__` existed. Letters-to-names remains unscheduled.)*
+   for as long as `__row__` existed. `--*-col` now takes a header name as readily
+   as a letter, resolved by `matrix.resolve_columns`, so no operator counts
+   columns by hand. What remains is the representation itself: `read_sheet` still
+   returns letters, and the fifty-six places that index a record still expect
+   them. That change lands in the path that writes evidence into a client's
+   matrix, so it goes on its own.)*
 5. **Adapters declare fidelity** (below) — replacing revision 1's unenforceable
    ban on calling models.
 6. **An address is meaningful only against `(adapter_id, adapter_version,
@@ -352,7 +357,8 @@ because a review traced what a reviewer actually sees today:
 
 ## Still open
 
-- **The letters-to-names migration** across fourteen consumers is unscheduled.
+- **The letters-to-names migration** is half done. Names reach the operator;
+  records are still keyed by letter internally, across fifty-six index sites.
 - **`conformance.py` covers the record half of the contract, not the unit half.**
   Address law and unit round trip need `locate`/`Unit`, which have no
   implementation. They are named and reported, not quietly dropped.

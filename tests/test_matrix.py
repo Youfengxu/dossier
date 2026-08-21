@@ -245,5 +245,69 @@ class DelimitedFiles(unittest.TestCase):
         self.assertEqual(rows[1]["B"], "6.3")
 
 
+class ColumnsByName(unittest.TestCase):
+    """--id-col takes "id" as well as "A", so nobody counts columns by hand.
+
+    Invariant 4 wants records keyed by name rather than letter. That means
+    changing what read_sheet returns and every one of the fifty-six places that
+    index a record — in the code path that writes evidence into a client's matrix.
+    This is the half that lands safely first: letters stay internal, names reach
+    the operator."""
+
+    def rows(self, text="id,section_ref,comment\nC-1,6.3,precedence\n"):
+        path = os.path.join(tempfile.mkdtemp(), "m.csv")
+        with open(path, "w", newline="") as handle:
+            handle.write(text)
+        return matrix.read_sheet(path, "any")
+
+    def test_a_header_name_resolves_to_its_letter(self):
+        self.assertEqual(matrix.resolve_column(self.rows(), "comment"), "C")
+
+    def test_matching_ignores_case_and_surrounding_space(self):
+        self.assertEqual(matrix.resolve_column(self.rows(), "  SECTION_REF "), "B")
+
+    def test_a_letter_still_works(self):
+        self.assertEqual(matrix.resolve_column(self.rows(), "b"), "B")
+
+    def test_a_name_beats_a_letter_when_a_spec_could_be_either(self):
+        """"ID" is a valid column letter — it is column 238. Someone typing it
+        means the column headed ID, so names are matched first and a letter is
+        the fallback for a spec that names no header."""
+        rows = self.rows("ID,other\nC-1,x\n")
+        self.assertEqual(matrix.resolve_column(rows, "ID"), "A")
+
+    def test_a_letter_naming_no_header_passes_through(self):
+        self.assertEqual(matrix.resolve_column(self.rows(), "ZZ"), "ZZ")
+
+    def test_an_unknown_name_lists_the_headers(self):
+        """The near miss is the common case: "Comments" for a column headed
+        "comment". Failing without saying what IS there wastes the operator's
+        next five minutes."""
+        with self.assertRaises(SystemExit) as caught:
+            matrix.resolve_column(self.rows(), "Comments")
+        message = str(caught.exception)
+        self.assertIn("section_ref", message)
+        self.assertIn("comment", message)
+
+    def test_a_duplicated_header_refuses_rather_than_picking_one(self):
+        rows = self.rows("id,comment,comment\nC-1,a,b\n")
+        with self.assertRaises(SystemExit) as caught:
+            matrix.resolve_column(rows, "comment")
+        self.assertIn("B, C", str(caught.exception))
+
+    def test_resolve_columns_rewrites_every_col_argument(self):
+        import argparse
+        args = argparse.Namespace(id_col="id", comment_col="C", sheet="Comments",
+                                  out="somewhere.md")
+        matrix.resolve_columns(self.rows(), args)
+        self.assertEqual((args.id_col, args.comment_col), ("A", "C"))
+        self.assertEqual(args.sheet, "Comments")     # untouched: not a *_col
+        self.assertEqual(args.out, "somewhere.md")
+
+    def test_the_bookkeeping_key_is_never_a_candidate(self):
+        with self.assertRaises(SystemExit):
+            matrix.resolve_column(self.rows(), matrix.ROW_KEY)
+
+
 if __name__ == "__main__":
     unittest.main()

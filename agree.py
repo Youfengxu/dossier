@@ -75,6 +75,8 @@ def main():
 
     rows_a = matrix_reader.read_sheet(args.a, args.sheet)
     rows_b = matrix_reader.read_sheet(args.b, args.sheet)
+    # Resolved against A: the two sheets are the same register, two runs.
+    matrix_reader.resolve_columns(rows_a, args)
 
     # Key by row id, not by position: the two runs skip the same rows for the
     # same reasons today, but a comparison that silently depends on that would

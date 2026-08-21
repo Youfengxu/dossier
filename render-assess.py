@@ -102,7 +102,11 @@ def main():
     _meta, lines = load_doc(project, args.doc)
     xlsx = args.xlsx if os.path.isabs(args.xlsx) else os.path.join(project, args.xlsx)
     rows = {}
-    for r in matrix_reader.read_sheet(xlsx, args.sheet)[1:]:
+    sheet_rows = matrix_reader.read_sheet(xlsx, args.sheet)
+    # Before the slice below discards the header, which is what
+    # a name resolves against.
+    matrix_reader.resolve_columns(sheet_rows, args)
+    for r in sheet_rows[1:]:
         rid = (r.get(args.id_col, "") or "").strip()
         if rid:
             rows[rid] = r

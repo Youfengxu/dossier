@@ -168,6 +168,66 @@ def read_csv(path):
     return rows
 
 
+LETTERS_ONLY = re.compile(r"^[A-Za-z]{1,3}$")
+
+
+def normalise(text):
+    return " ".join((text or "").split()).casefold()
+
+
+def resolve_column(rows, spec, what="column"):
+    """Turn "the Adjudication column" or "I" into a column letter.
+
+    Invariant 4 says records return names, never letters. Getting there means
+    changing what `read_sheet` returns and every one of the fifty-six places that
+    index a record — a change to the code path that writes evidence into a client's
+    matrix, and not one to make in the same week as anything else. This is the half
+    that can land safely now: the letters stay internal, and a human never has to
+    count columns to the right to say which one they mean.
+
+    NAMES ARE MATCHED FIRST, and the order is not arbitrary. "ID" is a perfectly
+    valid column letter — it is column 238 — so a spec that could be read either
+    way has to resolve to the one the person meant, which is the column headed ID.
+    A letter is what a spec falls back to when it names no header.
+    """
+    if not rows:
+        sys.exit(f"cannot resolve {what} {spec!r}: the sheet has no rows")
+    header = {letter: value for letter, value in rows[0].items()
+              if letter != ROW_KEY}
+    wanted = normalise(spec)
+    hits = sorted((letter for letter, value in header.items()
+                   if normalise(value) == wanted), key=col_num)
+    if len(hits) > 1:
+        sys.exit(f"{what} {spec!r} matches {len(hits)} columns "
+                 f"({', '.join(hits)}) — use the letter to say which")
+    if hits:
+        return hits[0]
+    if LETTERS_ONLY.match(spec or ""):
+        return spec.upper()
+    named = ", ".join(f"{letter}={value!r}" for letter, value in
+                      sorted(header.items(), key=lambda kv: col_num(kv[0]))
+                      if value.strip())
+    sys.exit(f"no {what} {spec!r}; headers are: {named or '(none)'}")
+
+
+def resolve_columns(rows, args, suffix="_col"):
+    """Resolve every --*-col argument in place, so each tool spends one line.
+
+    Mutates the parsed arguments rather than returning a mapping because the
+    alternative is threading a second object through call sites that already take
+    `args.id_col` — and a migration that touches every call site is the migration
+    this is deliberately not doing yet.
+    """
+    for name in sorted(vars(args)):
+        if not name.endswith(suffix):
+            continue
+        value = getattr(args, name)
+        if isinstance(value, str) and value:
+            setattr(args, name, resolve_column(
+                rows, value, what=name.replace("_", "-")))
+    return args
+
+
 def read_docx_table(path, which=None):
     """A register pasted into Word, read as records rather than as prose.
 

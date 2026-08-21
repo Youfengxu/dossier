@@ -77,6 +77,9 @@ def main():
     args = parser.parse_args()
 
     rows = matrix_reader.read_sheet(args.xlsx, args.sheet)
+    # --*-col accepts a header name as well as a letter; resolved here so
+    # nothing below has to care which one the operator typed.
+    matrix_reader.resolve_columns(rows, args)
     buckets = {k: [] for k in ORDER}
     for row in rows[1:]:
         rid = row.get(args.id_col, "").strip()

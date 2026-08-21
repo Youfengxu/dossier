@@ -122,6 +122,9 @@ def main():
     xlsx = args.xlsx if os.path.isabs(args.xlsx) \
         else os.path.join(project, args.xlsx)
     rows = matrix_reader.read_sheet(xlsx, args.sheet)
+    # --*-col accepts a header name as well as a letter; resolved here so
+    # nothing below has to care which one the operator typed.
+    matrix_reader.resolve_columns(rows, args)
     wanted = {v.strip().lower() for v in args.filter_values.split(",")}
 
     verdicts, evidence, counts = {}, {}, {}

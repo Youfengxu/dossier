@@ -56,6 +56,9 @@ def main():
     args = parser.parse_args()
 
     rows = matrix_reader.read_sheet(args.xlsx, args.sheet)
+    # --*-col accepts a header name as well as a letter; resolved here so
+    # nothing below has to care which one the operator typed.
+    matrix_reader.resolve_columns(rows, args)
     cols = [c.strip().upper() for c in args.cols.split(",")] if args.cols \
         else matrix_reader.columns(rows)
     if args.headers:

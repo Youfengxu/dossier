@@ -95,6 +95,9 @@ def main():
     args = parser.parse_args()
 
     rows = matrix_reader.read_sheet(args.xlsx, args.sheet)
+    # --*-col accepts a header name as well as a letter; resolved here so
+    # nothing below has to care which one the operator typed.
+    matrix_reader.resolve_columns(rows, args)
     project = os.path.dirname(os.path.abspath(args.xlsx))
 
     work, plan = [], []
