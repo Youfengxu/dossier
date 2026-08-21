@@ -64,6 +64,29 @@ class Packaging(unittest.TestCase):
                 if f.startswith(("build/", "dist/")) or ".egg-info" in f]
         self.assertEqual(junk[:5], [], f"{len(junk)} build artefacts are tracked")
 
+    def test_smoke_cases_only_use_fixtures_git_actually_has(self):
+        """Two smoke cases named gitignored files. They passed on the machine
+        that wrote them and failed in CI, which is the "works on my disk" failure
+        the harness exists to end — reproduced by the harness itself."""
+        import re
+        import subprocess
+        source = open(os.path.join(ROOT, "smoke.py"), encoding="utf-8").read()
+        # Both anchors must be the ASSIGNMENTS. "CANNOT_DRIVE" also appears in
+        # the module docstring, above CASES, so slicing to the bare name produced
+        # a reversed, empty range — and a check over nothing passes.
+        cases = source[source.index("CASES = ["):source.index("CANNOT_DRIVE = {")]
+        self.assertGreater(len(cases), 500, "the CASES slice came out empty")
+        wanted = set(re.findall(r"\{[pf]\}/([A-Za-z0-9._-]+)", cases))
+        tracked = subprocess.run(["git", "ls-files", "fixtures/floodtwin"],
+                                 cwd=ROOT, capture_output=True, text=True).stdout
+        have = {os.path.basename(line) for line in tracked.split()}
+        # Files a case produces are written into the project mid-run; anything
+        # else has to be in the repository or CI cannot see it.
+        produced = {"register-map.yaml"}
+        missing = sorted(wanted - have - produced)
+        self.assertEqual(missing, [],
+                         f"smoke.py references untracked fixtures: {missing}")
+
     def test_the_dispatcher_is_the_module_not_the_script(self):
         """`dossier` is a shim over dossier_cli, not the other way round. Inverted,
         the installed command cannot find the dispatcher at all."""

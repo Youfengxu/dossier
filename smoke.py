@@ -63,13 +63,17 @@ CASES = [
     ("verify.py", "--project {p} --doc deliverable-v2 "
                   "--coverage cov-embed-12.csv --out {o}/ver.csv --limit 2"),
     ("closure.py", "--project {p} --from deliverable-v1 --to deliverable-v2"),
-    ("compare-coverage.py", "--a {p}/cov-embed-6.csv --b {p}/cov-embed-12.csv "
-                            "--label-a six --label-b twelve"),
+    # Against the coverage trace.py wrote earlier in this run, not a second
+    # committed file: cov-embed-6.csv exists on the machine this was written on
+    # and is gitignored, so the case passed locally and failed in CI, which is
+    # the exact shape of "works on my disk" this harness is meant to end.
+    ("compare-coverage.py", "--a {p}/cov-embed-12.csv --b {o}/cov.csv "
+                            "--label-a committed --label-b fresh"),
     ("diagnose-retrieval.py", "--project {p} --doc deliverable-v2 "
                               "--obligations {p}/obligations.yaml "
                               "--coverage cov-embed-12.csv"),
     ("cluster-findings.py", "--project {p} --coverage cov-embed-12.csv"),
-    ("synthesize.py", "--project {p} --inventory {p}/inv-1pass.json --out {o}/syn.md"),
+    ("synthesize.py", "--project {p} --inventory {p}/inv-ablation.json --out {o}/syn.md"),
     ("claim.py", "--project {p} --doc deliverable-v2 --out {o}/claims.json --limit 2"),
     ("assess.py", "--project {p} --doc deliverable-v2 --matrix {m} --sheet Comments "
                   "--id-col id --comment-col comment --out {o}/assess.jsonl "
