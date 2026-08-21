@@ -66,21 +66,27 @@ def temp(text, suffix=".csv", binary=False):
 
 # ---------------------------------------------------------------- the checks
 
+FORMATS = ("comments.csv", "comments.xlsx", "comments.docx")
+
+
 def cross_format_agreement():
-    """The same fourteen comments as .csv and as .xlsx, read by the same call."""
-    csv_rows = matrix.read_sheet(os.path.join(FIXTURES, "comments.csv"), "Comments")
-    xlsx_rows = matrix.read_sheet(os.path.join(FIXTURES, "comments.xlsx"), "Comments")
-    want(len(csv_rows) == len(xlsx_rows),
-         f"row counts differ: csv {len(csv_rows)}, xlsx {len(xlsx_rows)}")
-    for a, b in zip(csv_rows, xlsx_rows):
-        want(a == b, f"row {a.get(matrix.ROW_KEY)} differs:\n"
-                     f"      csv  {a}\n      xlsx {b}")
-    return f"{len(csv_rows)} rows identical across both formats"
+    """The same fourteen comments in three formats, read by the same call."""
+    read = {name: matrix.read_sheet(os.path.join(FIXTURES, name), "Comments")
+            for name in FORMATS}
+    reference = read[FORMATS[0]]
+    for name in FORMATS[1:]:
+        rows = read[name]
+        want(len(rows) == len(reference),
+             f"row counts differ: {FORMATS[0]} {len(reference)}, {name} {len(rows)}")
+        for a, b in zip(reference, rows):
+            want(a == b, f"row {a.get(matrix.ROW_KEY)} differs:\n"
+                         f"      {FORMATS[0]:<14} {a}\n      {name:<14} {b}")
+    return f"{len(reference)} rows identical across {len(FORMATS)} formats"
 
 
 def record_model():
     """Values are str, never None; the header is a record; __row__ is correct."""
-    for name in ("comments.csv", "comments.xlsx"):
+    for name in FORMATS:
         rows = matrix.read_sheet(os.path.join(FIXTURES, name), "Comments")
         want(rows, f"{name}: no records")
         want(rows[0]["A"] == "id", f"{name}: header not returned as the first record")
@@ -150,6 +156,78 @@ def nasty_inputs():
     return ", ".join(cases)
 
 
+def docx_table_shapes():
+    """The shapes a register takes once somebody has been editing it in Word.
+
+    Added because `--prove` reported the merged-cell mutation as MISSED: the
+    committed twin is a clean rectangle, so breaking gridSpan handling changed
+    nothing and no check noticed. The twin stays clean — it is the cross-format
+    reference — and the awkward shapes are built here instead.
+    """
+    from tests.support import docx_bytes
+
+    def cell(text, span=None):
+        props = f'<w:tcPr><w:gridSpan w:val="{span}"/></w:tcPr>' if span else ""
+        return f"<w:tc>{props}<w:p><w:r><w:t>{text}</w:t></w:r></w:p></w:tc>"
+
+    def row(*cells):
+        return "<w:tr>" + "".join(cells) + "</w:tr>"
+
+    def read(body, which=None):
+        path = os.path.join(tempfile.mkdtemp(), "t.docx")
+        with open(path, "wb") as handle:
+            handle.write(docx_bytes(body))
+        return matrix.read_sheet(path, which)
+
+    cases = []
+
+    rows = read("<w:tbl>" + row(cell("id"), cell("ref"), cell("comment"))
+                + row(cell("spans two", span=2), cell("third")) + "</w:tbl>")
+    want(rows[1].get("C") == "third",
+         f"a gridSpan=2 cell did not advance the column: {rows[1]} — every cell "
+         f"after a merge sits one letter left of where it belongs")
+    want("B" not in rows[1], f"the merged cell claimed a column it spans over")
+    cases.append("merged cell")
+
+    rows = read("<w:tbl>" + row(cell("id"))
+                + row("<w:tc><w:p><w:r><w:t>outer</w:t></w:r></w:p>"
+                      "<w:tbl><w:tr><w:tc><w:p><w:r><w:t>inner</w:t></w:r>"
+                      "</w:p></w:tc></w:tr></w:tbl></w:tc>") + "</w:tbl>")
+    want(rows[1]["A"] == "outer",
+         f"a nested table's text was folded into the containing cell: "
+         f"{rows[1]['A']!r} — the value now matches nothing a reviewer can search")
+    cases.append("nested table")
+
+    body = ("<w:tbl>" + row(cell("layout")) + "</w:tbl>"
+            + "<w:tbl>" + row(cell("id"), cell("ref"))
+            + row(cell("C-1"), cell("6.3")) + "</w:tbl>")
+    path = os.path.join(tempfile.mkdtemp(), "two.docx")
+    with open(path, "wb") as handle:
+        handle.write(docx_bytes(body))
+    done = subprocess.run(
+        [sys.executable, "-c",
+         f"import sys; sys.path.insert(0, {ROOT!r}); import matrix; "
+         f"matrix.read_sheet({path!r}, 'Comments')"],
+        capture_output=True, text=True)
+    want(done.returncode != 0,
+         "a document with two tables silently picked one — guessing which table "
+         "is the register produces a confident answer about the wrong data")
+    want("2 tables" in done.stderr,
+         f"the refusal does not say what it found: {done.stderr.strip()[:120]}")
+    want(matrix.read_sheet(path, "2")[1]["A"] == "C-1",
+         "naming the table by number did not select it")
+    cases.append("two tables refused, selectable by number")
+
+    rows = read("<w:tbl>" + row(cell("id")) + row(cell("")) + row(cell("C-2"))
+                + "</w:tbl>")
+    want([r["A"] for r in rows] == ["id", "C-2"], "blank table row not dropped")
+    want(rows[1][matrix.ROW_KEY] == 3,
+         f"blank row shifted the row key to {rows[1][matrix.ROW_KEY]}")
+    cases.append("blank row")
+
+    return ", ".join(cases)
+
+
 def determinism():
     """Parse in two processes under different ambient state; require byte equality.
 
@@ -165,7 +243,7 @@ def determinism():
         {"PYTHONHASHSEED": "random", "LC_ALL": "de_DE.UTF-8", "TZ": "Pacific/Kiritimati"},
     ]
     working = [ROOT, tempfile.mkdtemp()]
-    for name in ("comments.csv", "comments.xlsx"):
+    for name in FORMATS:
         target = os.path.join(FIXTURES, name)
         seen = []
         for env, cwd in zip(environments, working):
@@ -200,15 +278,19 @@ def twin_has_not_drifted():
     changed and would make the result depend on where in a workflow this ran."""
     import importlib.util
     spec = importlib.util.spec_from_file_location(
-        "twin", os.path.join(FIXTURES, "make-xlsx-twin.py"))
+        "twin", os.path.join(FIXTURES, "make-twins.py"))
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     expected, records, _strings = module.build()
-    on_disk = open(os.path.join(FIXTURES, "comments.xlsx"), "rb").read()
-    want(on_disk == expected,
+    want(open(os.path.join(FIXTURES, "comments.xlsx"), "rb").read() == expected,
          "comments.xlsx no longer matches what comments.csv generates — "
-         "regenerate it with fixtures/floodtwin/make-xlsx-twin.py")
-    return f"committed twin matches its source ({records} rows)"
+         "regenerate with fixtures/floodtwin/make-twins.py")
+    rows = matrix.read_csv(os.path.join(FIXTURES, "comments.csv"))
+    want(open(os.path.join(FIXTURES, "comments.docx"), "rb").read()
+         == module.build_docx(rows),
+         "comments.docx no longer matches what comments.csv generates — "
+         "regenerate with fixtures/floodtwin/make-twins.py")
+    return f"both committed twins match their source ({records} rows)"
 
 
 def ooxml_writes_are_reproducible():
@@ -224,6 +306,12 @@ def ooxml_writes_are_reproducible():
     a test that needs a delay to fail is a test that will be deleted."""
     import zipfile
     from writeback import ZIP_EPOCH
+
+    for name in ("comments.xlsx", "comments.docx"):
+        for info in zipfile.ZipFile(os.path.join(FIXTURES, name)).infolist():
+            want(info.date_time == ZIP_EPOCH,
+                 f"{name}:{info.filename} is stamped {info.date_time}, not the "
+                 f"fixed epoch — the file cannot be regenerated byte-for-byte")
 
     twin = os.path.join(FIXTURES, "comments.xlsx")
     for info in zipfile.ZipFile(twin).infolist():
@@ -273,6 +361,12 @@ ADAPTER_MUTATIONS = [
      "old": '            dialect = csv.Sniffer().sniff(sample, delimiters=",;\\t|")',
      "new": "            dialect = csv.excel",
      "expect": "nasty inputs"},
+    {"what": "a merged cell no longer advances the column",
+     "old": "            cells[col_letters(column)] = cell_text(tc)\n"
+            "            column += span",
+     "new": "            cells[col_letters(column)] = cell_text(tc)\n"
+            "            column += 1",
+     "expect": "cross-format agreement"},
     {"what": "the bookkeeping key leaks out of columns()",
      "old": "    seen = {k for row in rows for k in row if k != ROW_KEY}",
      "new": "    seen = {k for row in rows for k in row}",
@@ -349,6 +443,7 @@ def main():
               ("record model", record_model),
               ("row key across a gap", row_key_survives_a_gap),
               ("nasty inputs", nasty_inputs),
+              ("docx table shapes", docx_table_shapes),
               ("determinism", determinism),
               ("committed twin is current", twin_has_not_drifted),
               ("ooxml writes reproducible", ooxml_writes_are_reproducible))

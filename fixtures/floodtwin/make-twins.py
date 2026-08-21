@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build `comments.xlsx` from `comments.csv` — the same fourteen rows, twice.
+"""Build `comments.xlsx` and `comments.docx` from `comments.csv`.
 
 Cross-format agreement is the cheapest real check the contract asks for: the same
 table, expressed two ways, must produce identical records. It is worth having as
@@ -11,7 +11,7 @@ Half the cells are written as shared strings and half inline, because Excel writ
 shared and `writeback.py` writes inline, and a reader that handles one of them
 fails on half the workbooks it will meet.
 
-    ./make-xlsx-twin.py          # rewrites comments.xlsx from comments.csv
+    ./make-twins.py              # rewrites both twins from comments.csv
 """
 
 import os
@@ -22,7 +22,28 @@ ROOT = os.path.dirname(os.path.dirname(HERE))
 sys.path.insert(0, ROOT)
 
 import matrix                                                   # noqa: E402
-from tests.support import xlsx_bytes                            # noqa: E402
+from tests.support import docx_bytes, xlsx_bytes                # noqa: E402
+
+
+def escape(text):
+    return (text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;"))
+
+
+def build_docx(rows):
+    """The same table as a Word table — the shape a register arrives in when
+    somebody pastes it into a document instead of attaching the spreadsheet."""
+    body = ["<w:tbl>"]
+    for record in rows:
+        body.append("<w:tr>")
+        for letter in sorted((k for k in record if k != matrix.ROW_KEY),
+                             key=matrix.col_num):
+            paragraphs = "".join(
+                f"<w:p><w:r><w:t>{escape(line)}</w:t></w:r></w:p>"
+                for line in (record[letter] or "").split("\n"))
+            body.append(f"<w:tc>{paragraphs or '<w:p/>'}</w:tc>")
+        body.append("</w:tr>")
+    body.append("</w:tbl>")
+    return docx_bytes("".join(body))
 
 
 def build():
@@ -54,11 +75,14 @@ def build():
 
 def main():
     payload, records, strings = build()
-    out = os.path.join(HERE, "comments.xlsx")
-    with open(out, "wb") as handle:
+    with open(os.path.join(HERE, "comments.xlsx"), "wb") as handle:
         handle.write(payload)
-    print(f"  wrote {os.path.basename(out)}: {records} rows, "
-          f"{strings} shared strings")
+    print(f"  wrote comments.xlsx: {records} rows, {strings} shared strings")
+
+    rows = matrix.read_csv(os.path.join(HERE, "comments.csv"))
+    with open(os.path.join(HERE, "comments.docx"), "wb") as handle:
+        handle.write(build_docx(rows))
+    print(f"  wrote comments.docx: {len(rows)} rows as a Word table")
     return 0
 
 

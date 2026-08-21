@@ -312,15 +312,15 @@ that gets deleted.
   present and correct across a gap, blank rows retained.
 - **Nasty inputs**: BOM, duplicate headers, blank header, ragged rows, embedded
   newline, empty file, header-only file.
-- **Cross-format agreement**: the same table as `.csv` and `.xlsx` must produce
-  identical records. *This one test would have caught four of the twelve
+- **Cross-format agreement**: the same table as `.csv`, `.xlsx` and `.docx` must
+  produce identical records. *This one test would have caught four of the twelve
   ambiguities a reviewer hit, mechanically, in five minutes.*
 
-The twin now exists: `fixtures/floodtwin/comments.xlsx`, built from `comments.csv`
-by `make-xlsx-twin.py`, half its cells written as shared strings and half inline
-because Excel writes shared and `writeback.py` writes inline. It is committed
-rather than generated inside the test, because a generated twin can only agree
-with its generator; the harness compares the committed bytes against a fresh
+The twins now exist: `fixtures/floodtwin/comments.xlsx` and `comments.docx`, both
+built from `comments.csv` by `make-twins.py`. The workbook has  half its cells written as shared strings and half
+inline, because Excel writes shared and `writeback.py` writes inline. Both are
+committed rather than generated inside the test, because a generated twin can
+only agree with its generator; the harness compares the committed bytes against a fresh
 build, so drift is detected instead of papered over.
 
 Two CI gaps to close alongside: the "every tool answers `--help`" step loops over
@@ -360,8 +360,9 @@ because a review traced what a reviewer actually sees today:
   would miss an `adapters/` package, and `--mutate` has no generic adapter
   mutation — so a contributed adapter sits outside the honesty gate that the
   built-in tools are inside.
-- **A delimited register is read and written, but `.docx` tables are not.** A
-  comment matrix pasted into Word is a shape the toolkit still cannot take.
+- **`.docx` registers are read, not written.** `writeback.annotate` handles
+  `.xlsx` and delimited files; a Word table can be assessed but the verdicts
+  cannot be written back into it.
 
 *Closed since revision 2, listed because the entries above are worth reading
 against how these went:*
@@ -370,6 +371,12 @@ against how these went:*
 - ~~`--refreeze` invalidates every locator, exits 0, and says nothing.~~ It now
   prints each document's old and new hash, the line-count delta, and that every
   locator shifts. It was already gated behind an explicit flag.
+- ~~A comment matrix pasted into Word is a shape the toolkit cannot take.~~
+  `read_docx_table` reads it, honouring `gridSpan` — a merged cell advances the
+  grid, so every cell after it keeps the column it belongs to. `--prove` reported
+  that mutation as MISSED at first, because the committed twin is a clean
+  rectangle and nothing exercised a merge; the awkward shapes now live in their
+  own check.
 - ~~The conformance harness is specified but not implemented.~~ `conformance.py`,
   7/7, in CI. It found the wall-clock zip stamp on its first run.
 - ~~The wider determinism class in invariant 1 is stated and unenforced.~~ Now

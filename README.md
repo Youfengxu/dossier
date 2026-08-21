@@ -135,9 +135,11 @@ ln -s <repo>/tools/dossier/dossier ~/.local/bin/dossier
 ```
 
 `.docx`, `.pptx` and `.xlsx` need nothing — `extract.py` reads them with the
-standard library. A comment register may be `.xlsx`, `.csv` or `.tsv`; the tools
-address its columns by letter either way, so nothing downstream changes with the
-format. Delimiter and encoding are detected, which matters more than it sounds:
+standard library. A comment register may be `.xlsx`, `.csv`, `.tsv` or a table in
+a `.docx`; the tools address its columns by letter in every case, so nothing
+downstream changes with the format. For a `.docx`, `--sheet` takes the number of
+the table when the document holds more than one — the reader refuses to guess
+rather than confidently reading a layout table. Delimiter and encoding are detected, which matters more than it sounds:
 a semicolon-separated European export otherwise reads as one column per row, and
 an Excel CSV carries a byte-order mark that turns the first header cell into
 `﻿id` and makes every lookup by name miss without saying so. Point the tools at your own inference with `DOSSIER_CHAT_URL`,

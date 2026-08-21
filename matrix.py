@@ -45,6 +45,11 @@ from llm import Client, LLMError  # noqa: E402
 import closure  # noqa: E402
 
 NS = {"m": "http://schemas.openxmlformats.org/spreadsheetml/2006/main"}
+W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+
+
+def w(tag):
+    return "{%s}%s" % (W, tag)
 PROMPT_VERSION = "matrix-1"
 
 SYSTEM = """You extract search terms from a review comment about a technical document.
@@ -95,6 +100,7 @@ def validate(obj):
 ROW_KEY = "__row__"
 
 CSV_SUFFIXES = (".csv", ".tsv")
+DOCX_SUFFIXES = (".docx", ".dotx")
 
 
 def columns(rows):
@@ -162,6 +168,86 @@ def read_csv(path):
     return rows
 
 
+def read_docx_table(path, which=None):
+    """A register pasted into Word, read as records rather than as prose.
+
+    `extract.py` already reads .docx, but it flattens tables into sequential
+    paragraphs — right for a deliverable, useless for a register, where the whole
+    meaning is which cell sits in which column.
+
+    MERGED CELLS ARE THE HAZARD. A cell carrying <w:gridSpan w:val="2"> occupies
+    two columns, so every cell after it in that row sits one letter further right
+    than its position suggests. Counting cells instead of grid columns reads the
+    row as if the merge were not there and shifts the remainder left — silently,
+    into a workbook that still opens cleanly, which is the same class of defect
+    __row__ exists to prevent one axis over.
+
+    Nested tables are not descended into. A table inside a cell is a layout
+    device, and folding its text into the containing cell produces a value that
+    matches nothing a reviewer can search for.
+    """
+    root = ET.fromstring(zipfile.ZipFile(path).read("word/document.xml"))
+    parent = {child: node for node in root.iter() for child in node}
+
+    def nested(table):
+        node = parent.get(table)
+        while node is not None:
+            if node.tag == w("tc"):
+                return True
+            node = parent.get(node)
+        return False
+
+    tables = [t for t in root.iter(w("tbl")) if not nested(t)]
+    if not tables:
+        sys.exit(f"no table in {os.path.basename(path)}")
+
+    if which and str(which).strip().isdigit():
+        index = int(str(which).strip()) - 1
+        if not 0 <= index < len(tables):
+            sys.exit(f"no table {which} in {os.path.basename(path)}; "
+                     f"it has {len(tables)}")
+        table = tables[index]
+    elif len(tables) == 1:
+        table = tables[0]
+    else:
+        # Guessing which table is the register is the kind of convenience that
+        # produces a confident answer about the wrong data. List them instead.
+        shapes = ", ".join(
+            f"{n + 1}: {len(t.findall(w('tr')))} rows"
+            for n, t in enumerate(tables))
+        sys.exit(f"{os.path.basename(path)} has {len(tables)} tables — pass "
+                 f"--sheet with the number of the one to read ({shapes})")
+
+    def cell_text(tc):
+        out = []
+        for child in tc:
+            if child.tag == w("tbl"):
+                continue
+            if child.tag == w("p"):
+                out.append("".join(node.text or "" for node in child.iter(w("t"))))
+        return "\n".join(out).strip()
+
+    rows = []
+    for number, tr in enumerate(table.findall(w("tr")), start=1):
+        cells, column = {}, 0
+        for tc in tr.findall(w("tc")):
+            span = 1
+            properties = tc.find(w("tcPr"))
+            if properties is not None:
+                grid = properties.find(w("gridSpan"))
+                if grid is not None:
+                    try:
+                        span = max(1, int(grid.get(w("val"), "1")))
+                    except ValueError:
+                        span = 1
+            cells[col_letters(column)] = cell_text(tc)
+            column += span
+        if any(v.strip() for v in cells.values()):
+            cells[ROW_KEY] = number
+            rows.append(cells)
+    return rows
+
+
 def read_sheet(path, sheet_name):
     """Return [{col_letter: value}] for the named sheet. Stdlib only.
 
@@ -179,6 +265,8 @@ def read_sheet(path, sheet_name):
     of the callers below indifferent to which format it was handed."""
     if path.lower().endswith(CSV_SUFFIXES):
         return read_csv(path)
+    if path.lower().endswith(DOCX_SUFFIXES):
+        return read_docx_table(path, sheet_name)
     z = zipfile.ZipFile(path)
     shared = []
     try:
