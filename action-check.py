@@ -128,7 +128,7 @@ def main():
     wanted = {v.strip().lower() for v in args.filter_values.split(",")}
 
     verdicts, evidence, counts = {}, {}, {}
-    for position, row in enumerate(rows[1:], start=2):
+    for position, row in matrix_reader.numbered(rows):
         rid = row.get(args.id_col, "").strip()
         if not rid:
             continue

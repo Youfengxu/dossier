@@ -70,7 +70,7 @@ def main():
         column = col_name(start + offset)
         rows = matrix_reader.read_sheet(current, args.sheet)
         values = {"1": name}
-        for pos, row in enumerate(rows[1:], start=2):
+        for pos, row in matrix_reader.numbered(rows):
             rid = (row.get(args.id_col, "") or "").strip()
             r = by_id.get(rid)
             if not r:

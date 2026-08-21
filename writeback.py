@@ -263,8 +263,7 @@ def main():
     # The row's own number, not its position in a list the reader compacted.
     # enumerate() was correct only for gapless sheets; one deleted row in Excel
     # and every value after it wrote one row high, into the wrong comment.
-    for position, row in ((row.get("__row__", n), row)
-                          for n, row in enumerate(rows[1:], start=2)):
+    for position, row in matrix_reader.numbered(rows):
         rid = row.get(args.id_col, "").strip()
         if not rid:
             continue

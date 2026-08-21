@@ -309,5 +309,62 @@ class ColumnsByName(unittest.TestCase):
             matrix.resolve_column(self.rows(), matrix.ROW_KEY)
 
 
+class NumberedRows(unittest.TestCase):
+    """(sheet row, record) — never (list position, record).
+
+    This bug was reported, investigated, and closed as already fixed, because
+    writeback.py had been corrected to prefer `__row__`. But `annotate()` receives
+    a dict already keyed by sheet row, and FOUR callers built that dict themselves
+    with `enumerate(rows[1:], start=2)`. The sink was right and the sources were
+    wrong, so the fix was real and the bug was still live: one comment deleted in
+    Excel and every verdict below it writes one row high, against the wrong
+    comment, into a workbook that opens cleanly and says nothing.
+    """
+
+    def sheet(self):
+        from tests.support import xlsx_bytes
+        path = os.path.join(tempfile.mkdtemp(), "reg.xlsx")
+        with open(path, "wb") as handle:
+            handle.write(xlsx_bytes([
+                (1, {"A": "id"}),
+                (2, {"A": "C-001"}),
+                # sheet row 3 deleted, as Excel leaves it
+                (4, {"A": "C-002"}),
+                (5, {"A": "C-003"}),
+            ], "Comments", None))
+        return path
+
+    def test_numbers_come_from_the_sheet_not_the_list(self):
+        rows = matrix.read_sheet(self.sheet(), "Comments")
+        self.assertEqual([n for n, _ in matrix.numbered(rows)], [2, 4, 5])
+
+    def test_it_falls_back_to_position_when_a_row_carries_no_key(self):
+        """Records built by hand rather than read from a sheet still work."""
+        self.assertEqual([n for n, _ in matrix.numbered([{"A": "h"}, {"A": "x"}])],
+                         [2])
+
+    def test_a_verdict_lands_against_its_own_comment_across_a_gap(self):
+        """The end-to-end failure, through the real writer."""
+        import writeback
+        src = self.sheet()
+        rows = matrix.read_sheet(src, "Comments")
+        values = {str(n): f"VERDICT for {row['A']}"
+                  for n, row in matrix.numbered(rows)}
+        dst = os.path.join(os.path.dirname(src), "out.xlsx")
+        writeback.annotate(src, dst, "Comments", values, "C", True)
+        for row in matrix.read_sheet(dst, "Comments")[1:]:
+            self.assertEqual(row.get("C"), f"VERDICT for {row['A']}",
+                             f"row {row[matrix.ROW_KEY]} got another row's verdict")
+
+    def test_the_old_idiom_is_what_broke_it(self):
+        """Kept as the counter-example, so the diagnosis stays legible: the same
+        register through enumerate() misfiles C-002 and loses C-003 entirely."""
+        rows = matrix.read_sheet(self.sheet(), "Comments")
+        by_position = {str(n): row["A"]
+                       for n, row in enumerate(rows[1:], start=2)}
+        self.assertEqual(by_position["4"], "C-003")      # row 4 IS C-002
+        self.assertNotIn("5", by_position)               # C-003 never written
+
+
 if __name__ == "__main__":
     unittest.main()

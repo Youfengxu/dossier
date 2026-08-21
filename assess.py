@@ -152,7 +152,7 @@ def main():
     # nothing below has to care which one the operator typed.
     matrix_reader.resolve_columns(rows, args)
     work = []
-    for pos, r in enumerate(rows[1:], start=2):
+    for pos, r in matrix_reader.numbered(rows):
         rid = (r.get(args.id_col, "") or "").strip()
         comment = (r.get(args.comment_col, "") or "").strip()
         if rid and comment:

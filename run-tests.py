@@ -111,6 +111,20 @@ MUTATIONS = [
         ],
     },
     {
+        "what": "matrix.numbered — the sheet row taken from list position",
+        "why": "the reported bug, closed once as already fixed because the WRITER "
+               "had been corrected and the four callers building its row-keyed "
+               "dict had not; one deleted row in Excel files every verdict below "
+               "it against the wrong comment, in a workbook that opens cleanly",
+        "module": "matrix",
+        "old": "        yield row.get(ROW_KEY, position), row",
+        "new": "        yield position, row",
+        "tests": [
+            "tests.test_matrix.NumberedRows.test_numbers_come_from_the_sheet_not_the_list",
+            "tests.test_matrix.NumberedRows.test_a_verdict_lands_against_its_own_comment_across_a_gap",
+        ],
+    },
+    {
         "what": "vocabulary.flagged — the unknown value dropped",
         "why": "eight tools ask what a reviewer must look at; dropping the "
                "unknown value silently stops flagging 'we could not verify this', "

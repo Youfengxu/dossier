@@ -101,7 +101,7 @@ def main():
     project = os.path.dirname(os.path.abspath(args.xlsx))
 
     work, plan = [], []
-    for position, row in enumerate(rows[1:], start=2):
+    for position, row in matrix_reader.numbered(rows):
         rid = row.get(args.id_col, "").strip()
         if not rid:
             continue

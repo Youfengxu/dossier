@@ -175,6 +175,24 @@ def normalise(text):
     return " ".join((text or "").split()).casefold()
 
 
+def numbered(rows, skip_header=True):
+    """Yield (physical_sheet_row, record) — never (list_position, record).
+
+    `read_sheet` drops blank rows, so list position and sheet row diverge the
+    moment a register has a gap, and someone deleting a comment in Excel is not an
+    edge case. Every value written after that gap lands one row high, against the
+    wrong comment, in a workbook that still opens cleanly and says nothing.
+
+    `enumerate(rows[1:], start=2)` was the idiom in six tools. writeback.py was
+    fixed to prefer `__row__` and the four callers that BUILD its row-keyed dict
+    were not, so the sink was correct and the sources were not — which is why the
+    bug survived being fixed. This exists so there is one way to ask the question.
+    """
+    for position, row in enumerate(rows[1:] if skip_header else rows,
+                                   start=2 if skip_header else 1):
+        yield row.get(ROW_KEY, position), row
+
+
 def resolve_column(rows, spec, what="column"):
     """Turn "the Adjudication column" or "I" into a column letter.
 
