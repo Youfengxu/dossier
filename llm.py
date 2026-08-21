@@ -98,6 +98,24 @@ FAKE_REPLY = {
 }
 
 
+def auth_headers():
+    """`Authorization: Bearer …` when DOSSIER_API_KEY is set, nothing otherwise.
+
+    Every endpoint this toolkit had ever spoken to was local and unauthenticated,
+    so the transport sent Content-Type and nothing else. Pointing it at a hosted
+    provider — to compare a local model against one you cannot host — failed with
+    an opaque 401 from inside urllib, which names neither the missing header nor
+    the variable that would supply it.
+
+    It is sent to whatever --url names, with no host allow-listing, because the
+    alternative is guessing which endpoints deserve a credential. Export it for the
+    run rather than from a profile: a key set globally goes to every endpoint you
+    point at afterwards, including local ones that have no use for it.
+    """
+    key = os.environ.get("DOSSIER_API_KEY", "").strip()
+    return {"Authorization": f"Bearer {key}"} if key else {}
+
+
 def faking():
     """True when DOSSIER_FAKE_CHAT asks for canned replies. Opt-in only: a stub
     that could switch itself on would eventually answer a real review."""
@@ -162,7 +180,7 @@ def chat(url, model, system=None, user=None, *, messages=None, max_tokens=1200,
 
     request = urllib.request.Request(
         url, data=json.dumps(payload).encode(),
-        headers={"Content-Type": "application/json"})
+        headers={"Content-Type": "application/json", **auth_headers()})
     with urllib.request.urlopen(request, timeout=timeout) as response:
         body = json.load(response)
     choice = body["choices"][0]
@@ -450,7 +468,7 @@ class Embedder:
         payload = {"model": self.model, "input": texts}
         request = urllib.request.Request(
             self.url, data=json.dumps(payload).encode(),
-            headers={"Content-Type": "application/json"})
+            headers={"Content-Type": "application/json", **auth_headers()})
         # Retry with backoff. Unlike a chat call, an embedding batch has no
         # corrective retry above it, so one transient 500 propagates and kills
         # the process — a synthesis run died that way immediately after a

@@ -425,5 +425,38 @@ class EvidenceReachesTheReviewer(unittest.TestCase):
         self.assertEqual(text.count("> **d:"), 2)      # MAX_QUOTED
 
 
+class BearerToken(unittest.TestCase):
+    """Auth is opt-in and absent by default.
+
+    Every endpoint this toolkit had spoken to was local and unauthenticated, so the
+    transport sent no Authorization header at all. Pointing it at a hosted provider
+    failed with an opaque 401 from inside urllib, naming neither the missing header
+    nor the variable that would supply one."""
+
+    def setUp(self):
+        import llm
+        self.llm = llm
+        self.saved = os.environ.pop("DOSSIER_API_KEY", None)
+
+    def tearDown(self):
+        os.environ.pop("DOSSIER_API_KEY", None)
+        if self.saved is not None:
+            os.environ["DOSSIER_API_KEY"] = self.saved
+
+    def test_no_header_without_the_variable(self):
+        """A local endpoint must not receive a stray credential."""
+        self.assertEqual(self.llm.auth_headers(), {})
+
+    def test_bearer_when_set(self):
+        os.environ["DOSSIER_API_KEY"] = "abc123"
+        self.assertEqual(self.llm.auth_headers(),
+                         {"Authorization": "Bearer abc123"})
+
+    def test_whitespace_only_counts_as_unset(self):
+        """An empty export is a common way to end up sending 'Bearer '."""
+        os.environ["DOSSIER_API_KEY"] = "   "
+        self.assertEqual(self.llm.auth_headers(), {})
+
+
 if __name__ == "__main__":
     unittest.main()
