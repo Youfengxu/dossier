@@ -182,3 +182,51 @@ in one call.
 method is more correct regardless of the score. It is not kept because the number
 moved: +1 of 24 is inside the noise this fixture warns about, and the change has
 not been validated anywhere else. Validate on SEC (100 rows) before believing it.
+
+## Screening five models on the enriched slice — 2026-08-22
+
+98 rows, 34 alternate-route positives with matched controls, majority baseline
+55.1%. Scored on the pair, because either half alone is buyable by having no
+opinion.
+
+| run | alt-route | failures | overall |
+|---|---|---|---|
+| **Qwen3-235B-A22B Instruct** | **18/34 = 53%** | 37/54 = 69% | **65.3%** |
+| MiniMax M3 (428B) | 9/34 = 26% | 43/54 = 80% | 58.2% |
+| Nemotron 3 Super 120B | 6/34 = 18% | 42/54 = 78% | 57.1% |
+| Qwen3.8-27B | 7/34 = 21% | 39/54 = 72% | 53.1% |
+| Qwen3-235B-A22B **Thinking** | 9/34 = 26% | 29/54 = 54% | **45.9%** |
+
+### Thinking mode made it worse, and that was the hypothesis
+
+The Instruct/Thinking pair is the same weights with reasoning on and off — the one
+controlled comparison in the set. The prediction was that reasoning would help,
+because judging whether method Y satisfies a requirement written as method X is an
+equivalence judgement and that is what reasoning modes are for.
+
+It halved the alternate-route score (53% -> 26%), cost fifteen points of failure
+recall (69% -> 54%), and produced **the only run below the majority baseline**.
+Turning reasoning on made the model worse at every part of the task.
+
+### What the spread says
+
+Failure recall clusters at 54-80% across every model. Alternate-route ranges 18%
+to 53%. So the models do not differ much in catching failure — they differ almost
+entirely in whether they can see compliance reached by another route, which is
+what this fixture was built to isolate and is evidence it measures something real
+rather than general quality.
+
+Scale does not predict it either: 428B scored 26%, 235B scored 53%, 120B scored
+18%, 27B scored 21%.
+
+### The recommendation
+
+**Qwen3-235B-A22B Instruct**, which already sits on GX10 at 97GB in Q3_K_XL. No
+download, no llama.cpp fork, no eviction of anything that is not already displaced
+by a 97GB model. Do not enable thinking.
+
+53% is the best available and is not good. The remaining rows still need the
+two-stage technique or human escalation; this chooses the model, it does not solve
+the problem.
+
+Cost: $10.54 across five hosted screens.
