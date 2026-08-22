@@ -296,3 +296,29 @@ Use retrieval to find failures, not to clear compliance. An `unmet` from a
 retrieval pass means "no supporting passage was retrieved", which is a weaker claim
 than "the document does not do this" and must not be written into a register as
 though it were the latter.
+
+## Coder-Next, screened last and second overall
+
+Screened after it had already produced three client deliverables, which is the
+wrong order and the reason it is worth recording.
+
+| run | alt-route | failures | overall |
+|---|---|---|---|
+| Qwen3-235B-A22B Instruct | 18/34 = 53% | 37/54 = 69% | 65.3% |
+| **Qwen3-Coder-Next-80B** | **17/34 = 50%** | 35/54 = 65% | **61.2%** |
+| MiniMax M3 (428B) | 9/34 = 26% | 43/54 = 80% | 58.2% |
+| Nemotron 3 Super | 6/34 = 18% | 42/54 = 78% | 57.1% |
+| Qwen3.8-27B | 7/34 = 21% | 39/54 = 72% | 53.1% |
+
+One row separates it from the leader on alternate-route and four rows of
+ninety-eight overall — inside what this sample can resolve. So the practical
+ranking inverts. Qwen3-235B wins on paper and cannot be deployed: it exceeds its
+64k context on a 127k-token deliverable, runs at 2-3 tok/s against Coder-Next's
+46.6, and evicts the orchestrator's worker to load. Coder-Next is pinned, holds
+262k, and is already serving.
+
+**Prediction recorded and wrong.** Before running this I wrote that Coder-Next
+was "an 80B/3B-active coding model; I would guess worse, not better" — reasoning
+from Laguna, where coding strength did not transfer. It transferred here. The
+guess was cheap and the measurement was ten minutes; there was no reason to prefer
+the guess.
