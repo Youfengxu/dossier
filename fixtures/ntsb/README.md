@@ -262,3 +262,37 @@ representative) before adopting.
 
 Not adopted. Worth refining rather than discarding: it is the only intervention
 so far that touched the target class at all.
+
+## Retrieval cannot see alternate-route compliance
+
+Same model (Qwen3-235B-A22B Instruct), same 98 rows, same labels. Only the way the
+evidence reaches it differs: the whole document in the prompt, or passages selected
+by bge-m3 embedding similarity.
+
+| run | alt-route | failures | overall |
+|---|---|---|---|
+| whole-document | 18/34 = 53% | 37/54 = 69% | 65% |
+| retrieval | **2/34 = 6%** | **47/52 = 90%** | 57% |
+
+**Alternate-route collapses from 53% to 6%, and the mechanism is not subtle.**
+Retrieval selects passages resembling the recommendation, and a recommendation's
+distinctive vocabulary is the vocabulary of the METHOD it names. When the addressee
+satisfied it by another route, the passage describing that route shares little
+language with the recommendation, so it is never retrieved — and the judge, shown
+only passages about a method nobody used, correctly reports that the method is
+absent. The verdict is right about what it saw and wrong about the document.
+
+The definition of the class is that the same outcome is reached in different words.
+That is precisely what similarity search is worst at.
+
+Failure recall moves the other way, 69% to 90%. Retrieval is a BETTER failure
+detector and a much worse compliance adjudicator, which is a coherent position
+rather than a defect: it is being shown less, so it asserts absence more, and most
+absences are real.
+
+### What follows
+
+Use retrieval to find failures, not to clear compliance. An `unmet` from a
+retrieval pass means "no supporting passage was retrieved", which is a weaker claim
+than "the document does not do this" and must not be written into a register as
+though it were the latter.
