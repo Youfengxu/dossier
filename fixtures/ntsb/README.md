@@ -230,3 +230,35 @@ two-stage technique or human escalation; this chooses the model, it does not sol
 the problem.
 
 Cost: $10.54 across five hosted screens.
+
+## The two-stage question — moves the target, trades the wrong way
+
+Qwen3-235B-A22B Instruct, 54 rows (all 34 alternate-route positives plus 20
+failure controls), scored against the single-stage run on the **same rows**:
+
+| run | alt-route | failures | overall |
+|---|---|---|---|
+| single-stage | 18/34 = 53% | 13/20 = 65% | 57% |
+| two-stage | **24/34 = 71%** | **9/20 = 45%** | 61% |
+
+Stage one restates what the comment REQUIRES with the document absent, so the
+model cannot anchor on the method the comment names; stage two judges against that
+outcome, with the method labelled as one acceptable route rather than the only one.
+
+It is the first thing that has moved alternate-route substantially: +18 points.
+It also cost 20 points of failure recall, and that is the expensive direction —
+a missed failure is worse than an extra flag in review work.
+
+**Read it as a threshold shift, not better discrimination.** It gained six
+alternate-route rows and lost four failure rows: net two rows on fifty-four, which
+is inside the noise. Making the model more willing to say `addressed` produces
+exactly this signature, and the paired metric is what makes it visible; the
+alternate-route number alone would have read as a clear win.
+
+**The subset is deliberately enriched** — 63% positives against a natural 35% —
+so the overall column is not comparable to the 98-row figures above, and a model
+biased toward `addressed` flatters itself here. Validate on SEC (100 rows,
+representative) before adopting.
+
+Not adopted. Worth refining rather than discarding: it is the only intervention
+so far that touched the target class at all.

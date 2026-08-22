@@ -147,6 +147,9 @@ def main():
     # qwen3.8 0.7, qwen3-235b-thinking 0.6 — so roughly half of all rows paid
     # twice for their input. Starting higher costs nothing when unused, because
     # output is billed on tokens produced rather than on the ceiling requested.
+    p.add_argument("--two-stage", action="store_true",
+                   help="establish the required outcome in a separate call before "
+                        "judging the document against it")
     p.add_argument("--max-tokens", type=int, default=4000)
     p.add_argument("--max-tokens-cap", type=int, default=8000)
     p.add_argument("--timeout", type=int, default=1200)
@@ -183,6 +186,33 @@ def main():
             except Exception:
                 continue
 
+    def required_outcome(comment):
+        """What must be TRUE for this comment to be satisfied, method aside.
+
+        The document is deliberately absent from this call. Asked together, the
+        model reads the comment, finds the method it names, looks for that method,
+        and answers about the method — which is the whole defect: five models and
+        two promptings all scored far worse on compliance reached by another route
+        than on compliance by the route named. Naming the outcome first, with
+        nothing to match against, removes the opportunity to anchor on it.
+        """
+        ask_for = (
+            "Restate what this review comment REQUIRES, as an outcome that could "
+            "be satisfied in more than one way. Name the end state, not the "
+            "method. If the comment specifies a particular method, say what that "
+            "method is FOR — the thing it is meant to achieve.\n\n"
+            "Reply with JSON only: "
+            '{"outcome": "...", "method_named": "... or null"}\n\n'
+            f"THE COMMENT:\n{comment}")
+        try:
+            content, _reasoning, _why = llm.chat(
+                args.url, args.model, system="You restate requirements precisely.",
+                user=ask_for, max_tokens=600, timeout=args.timeout)
+            obj = json.loads(content)
+            return (obj.get("outcome") or "").strip(), (obj.get("method_named") or "")
+        except Exception:
+            return "", ""
+
     for pos, rid, r in work:
         if rid in done:
             print(f"  {rid}: done, skipping"); continue
@@ -191,7 +221,17 @@ def main():
             parts.append(f"SECTION REFERENCE GIVEN BY THE REVIEWER: "
                          f"{r[args.section_col].strip()}  (written against an "
                          f"earlier revision; find the matching section here)")
-        parts += ["", "THE COMMENT:", r[args.comment_col].strip()]
+        comment_text = r[args.comment_col].strip()
+        if args.two_stage:
+            outcome, method = required_outcome(comment_text)
+            if outcome:
+                parts += ["", "WHAT THIS COMMENT REQUIRES (established before the "
+                          "document was read):", outcome]
+                if method:
+                    parts += ["", f"The comment names this method: {method}. It is "
+                              f"ONE way to reach the outcome above, not the only "
+                              f"acceptable one. Judge the outcome."]
+        parts += ["", "THE COMMENT AS WRITTEN:", comment_text]
         if args.action_col and (r.get(args.action_col, "") or "").strip():
             parts += ["", "WHAT THE RESPONDING PARTY SAYS THEY DID (a claim, not "
                       "evidence — judge the document, not this):",
