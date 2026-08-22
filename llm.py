@@ -389,8 +389,13 @@ class Client:
 
 
 
+# :8085, not :11434. The default pointed at Ollama's port on a stack that
+# deliberately does not run Ollama (see ai-stack/serving-layers.md, "why no
+# Ollama"), so the endpoint was never reachable and every retrieval silently fell
+# back to term overlap. Silently is the problem: the run completes, writes a
+# coverage file, and reports verdicts that look identical to embedded ones.
 DEFAULT_EMBED_URL = _setting("DOSSIER_EMBED_URL",
-                             "http://localhost:11434/v1/embeddings")
+                             "http://localhost:8085/v1/embeddings")
 DEFAULT_EMBED_MODEL = _setting("DOSSIER_EMBED_MODEL", "bge-m3")
 
 

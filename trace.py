@@ -392,7 +392,10 @@ def main():
     parser.add_argument("--no-absence-gate", action="store_true")
     parser.add_argument("--embed-url",
                         default=llm.DEFAULT_EMBED_URL)
-    parser.add_argument("--embed-model", default="Qwen3-Embedding-8B-Q4_K_M")
+    # bge-m3: served by the Mac's llama-swap directly. Qwen3-Embedding-8B lives
+    # on k11 and is only addressable through the federation as
+    # "k11/Qwen3-Embedding-8B-Q4_K_M", so the bare name resolved to nothing.
+    parser.add_argument("--embed-model", default="bge-m3")
     args = parser.parse_args()
 
     project = os.path.abspath(os.path.expanduser(args.project))
