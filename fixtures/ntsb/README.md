@@ -388,3 +388,34 @@ A second warning worth carrying if this ever gets pre-registered: in that
 instrument, two cells were named as controls and one of them was not, because the
 manipulation could move it. Before calling a cell a control, check what actually
 cannot move under the intervention being tested.
+
+### The general form of the mistake, arrived at from two directions
+
+Over two days this fixture and the Referent Gate instrument each produced a
+ranking, and each ranking turned out to be a claim about the instrument rather
+than about the systems ranked.
+
+  Here      models were ordered on a pooled total. The order was substantially
+            the order of how well each exploited rows where wording happens to
+            track outcome. Splitting the cells put every run at chance on the
+            half that requires judgement.
+
+  There     a model scored 39/40 on a hand-written four-cell fixture and 260/400
+            when the same structure was generated over 400 items — below a model
+            the hand-written version had shown failing the discriminating cell
+            0/10. The ordering did not degrade, it inverted.
+
+Different domains, different instruments, same failure: **a ranking was published
+before anything established that the instrument measured what it was taken to
+measure.** Both were caught the same way — by someone reading the artifact rather
+than the prose describing it.
+
+The practical rule this leaves: before reporting an order, show a cell, a control
+or a directional prediction that the order would fail if the instrument were
+measuring something else. If that cannot be produced, the number is a description
+of the fixture.
+
+Three errors in the exchange were caught this way and none by argument: a
+saturation null that was a decomposition result, a scale claim that quoted
+alternate-route recall as though it were the cell result, and the pooled ranking
+above. Two of the three were mine.
