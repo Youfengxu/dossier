@@ -322,3 +322,55 @@ was "an 80B/3B-active coding model; I would guess worse, not better" — reasoni
 from Laguna, where coding strength did not transfer. It transferred here. The
 guess was cheap and the measurement was ten minutes; there was no reason to prefer
 the guess.
+
+## The fourth cell: what the ranking was actually measuring
+
+Crossing what the requirement SAYS with what the response DID gives four cells. The
+two agreeing cells are uninformative — any policy that tracks wording scores well.
+The off-diagonal is where a vocabulary matcher and an outcome judge must disagree.
+
+                        addressed              not_addressed
+    high overlap    A  both agree (24)     C  words present, nothing done (25)
+    low  overlap    B  ALTERNATE ROUTE(20) D  both agree (29)
+
+| run | A | B | C | D | agree | diverge | gap | policy |
+|---|---|---|---|---|---|---|---|---|
+| coder-next | 71% | 40% | 56% | 72% | 72% | 48% | +24 | vocabulary matcher |
+| q235-inst | 79% | 40% | 52% | 83% | 81% | 46% | **+35** | vocabulary matcher |
+| minimax | 46% | 15% | 76% | 83% | 64% | 46% | +19 | blanket refuse |
+| nemotron | 38% | 25% | 68% | 86% | 62% | 46% | +15 | blanket refuse |
+| qwen38 | 38% | 20% | 68% | 76% | 57% | 44% | +13 | blanket refuse |
+| q235-think | 42% | 30% | 52% | 55% | 48% | 41% | +7 | blanket refuse |
+
+**No run is an outcome judge.** Every one lands on a shortcut policy, and every one
+scores 41–48% on the diverging cells — chance. The spread that produced the earlier
+ranking lives almost entirely in the agreeing cells, where vocabulary and truth
+coincide, so the ranking was substantially a measure of how often the fixture lets
+wording stand in for judgement.
+
+### The errors are directional, which rules out "these cells are just harder"
+
+An imperfect but genuine judge would fail B and C without a preferred direction. A
+vocabulary matcher must fail them in a specific direction: on B say not_addressed
+because the words are missing, on C say addressed because the words are there.
+
+    run           B errors -> not_addressed    C errors -> addressed
+    coder-next        12/12   100%                 11/11   100%
+    q235-inst         12/12   100%                 12/12   100%
+    minimax           16/17    94%                  6/6    100%
+    qwen38            15/16    94%                  3/8     38%
+    nemotron          13/15    87%                  4/8     50%
+    q235-think         7/14    50%                  6/12    50%
+
+**Every error the two leading models make on the off-diagonal runs the predicted
+way — 23/23 and 24/24.** That is a policy, not noise. q235-think is undirected at
+50/50 on both, which is what incompetence rather than shortcut looks like.
+
+### What this costs the earlier conclusions
+
+Coder-Next's 50% alternate-route was read as "second-best reader, deliverables are
+sound". It is better read as: it matches vocabulary well, which is worth something
+because vocabulary usually tracks the outcome, and it is at chance precisely where
+that breaks down. The model recommendation does not change — it is still the best
+available and still fits — but the reason to trust it has narrowed, and the case for
+human review of the flagged rows is now much stronger than a 50% figure suggested.
