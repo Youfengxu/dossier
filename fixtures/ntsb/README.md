@@ -419,3 +419,38 @@ Three errors in the exchange were caught this way and none by argument: a
 saturation null that was a decomposition result, a scale claim that quoted
 alternate-route recall as though it were the cell result, and the pooled ranking
 above. Two of the three were mine.
+
+### A checker written to confirm gets less scrutiny than one written to find
+
+The last thing the exchange produced, and it is about the tools used to check the
+work rather than the work.
+
+Verifying two edits by grep produced two false negatives, both nearly reported as
+contradictions: a slice from `def _v_citation` to the next `\ndef ` ran to EOF
+because it was the last top-level definition, sweeping in a docstring and four test
+fixtures; and a test for a literal curly quote found nothing because the pattern was
+written with `\u201c` escapes. Earlier the same evening, on this side: a `grep -c`
+that counted a comment describing a variable's removal as the variable; a
+`[ -f "$f" ] && …` whose non-zero exit on the last loop iteration was reported by
+the harness as a failed task, twice; a `${VAR:-no}` that printed an API key it was
+written to avoid printing; a `tr -d` that mangled the filenames it was listing.
+
+Six naive checks, all wrong, none of them in the thing being measured. The
+generalisation is narrower and more useful than "be careful":
+
+  **A checker written to confirm what you already expect receives far less
+  scrutiny than one written to find something you do not. The remedy is to run it
+  once against a case where the answer is known.**
+
+That is the same move as everything else here that worked — `--mutate` breaking the
+code to see the tests fail, `conformance --prove` breaking the adapter to see the
+checks fire, the reintroduction test putting a fixed bug back to watch the guard
+refuse. Each is a checker tested against a known answer before being trusted.
+None of the six above had that, and each was believed on sight.
+
+One specific case is worth naming because it is the most dangerous shape: a search
+that is correct and returns nothing is indistinguishable from absence. A file named
+`tasks_citation.py` containing a task named `citation_verbatim` was searched for
+under the second name; the search was well-formed, found nothing, and the nothing
+was reported as "no copy exists". A negative result from an untested checker is not
+weak evidence of absence. It is no evidence, and it arrives feeling like proof.
