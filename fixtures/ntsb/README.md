@@ -374,3 +374,17 @@ because vocabulary usually tracks the outcome, and it is at chance precisely whe
 that breaks down. The model recommendation does not change — it is still the best
 available and still fits — but the reason to trust it has narrowed, and the case for
 human review of the flagged rows is now much stronger than a 50% figure suggested.
+
+### A design constraint, from the instrument this borrows
+
+Two reviewers of the Referent Gate instrument flagged that pooling its act cells
+against its abstain cells destroys it: a shortcut policy scores at chance once
+pooled and becomes invisible. The same holds here. **Never collapse A/D against
+B/C into one index.** The vocabulary matcher identified above is precisely the
+policy that disappears under pooling — and the earlier ranking in this file, which
+sorted on a pooled total, is what hid it for a day.
+
+A second warning worth carrying if this ever gets pre-registered: in that
+instrument, two cells were named as controls and one of them was not, because the
+manipulation could move it. Before calling a cell a control, check what actually
+cannot move under the intervention being tested.
