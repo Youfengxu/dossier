@@ -227,12 +227,10 @@ def numbered(rows, skip_header=True):
 def resolve_column(rows, spec, what="column"):
     """Turn "the Adjudication column" or "I" into a column letter.
 
-    Invariant 4 says records return names, never letters. Getting there means
-    changing what `read_sheet` returns and every one of the fifty-six places that
-    index a record — a change to the code path that writes evidence into a client's
-    matrix, and not one to make in the same week as anything else. This is the half
-    that can land safely now: the letters stay internal, and a human never has to
-    count columns to the right to say which one they mean.
+    Returns a `Letter`, not a bare str, so the round trip survives: the letter
+    goes straight back into `row[col]` at nineteen call sites, and a Record must
+    not re-read it as a header name. See Letter for why the string alone cannot
+    carry that.
 
     NAMES ARE MATCHED FIRST, and the order is not arbitrary. "ID" is a perfectly
     valid column letter — it is column 238 — so a spec that could be read either
@@ -250,9 +248,9 @@ def resolve_column(rows, spec, what="column"):
         sys.exit(f"{what} {spec!r} matches {len(hits)} columns "
                  f"({', '.join(hits)}) — use the letter to say which")
     if hits:
-        return hits[0]
+        return Letter(hits[0])
     if LETTERS_ONLY.match(spec or ""):
-        return spec.upper()
+        return Letter(spec.upper())
     named = ", ".join(f"{letter}={value!r}" for letter, value in
                       sorted(header.items(), key=lambda kv: col_num(kv[0]))
                       if value.strip())
@@ -275,6 +273,129 @@ def resolve_columns(rows, args, suffix="_col"):
             setattr(args, name, resolve_column(
                 rows, value, what=name.replace("_", "-")))
     return args
+
+
+class Letter(str):
+    """A column letter that KNOWS it is one, because resolve_column resolved it.
+
+    Without this, names-first has a round trip that eats itself. The pattern in
+    nineteen call sites is:
+
+        col = resolve_column(rows, args.status_col)   # a name in, a LETTER out
+        value = row[col]                              # and the letter goes back in
+
+    If a header is itself a single letter — a review matrix with criteria columns
+    headed "A", "B", "C" is ordinary — then step two re-resolves that letter as a
+    NAME and reads a different column than step one selected. Letters-first fixes
+    the round trip and breaks the agreement with resolve_column instead.
+
+    Neither order can fix both, because the string alone does not carry enough:
+    "C" typed by a caller means the column headed C, while "C" returned by
+    resolve_column means column C. The provenance is the missing bit, so carry it.
+    A bare string still resolves names-first; a Letter skips names entirely.
+
+    It is a str, so all nineteen sites, writeback's cell addressing, f-strings and
+    dict keys keep working untouched.
+    """
+
+    __slots__ = ()
+
+    def upper(self):
+        return Letter(str.upper(self))     # the tag must survive col.upper()
+
+    def strip(self, *a):
+        return Letter(str.strip(self, *a))
+
+
+class Record(dict):
+    """A row addressable by header name as well as by column letter.
+
+    Invariant 4 says records return names, never letters. Taken literally that
+    means abolishing letters, and it cannot be done: writeback.annotate writes to
+    cell C3, so a letter is the physical address of a cell and the write path
+    needs it. The invariant is about the READ side — what a consumer says when it
+    asks a row for a value — and this satisfies it there while leaving the
+    physical addressing intact.
+
+        row["id"]     the header name, which is what a person means
+        row["A"]      the column letter, which is what a spreadsheet means
+        row[ROW_KEY]  the physical sheet row
+
+    Storage stays keyed by letter, so keys(), items() and columns() are unchanged
+    and writeback keeps working untouched. That matters more than elegance: the
+    alternative — flipping the storage and updating fifty-six index sites — is a
+    partial migration waiting to happen, and a partial migration is the defect
+    that produced the row-alignment bug, the six unwired resolve_columns callers,
+    and the guards that lived in one file and not its sibling. Here nothing has to
+    be migrated at all; a caller that says "A" and a caller that says "id" are both
+    right from the moment this lands.
+
+    A name matching two columns raises rather than picking, for the same reason
+    resolve_column refuses: silently choosing means evidence lands in a column
+    nobody selected.
+    """
+
+    __slots__ = ("_names",)
+
+    def __init__(self, cells, names=None):
+        super().__init__(cells)
+        self._names = names or {}
+
+    def _letter(self, key):
+        if isinstance(key, Letter):        # resolved already; never re-resolve
+            return key if dict.__contains__(self, key) else None
+        # NAMES FIRST, matching resolve_column. Letters-first looks safer and is
+        # not: a review matrix headed with criteria labels "A", "B", "C" is
+        # ordinary, and there row["C"] would return column C while
+        # resolve_column(rows, "C") returned the column HEADED "C" — one string
+        # meaning two columns in one codebase. Whichever order is chosen, both
+        # must choose it.
+        found = self._names.get(normalise(key))
+        if isinstance(found, list):
+            raise KeyError(f"{key!r} names {len(found)} columns "
+                           f"({', '.join(found)}) — address it by letter")
+        if found is not None:
+            return found
+        return key if dict.__contains__(self, key) else None
+
+    def __getitem__(self, key):
+        letter = self._letter(key)
+        if letter is None:
+            raise KeyError(key)
+        return dict.__getitem__(self, letter)
+
+    def __contains__(self, key):
+        return self._letter(key) is not None
+
+    def get(self, key, default=None):
+        try:
+            return self[key]
+        except KeyError:
+            return default
+
+
+def header_names(header):
+    """{normalised name: letter}, or a list of letters where a name repeats."""
+    out = {}
+    for letter, value in header.items():
+        if letter == ROW_KEY or not str(value).strip():
+            continue
+        name = normalise(value)
+        if name in out:
+            existing = out[name]
+            out[name] = (existing if isinstance(existing, list) else [existing]) \
+                + [letter]
+        else:
+            out[name] = letter
+    return out
+
+
+def as_records(rows):
+    """Re-key rows so each answers to its header name as well as its letter."""
+    if not rows:
+        return rows
+    names = header_names(rows[0])
+    return [Record(row, names) for row in rows]
 
 
 def read_docx_table(path, which=None):
@@ -374,9 +495,9 @@ def read_sheet(path, sheet_name):
     of the callers below indifferent to which format it was handed."""
     found = detect(path)
     if found == "delimited":
-        return read_csv(path)
+        return as_records(read_csv(path))
     if found == "docx":
-        return read_docx_table(path, sheet_name)
+        return as_records(read_docx_table(path, sheet_name))
     z = zipfile.ZipFile(path)
     shared = []
     try:
@@ -422,7 +543,7 @@ def read_sheet(path, sheet_name):
             except (TypeError, ValueError):
                 cells[ROW_KEY] = len(rows) + 1      # sheet omitted r=, fall back
             rows.append(cells)
-    return rows
+    return as_records(rows)
 
 
 def yaml_escape(text):

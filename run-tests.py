@@ -47,6 +47,32 @@ ROOT = os.path.dirname(os.path.realpath(__file__))
 # fail.
 MUTATIONS = [
     {
+        "what": "matrix.Record — letters resolved before header names",
+        "why": "a matrix headed with criteria labels \"A\"/\"B\"/\"C\" is ordinary, "
+               "and there row[\"C\"] would read column C while resolve_column "
+               "picked the column HEADED C — one string, two columns",
+        "module": "matrix",
+        "old": '        found = self._names.get(normalise(key))',
+        "new": '        if dict.__contains__(self, key):\n            return key\n        found = self._names.get(normalise(key))',
+        "tests": [
+            "tests.test_matrix.NameAddressing."
+            "test_a_name_beats_a_letter_and_matches_resolve_column",
+        ],
+    },
+    {
+        "what": "matrix.resolve_column — returns a bare str, losing the Letter tag",
+        "why": "the letter it returns goes straight back into row[col] at "
+               "nineteen sites; untagged it is re-resolved as a header NAME and "
+               "reads a different column than the one just selected",
+        "module": "matrix",
+        "old": '        return Letter(hits[0])',
+        "new": '        return hits[0]',
+        "tests": [
+            "tests.test_matrix.NameAddressing."
+            "test_the_resolve_column_round_trip_survives_a_letter_shaped_header",
+        ],
+    },
+    {
         "what": "closure.classify — absence and broken-query verdicts swapped",
         "why": "a mistyped search term then reports 'still missing' with the "
                "same confidence as a real finding",

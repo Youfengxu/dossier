@@ -188,12 +188,44 @@ CSV and JSON set `SUPPORTS_ANNOTATE = False` and callers fall back to `emit`
 plus a sidecar. That is honest about a real capability difference rather than
 hiding it behind a default argument.
 
-### Invariant 4 is retained, with its migration named
+### Invariant 4 is retained — and the migration turned out not to be needed
 
 `records` returns column **names**, never letters. Revision 1 stated this without
-noting the cost: the current key space *is* letters, and fourteen consumers plus
-their CLI flags (`--id-col A`, `--comment-col D`) depend on it. The migration is
-part of the work, not a footnote.
+noting the cost; revision 2 priced it at fourteen consumers plus their CLI flags.
+Both were reading the invariant as *abolish letters*, and on that reading it cannot
+be satisfied at all: `writeback.annotate` writes to cell C3, so a letter is the
+physical address of a cell and the write path needs one.
+
+Split the two halves and the cost disappears. The invariant governs **reading** —
+what a consumer says when it asks a row for a value — so a record answers to both,
+and the storage stays keyed by letter:
+
+```python
+row["adjudication"]   # what a person means
+row["I"]              # what a spreadsheet means, and what writeback needs
+row[ROW_KEY]          # the physical sheet row
+```
+
+Nothing had to be migrated, which is the point rather than a convenience. A
+migration of fifty-six index sites is a *partial* migration waiting to happen, and
+a partial migration is the defect that produced the row-alignment bug (fixed in
+`writeback.py`, live in four callers), the six `resolve_columns` callers that were
+never wired, and guards that lived in one file and not its sibling. Here a caller
+saying `"I"` and a caller saying `"adjudication"` are both correct from the moment
+it lands, and consumers move over one at a time or never.
+
+Two rules keep it honest:
+
+- **A name matching two columns raises**, naming both, for the same reason
+  `resolve_column` refuses — silently picking means evidence lands in a column
+  nobody selected. A blank header leaves its column addressable by letter only.
+- **Names resolve before letters, and `resolve_column` returns a `Letter`.** The
+  first half matches `resolve_column`, so one string means one column everywhere.
+  The second half is what makes the first survive contact: `col = resolve_column(...)`
+  then `row[col]` is the pattern at nineteen sites, and a matrix headed with
+  criteria labels `A`/`B`/`C` — entirely ordinary — makes the returned *letter*
+  ambiguous with a header *name* on the way back in. The string alone cannot carry
+  which one it is, so `Letter` carries the provenance. Both are pinned by mutation.
 
 ---
 

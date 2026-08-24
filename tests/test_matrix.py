@@ -368,3 +368,119 @@ class NumberedRows(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class NameAddressing(unittest.TestCase):
+    """Invariant 4: a record answers to its header name, not only its letter.
+
+    Taken literally the invariant says abolish letters, and that cannot be done —
+    writeback.annotate writes to cell C3, so a letter is the physical address of a
+    cell. These pin the reading half: names work, letters keep working for the
+    write path, and an ambiguous name refuses rather than picking.
+    """
+
+    def record(self, header, cells):
+        return matrix.Record(cells, matrix.header_names(header))
+
+    def test_name_and_letter_reach_the_same_cell(self):
+        r = self.record({"A": "id", "B": "Status"}, {"A": "C-1", "B": "open"})
+        self.assertEqual(r["Status"], "open")
+        self.assertEqual(r["B"], "open")
+        self.assertIs(r["Status"], r["B"])
+
+    def test_name_matching_ignores_case_and_padding(self):
+        r = self.record({"A": "Adjudication "}, {"A": "met"})
+        self.assertEqual(r["adjudication"], "met")
+        self.assertEqual(r["ADJUDICATION"], "met")
+        self.assertIn("Adjudication", r)
+
+    def test_a_name_matching_two_columns_refuses(self):
+        # Picking one would land evidence in a column nobody selected — the same
+        # reason resolve_column refuses.
+        r = self.record({"A": "status", "B": "Status"}, {"A": "x", "B": "y"})
+        with self.assertRaises(KeyError) as caught:
+            r["status"]
+        self.assertIn("names 2 columns", str(caught.exception))
+        self.assertEqual(r["A"], "x")           # letters stay unambiguous
+        self.assertEqual(r["B"], "y")
+
+    def test_blank_header_leaves_the_column_letter_only(self):
+        r = self.record({"A": "id", "B": "   "}, {"A": "C-1", "B": "kept"})
+        self.assertEqual(r["B"], "kept")
+        self.assertNotIn("", r)
+        self.assertIsNone(r.get(""))
+
+    def test_storage_stays_letters_so_writeback_is_untouched(self):
+        # columns() and writeback both walk keys(). If naming flipped the storage,
+        # every column letter downstream would silently become a header string.
+        rows = [self.record({"A": "id", "B": "Status"}, {"A": "id", "B": "Status"}),
+                self.record({"A": "id", "B": "Status"}, {"A": "C-1", "B": "open"})]
+        self.assertEqual(matrix.columns(rows), ["A", "B"])
+        self.assertEqual(sorted(rows[1].keys()), ["A", "B"])
+
+    def test_row_key_survives_naming(self):
+        r = matrix.Record({"A": "C-1", matrix.ROW_KEY: 7},
+                          matrix.header_names({"A": "id", matrix.ROW_KEY: 1}))
+        self.assertEqual(r[matrix.ROW_KEY], 7)
+        self.assertEqual(r["id"], "C-1")
+
+    def test_missing_name_raises_and_get_defaults(self):
+        r = self.record({"A": "id"}, {"A": "C-1"})
+        with self.assertRaises(KeyError):
+            r["nonexistent"]
+        self.assertEqual(r.get("nonexistent", "fallback"), "fallback")
+
+    def test_every_reader_returns_named_records(self):
+        # xlsx, csv and docx must agree: a reader that forgets is a partial
+        # migration, which is the defect this design exists to avoid.
+        import csv as _csv
+        import tempfile as _t
+        with _t.TemporaryDirectory() as d:
+            p = os.path.join(d, "n.csv")
+            with open(p, "w", newline="") as h:
+                w = _csv.writer(h); w.writerow(["id", "Status"]); w.writerow(["C-1", "open"])
+            rows = matrix.read_sheet(p, "Sheet1")
+            self.assertIsInstance(rows[1], matrix.Record)
+            self.assertEqual(rows[1]["Status"], "open")
+
+    def test_a_name_beats_a_letter_and_matches_resolve_column(self):
+        """One string must mean one column. A matrix headed with criteria labels
+        "A"/"B"/"C" is ordinary, and there letters-first and names-first pick
+        DIFFERENT columns. resolve_column already chose names-first; this fails if
+        either side is changed without the other."""
+        rows = matrix.as_records([{"A": "id", "B": "C", "C": "B"},
+                                  {"A": "C-1", "B": "beta", "C": "gamma"}])
+        self.assertEqual(matrix.resolve_column(rows, "C"), "B")
+        self.assertEqual(rows[1]["C"], "beta")          # the column HEADED "C"
+        self.assertEqual(rows[1][matrix.resolve_column(rows, "C")], rows[1]["C"])
+
+    def test_a_letter_still_resolves_when_no_header_claims_it(self):
+        rows = matrix.as_records([{"A": "id", "B": "Status"},
+                                  {"A": "C-1", "B": "open"}])
+        self.assertEqual(rows[1]["B"], "open")
+
+    def test_the_resolve_column_round_trip_survives_a_letter_shaped_header(self):
+        """col = resolve_column(...); row[col] — the pattern at nineteen sites.
+
+        With names-first and a bare string, step two re-resolves the LETTER from
+        step one as a NAME and reads a different column. This is the test that
+        caught it; it fails if resolve_column stops returning a Letter.
+        """
+        rows = matrix.as_records([{"A": "id", "B": "C", "C": "B"},
+                                  {"A": "C-1", "B": "beta", "C": "gamma"}])
+        col = matrix.resolve_column(rows, "C")          # the column HEADED "C" = B
+        self.assertIsInstance(col, matrix.Letter)
+        self.assertEqual(col, "B")
+        self.assertEqual(rows[1][col], "beta")          # NOT "gamma"
+        self.assertEqual(rows[1][col], rows[1]["C"])    # both mean the same column
+
+    def test_letter_survives_the_string_ops_callers_use(self):
+        col = matrix.Letter("b")
+        self.assertIsInstance(col.upper(), matrix.Letter)
+        self.assertIsInstance(col.strip(), matrix.Letter)
+        self.assertEqual(col.upper(), "B")
+
+    def test_a_letter_naming_no_column_is_absent_not_renamed(self):
+        rows = matrix.as_records([{"A": "id", "B": "C"}, {"A": "C-1", "B": "beta"}])
+        self.assertNotIn(matrix.Letter("Z"), rows[1])
+        self.assertIsNone(rows[1].get(matrix.Letter("Z")))
