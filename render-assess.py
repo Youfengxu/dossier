@@ -31,7 +31,7 @@ import re
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
-from locate import HEADING, searchable  # noqa: E402,F401
+from locate import HEADING, quoted, searchable  # noqa: E402,F401
 from locate import heading_only as nearest_heading  # noqa: E402
 import vocabulary                                          # noqa: E402
 import matrix as matrix_reader                               # noqa: E402
@@ -165,12 +165,17 @@ def main():
                         body = [ln.strip() for ln in lines[a:min(b, a + QUOTE_LINES) + 1]
                                 if ln.strip()]
                         if body:
-                            quoted = " ".join(body)
-                            if len(quoted) > QUOTE_CHARS:
-                                quoted = quoted[:QUOTE_CHARS].rstrip() + " …"
-                            out += [f"> **{args.doc}:{a}"
-                                    + (f"-{b}" if b != a else "") + "** "
-                                    + quoted, ""]
+                            ref = (f"**{args.doc}:{a}"
+                                   + (f"-{b}" if b != a else "") + "**")
+                            text, is_block = quoted("\n".join(body))
+                            if is_block:
+                                # Blockquoting a table hides it: "> | ID | ..."
+                                # is not a table to any renderer. Emit the rows.
+                                out += [ref, "", text, ""]
+                            else:
+                                if len(text) > QUOTE_CHARS:
+                                    text = text[:QUOTE_CHARS].rstrip() + " …"
+                                out += [f"> {ref} " + text, ""]
                             shown += 1
                     h = nearest_heading(lines, a)
                     if h and h not in heads:

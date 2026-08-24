@@ -45,7 +45,32 @@ ROOT = os.path.dirname(os.path.realpath(__file__))
 # mutation is stale and the run says so rather than quietly checking nothing —
 # a mutation that no longer applies is the same failure as a test that cannot
 # fail.
+#
+# NAME ONLY IN-PROCESS TESTS HERE. mutate() applies a mutation by re-executing
+# source into the imported module object and never writes to disk (see its
+# docstring for why). A test that shells out therefore runs a fresh interpreter
+# reading the UNMUTATED file, cannot fail, and makes the entry read NOT CAUGHT
+# however good the test is. That is indistinguishable from a weak test, and it
+# is what happened to the locate.quoted entry until bundle.markdown was lifted
+# out of main() so the check could run in-process. If an entry is stubbornly
+# NOT CAUGHT, check that its tests are not subprocess tests before rewriting
+# them.
 MUTATIONS = [
+    {
+        "what": "locate.quoted — a table quote reflowed like prose",
+        "why": "every character reaches the report and none of it can be "
+               "checked: a table's meaning is the alignment of cell to column, "
+               "and the collapse discards exactly that. Evidence that is "
+               "decorative, and harder to spot than evidence that is missing",
+        "module": "locate",
+        "old": '    rows = [ln for ln in lines if ln.count("|") >= 2]',
+        "new": '    rows = []',
+        "tests": [
+            "tests.test_quoting.Quoted.test_a_table_keeps_one_row_per_line",
+            "tests.test_quoting.RenderersAreWired."
+            "test_markdown_emits_a_table_quote_as_a_table",
+        ],
+    },
     {
         "what": "matrix.Record — letters resolved before header names",
         "why": "a matrix headed with criteria labels \"A\"/\"B\"/\"C\" is ordinary, "

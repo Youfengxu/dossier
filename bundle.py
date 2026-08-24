@@ -28,6 +28,8 @@ import os
 import sys
 import zipfile
 
+import locate
+
 sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
 import matrix as matrix_reader
 import vocabulary  # noqa: E402
@@ -106,6 +108,9 @@ def write_xlsx(path, sheet_name, headers, rows):
         z.writestr("xl/worksheets/sheet1.xml", sheet)
 
 
+QUOTE_ROWS = 12          # a table longer than this is summarised, not pasted
+
+
 def collect(args, project):
     findings = []
 
@@ -168,6 +173,59 @@ def collect(args, project):
     return findings
 
 
+def markdown(findings, counts, title, doc):
+    """The reviewer-facing report, lifted out of main() so it can be TESTED.
+
+    It was inline, which made the only way to check its output a subprocess —
+    and a subprocess is invisible to run-tests.py --mutate, which applies
+    mutations in-process and never touches disk. A shelled-out test named in a
+    mutation therefore reads as NOT CAUGHT no matter how good it is. Lifting the
+    function is what makes the check real.
+    """
+    out = [f"# {title}", ""]
+    out.append(" ".join(
+        f"{len(findings)} findings from one pipeline run against {doc}."
+        " Ordered so the obligations the deliverable does not meet come first."
+        " Every locator is a line number in the frozen text, so it points at"
+        " the same place tomorrow.".split()))
+    out.append("")
+    for key in sorted(counts):
+        out.append(f"- {counts[key]} — {key}")
+    out.append("")
+
+    current = None
+    for f in findings:
+        group = f["class"] if f["class"] != "RFO coverage" \
+            else f"RFO coverage — {f['status']}"
+        if group != current:
+            current = group
+            out.append(f"## {group}")
+            out.append("")
+        head = f"### {f['id']} " if f["id"] else "### "
+        out.append((head + (f["statement"][:90] if not f["id"] else "")).strip())
+        out.append("")
+        if f["id"] and f["statement"]:
+            out.append(f"**Requirement.** {' '.join(f['statement'].split())}")
+            out.append("")
+        if f["why"]:
+            out.append(f"**Finding.** {' '.join(f['why'].split())}")
+            out.append("")
+        if f["evidence"]:
+            body, is_block = locate.quoted(f["evidence"], limit=QUOTE_ROWS)
+            if is_block:
+                # A table quote goes on its own lines. Collapsed onto one it is
+                # a wall of pipes: present, and impossible to check against.
+                out += ["**Evidence.**", "", body, ""]
+            else:
+                out += [f"**Evidence.** {body}", ""]
+        if f["locator"]:
+            out.append(f"**Where.** {f['locator']}")
+            out.append("")
+        out.append("**Your comment:** ______")
+        out.append("")
+    return "\n".join(out).rstrip() + "\n"
+
+
 def main():
     parser = argparse.ArgumentParser(
         description=__doc__,
@@ -200,47 +258,12 @@ def main():
             else f"RFO coverage: {f['status']}"
         counts[key] = counts.get(key, 0) + 1
 
-    out = [f"# {title}", ""]
-    out.append(" ".join(
-        f"{len(findings)} findings from one pipeline run against {args.doc}."
-        " Ordered so the obligations the deliverable does not meet come first."
-        " Every locator is a line number in the frozen text, so it points at"
-        " the same place tomorrow.".split()))
-    out.append("")
-    for key in sorted(counts):
-        out.append(f"- {counts[key]} — {key}")
-    out.append("")
-
-    current = None
-    for f in findings:
-        group = f["class"] if f["class"] != "RFO coverage" \
-            else f"RFO coverage — {f['status']}"
-        if group != current:
-            current = group
-            out.append(f"## {group}")
-            out.append("")
-        head = f"### {f['id']} " if f["id"] else "### "
-        out.append((head + (f["statement"][:90] if not f["id"] else "")).strip())
-        out.append("")
-        if f["id"] and f["statement"]:
-            out.append(f"**Requirement.** {' '.join(f['statement'].split())}")
-            out.append("")
-        if f["why"]:
-            out.append(f"**Finding.** {' '.join(f['why'].split())}")
-            out.append("")
-        if f["evidence"]:
-            out.append(f"**Evidence.** {' '.join(f['evidence'].split())}")
-            out.append("")
-        if f["locator"]:
-            out.append(f"**Where.** {f['locator']}")
-            out.append("")
-        out.append("**Your comment:** ______")
-        out.append("")
+    out = markdown(findings, counts, title, args.doc).splitlines()
 
     md_path = os.path.abspath(os.path.expanduser(args.out_md))
     os.makedirs(os.path.dirname(md_path) or ".", exist_ok=True)
     with open(md_path, "w", encoding="utf-8") as handle:
-        handle.write("\n".join(out).rstrip() + "\n")
+        handle.write("\n".join(out) + "\n")
 
     print(f"wrote {xlsx_path}")
     print(f"wrote {md_path}")

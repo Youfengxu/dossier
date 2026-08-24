@@ -84,3 +84,39 @@ if __name__ == "__main__":
     import sys
     print(__doc__.strip())
     sys.exit(0)
+
+
+def quoted(text, limit=None):
+    """Render a cited passage so a reviewer can still JUDGE it.
+
+    Both renderers used to write `" ".join(text.split())`. For prose that is
+    right — a quote pulled from a document arrives wrapped at whatever width the
+    source used, and reflowing it is what makes it readable in a report.
+
+    Applied to a table it destroys the evidence while appearing to include it:
+
+        | ID | Component | Responsibility | |---|---|---| | RO | Runtime
+        Orchestrator | Execution scheduling, tick advancement, state commit | ...
+
+    Every character is present and nothing can be checked, because a table's
+    meaning is in the alignment of cell to column and that is exactly what the
+    collapse discards. Five of the seventeen quotes in the floodtwin fixture are
+    tables, and all five reached the report in that state — evidence that is
+    decorative in a subtler way than evidence that is missing, and harder to
+    notice precisely because the text is right there.
+
+    So: reflow prose, keep tables as tables. Returns (rendered, is_block) — a
+    block has to be emitted on its own lines rather than after a bold label.
+    """
+    if not (text or "").strip():
+        return "", False
+    lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
+    # A table is two or more pipe-delimited rows. One pipe is prose containing a
+    # pipe; a single row has no alignment to preserve.
+    rows = [ln for ln in lines if ln.count("|") >= 2]
+    if len(rows) >= 2:
+        if limit and len(rows) > limit:
+            rows = rows[:limit] + [f"| … {len(lines) - limit} further row(s) |"]
+        return "\n".join(rows), True
+    flat = " ".join(text.split())
+    return flat, False
