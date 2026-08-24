@@ -46,20 +46,69 @@ HEADERS = ["ID", "Class", "Status", "Statement", "Locator", "Evidence",
 
 
 
+BODY_STYLE, HEADER_STYLE = 1, 2
+
+# WHY THIS PART EXISTS AT ALL. The workbook had no styles.xml, and without one
+# there is no cellXfs entry to carry alignment, so wrapText is not merely unset —
+# it is unsettable. Every cell then takes the default format, where a newline is
+# STORED but never shown as a break and the text is clipped at the column
+# boundary as soon as the neighbouring cell is non-empty. Six evidence cells in
+# the floodtwin fixture hold 194-519 characters over several lines, and column G
+# is populated in all six, so a reviewer sees roughly the first fifty characters
+# of a quote and nothing indicating there is more. The markdown bug at least put
+# every character on the page.
+#
+# Element order is fixed by the ECMA-376 CT_Stylesheet sequence — fonts, fills,
+# borders, cellStyleXfs, cellXfs — and fill 0 = none with fill 1 = gray125 is the
+# conventional preamble even though neither is used here.
+#
+# NOTHING AVAILABLE HERE ENFORCES THAT. LibreOffice opens this workbook, and it
+# also opens one with cellXfs moved in front of fonts, so a successful convert
+# proves the file is readable and proves nothing about the ordering. Excel is
+# stricter about the sequence, but there is no Excel on this machine and that
+# was not tested — test_styles_follow_the_schema_sequence asserts the order
+# directly, because the assertion is the only enforcement there is.
+STYLES = (
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+    '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
+    '<fonts count="2">'
+    '<font><sz val="11"/><name val="Calibri"/></font>'
+    '<font><b/><sz val="11"/><name val="Calibri"/></font>'
+    '</fonts>'
+    '<fills count="2">'
+    '<fill><patternFill patternType="none"/></fill>'
+    '<fill><patternFill patternType="gray125"/></fill>'
+    '</fills>'
+    '<borders count="1"><border/></borders>'
+    '<cellStyleXfs count="1">'
+    '<xf numFmtId="0" fontId="0" fillId="0" borderId="0"/>'
+    '</cellStyleXfs>'
+    '<cellXfs count="3">'
+    '<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>'
+    '<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"'
+    ' applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf>'
+    '<xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0"'
+    ' applyFont="1" applyAlignment="1">'
+    '<alignment vertical="top" wrapText="1"/></xf>'
+    '</cellXfs>'
+    '</styleSheet>')
+
+
 def write_xlsx(path, sheet_name, headers, rows):
     """Minimal OOXML. Inline strings keep it to one part and one pass."""
-    def cell(ref, value):
+    def cell(ref, value, style):
         if value is None or value == "":
-            return f'<c r="{ref}" t="inlineStr"><is><t/></is></c>'
+            return f'<c r="{ref}" s="{style}" t="inlineStr"><is><t/></is></c>'
         text = html.escape(str(value), quote=False)
         # Excel rejects most control characters outright.
         text = "".join(ch for ch in text if ch >= " " or ch in "\t\n")
-        return (f'<c r="{ref}" t="inlineStr"><is>'
+        return (f'<c r="{ref}" s="{style}" t="inlineStr"><is>'
                 f'<t xml:space="preserve">{text}</t></is></c>')
 
     body = []
     for row_index, row in enumerate([headers] + rows, start=1):
-        cells = "".join(cell(f"{matrix_reader.col_letters(i)}{row_index}", v)
+        style = HEADER_STYLE if row_index == 1 else BODY_STYLE
+        cells = "".join(cell(f"{matrix_reader.col_letters(i)}{row_index}", v, style)
                         for i, v in enumerate(row))
         body.append(f'<row r="{row_index}">{cells}</row>')
 
@@ -82,6 +131,8 @@ def write_xlsx(path, sheet_name, headers, rows):
         '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
         '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/'
         'officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>'
+        '<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/'
+        'officeDocument/2006/relationships/styles" Target="styles.xml"/>'
         '</Relationships>')
     root_rels = (
         '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
@@ -97,7 +148,9 @@ def write_xlsx(path, sheet_name, headers, rows):
         '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-'
         'officedocument.spreadsheetml.sheet.main+xml"/>'
         '<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.'
-        'openxmlformats-officedocument.spreadsheetml.worksheet+xml"/></Types>')
+        'openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>'
+        '<Override PartName="/xl/styles.xml" ContentType="application/vnd.'
+        'openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>')
 
     os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
     with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as z:
@@ -105,6 +158,7 @@ def write_xlsx(path, sheet_name, headers, rows):
         z.writestr("_rels/.rels", root_rels)
         z.writestr("xl/workbook.xml", workbook)
         z.writestr("xl/_rels/workbook.xml.rels", rels)
+        z.writestr("xl/styles.xml", STYLES)
         z.writestr("xl/worksheets/sheet1.xml", sheet)
 
 
@@ -246,8 +300,12 @@ def main():
     if not findings:
         sys.exit("no inputs found — check --coverage/--undefined/--candidates")
 
+    # The SAME evidence the markdown shows. It was the raw string here and the
+    # capped one there, so two artefacts of one run disagreed about what was
+    # cited.
     rows = [[f["id"], f["class"], f["status"], f["statement"], f["locator"],
-             f["evidence"], f["why"], ""] for f in findings]
+             locate.quoted(f["evidence"], limit=QUOTE_ROWS)[0], f["why"], ""]
+            for f in findings]
     xlsx_path = os.path.abspath(os.path.expanduser(args.out_xlsx))
     write_xlsx(xlsx_path, args.doc[:31], HEADERS, rows)
 

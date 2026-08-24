@@ -57,6 +57,22 @@ ROOT = os.path.dirname(os.path.realpath(__file__))
 # them.
 MUTATIONS = [
     {
+        "what": "bundle — body cells fall back to the unstyled default",
+        "why": "the default format does not wrap, so a multi-line evidence "
+               "quote is stored intact and shown clipped at the column edge — "
+               "a reviewer sees fifty characters of a five-hundred-character "
+               "citation with nothing to say more exists",
+        "module": "bundle",
+        "old": 'BODY_STYLE, HEADER_STYLE = 1, 2',
+        "new": 'BODY_STYLE, HEADER_STYLE = 0, 0',
+        "tests": [
+            "tests.test_xlsx_styles.StylesPart."
+            "test_body_cells_reference_a_style_that_wraps",
+            "tests.test_xlsx_styles.StylesPart."
+            "test_header_cells_reference_a_style_that_wraps_and_is_bold",
+        ],
+    },
+    {
         "what": "locate.quoted — a table quote reflowed like prose",
         "why": "every character reaches the report and none of it can be "
                "checked: a table's meaning is the alignment of cell to column, "
