@@ -34,6 +34,11 @@ jobs:
         # nothing was pointing it here.
         run: python3 check-refs.py
 
+      - name: no unguarded tie-breaks or filtered tallies
+        # DESIGN §0.1. The principle was documented and then violated twice by
+        # someone who had read it, because prose does not enforce. This does.
+        run: python3 check-aggregation.py
+
       - name: unit tests
         run: python3 run-tests.py
 

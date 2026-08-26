@@ -32,6 +32,7 @@ dossier = "dossier_cli:main"
 # `dossier assess` are the same code path. Listing them as modules keeps that
 # true after an install instead of quietly making the CLI the only entry point.
 py-modules = [
+    "check-aggregation",
     "dossier_cli", "adjudicate", "agree", "assess", "bundle", "claim", "closure",
     "cluster-findings", "compare-coverage", "converse", "diagnose-retrieval",
     "doctor", "extract", "freeze", "inventory", "inputs-column", "insert-column",
