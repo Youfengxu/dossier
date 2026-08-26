@@ -13,6 +13,49 @@ the synthetic fixture in `fixtures/floodtwin`, never from client material.
 
 ---
 
+## 0. The principle that governs every layer
+
+Everything below is about reviewing documents. This section is not. It states the
+one rule that turned out to govern the method, the test harness and the pipeline
+alike, and it is first because keeping it at depth three cost a day of rework.
+
+### 0.1 A failed check is not a passed check
+
+**Wherever a guard can fail, the failure must land on the cautious side of the
+decision it guards.** An error, an absence and a refutation are three different
+things, and code that collapses them reports the confident answer.
+
+Three independent violations, in three different layers, none of which errored:
+
+| where | what happened | what it printed |
+|---|---|---|
+| verification lens | a lens that errored defaulted to `refuted=False` | 20 confirmed — 15 once failures forced `contested` |
+| model panel | two of three models errored; the survivors were tallied | "panel split on 0 rows", unanimous, from one model agreeing with itself |
+| tie-breaking | an even split resolved by `Counter.most_common()` insertion order | 23 not-addressed, 9 of them decided by which model was listed first |
+
+The second and third were written **after** this principle was documented, by
+someone who had read it. That is the argument for hoisting it: at §3.11 it read as
+advice about verification lenses, and a person writing panel-aggregation code two
+modules away did not recognise it as the same rule. It is not a review principle.
+It is a rule about what a program may claim.
+
+The remedy is always the same shape and is worth stating as a checklist, because
+recognising the situation is the hard part, not fixing it:
+
+- name every way the step can fail, including *no result* and *tied result*;
+- decide which side of the decision each failure lands on, and default to the
+  cautious one;
+- make the output state its own coverage — how many inputs actually answered —
+  so a reader cannot mistake thin evidence for agreement;
+- never let a tie be broken by iteration order.
+
+*Sibling candidates not hoisted, for later judgement:* §3.4 (the model may not
+invent the evidence for its own verdict), §3.12 (ground truth is a hypothesis,
+not an oracle), §3.17 (where a deterministic check exists, it wins). Each may be
+stance-level rather than method-level; none has yet cost a day twice.
+
+---
+
 ## 1. The thesis: the problem is provenance, not reasoning
 
 A finding is not good because it reads well. It is good because when the vendor
@@ -160,11 +203,12 @@ the case is in the fixture.
 
 ### 3.11 A failed check is not a passed check
 
-A verification lens that errors must not read as "did not refute". The first
-version defaulted a failed lens to `refuted=False`, which silently promoted
-candidates to `confirmed` on infrastructure noise — 20 confirmed became 15 once
-failures were made to force `contested` instead. Wherever a guard can fail, the
-failure must land on the cautious side of the decision it guards.
+**Moved to [§0.1](#01-a-failed-check-is-not-a-passed-check).** It is not a
+property of verification lenses, which is all this section said while it lived
+here — it governs the harness and the panel aggregation too, and two later
+violations were written by someone who had read this section and did not
+recognise the same rule outside its original setting. The heading stays so
+existing citations resolve; the reasoning is at §0.1.
 
 ### 3.12 Ground truth is a hypothesis, not an oracle
 

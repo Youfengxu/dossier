@@ -18,7 +18,7 @@ The CI already had three gates and none of them checked an answer: they check
 that nothing names the client, that no citation dangles, and that every tool
 loads. A tool that loads and returns the wrong verdict passes all three.
 
-WHY --mutate. DESIGN §3.11 — a failed check is not a passed check — applies to
+WHY --mutate. DESIGN §0.1 — a failed check is not a passed check — applies to
 the tests as much as to anything they cover. A test that passes against broken
 code is worse than no test, because it converts an absence of checking into a
 claim of checking. --mutate breaks one function at a time, in memory, and
