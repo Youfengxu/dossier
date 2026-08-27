@@ -209,8 +209,8 @@ MUTATIONS = [
         "why": "Word splits words across runs, so this inserts a space into the "
                "middle of every term an anchor quotes",
         "module": "extract",
-        "old": "            txt = ''.join(t.text or '' for t in el.iter('{%s}t' % NS['w']))",
-        "new": "            txt = ' '.join(t.text or '' for t in el.iter('{%s}t' % NS['w']))",
+        "old": "            txt = ''.join(t.text or '' for t in el.iter()",
+        "new": "            txt = ' '.join(t.text or '' for t in el.iter()",
         "tests": [
             "tests.test_extract.Docx.test_runs_inside_a_paragraph_are_joined_with_no_separator",
         ],
