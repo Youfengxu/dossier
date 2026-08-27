@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fail if anything in this tree names the engagement it was built on.
+"""Fail if anything names the engagement it was built on — in the tree, or in history.
 
     ./check-clean.py            # exits non-zero on any hit
 
@@ -128,11 +128,103 @@ def files(root):
             yield path
 
 
+SCANNABLE = re.compile(r"\.(py|md|ya?ml|txt|toml|cfg|json)$|(^|/)dossier$")
+
+
+def history_blobs(root, ref):
+    """Every (blob, path) reachable from `ref` whose name looks scannable.
+
+    NOT gitignore-filtered, and that is the whole point. `ignored()` is right for
+    the working tree — a file git will not track cannot be published. History is
+    the opposite case: if a blob is in a commit, `git clone` ships it, and it does
+    not matter that the path is ignored today. A fixture cache that was committed
+    once and gitignored afterwards is still in the pack.
+    """
+    listing = subprocess.run(["git", "rev-list", "--objects", ref], cwd=root,
+                             capture_output=True, text=True, timeout=300)
+    if listing.returncode != 0:
+        sys.exit(f"cannot walk {ref!r}: {listing.stderr.strip()[:160]}")
+    out = []
+    for line in listing.stdout.splitlines():
+        parts = line.split(" ", 1)
+        if len(parts) == 2 and SCANNABLE.search(parts[1]):
+            out.append((parts[0], parts[1]))
+    return out
+
+
+def read_blobs(root, blobs):
+    """Contents of many blobs in one `git cat-file --batch`, not one call each."""
+    if not blobs:
+        return {}
+    proc = subprocess.run(["git", "cat-file", "--batch"], cwd=root,
+                          input="\n".join(sha for sha, _ in blobs).encode(),
+                          capture_output=True, timeout=600)
+    if proc.returncode != 0:
+        sys.exit("git cat-file failed while reading history")
+    data, out, pos = proc.stdout, {}, 0
+    while pos < len(data):
+        end = data.find(b"\n", pos)
+        if end == -1:
+            break
+        header = data[pos:end].decode("utf-8", "replace").split()
+        pos = end + 1
+        if len(header) < 3:
+            continue
+        sha, size = header[0], int(header[2])
+        out[sha] = data[pos:pos + size].decode("utf-8", "replace")
+        pos += size + 1
+    return out
+
+
+def commits_for(root, blob, path):
+    """Which commits carry this blob, newest first. Best effort, for reporting."""
+    done = subprocess.run(
+        ["git", "log", "--format=%h %ad", "--date=short", f"--find-object={blob}",
+         "--all", "--", path],
+        cwd=root, capture_output=True, text=True, timeout=120)
+    return [l for l in done.stdout.splitlines() if l.strip()][:3]
+
+
+def scan_history(root, by_length, ref, label):
+    blobs = history_blobs(root, ref)
+    contents = read_blobs(root, blobs)
+    print(f"scanning history of {ref}: {len(blobs)} scannable blob(s)\n")
+    hits = []
+    for sha, path in blobs:
+        text = contents.get(sha)
+        if not text:
+            continue
+        for number, category, span in hits_in(text, by_length):
+            hits.append((sha, path, number, label.get(category, category), span))
+    if not hits:
+        print(f"clean — no engagement identifiers anywhere in the history of {ref}")
+        return 0
+
+    by_path = {}
+    for sha, path, number, kind, span in hits:
+        by_path.setdefault((path, sha), []).append((number, kind, span))
+    print(f"{len(hits)} occurrence(s) in {len(by_path)} historical blob(s). "
+          f"A working tree can be clean while these still ship:\n")
+    for (path, sha), found in sorted(by_path.items()):
+        kinds = sorted({k for _, k, _ in found})
+        print(f"  {path}  (blob {sha[:10]}, {len(found)} hit(s): {', '.join(kinds)})")
+        for line in commits_for(root, sha, path):
+            print(f"      in commit {line}")
+    print("\nA scrub of the working tree does not remove these. Publishing this "
+          "history\nmeans publishing them. Either publish from an orphan root, or "
+          "rewrite history\nand re-run this before pushing.")
+    return 1
+
+
 def main():
     root = os.path.dirname(os.path.realpath(__file__))
     by_length = load_denylist()
     label = {"IDENTIFIERS": "IDENTIFIER", "PEOPLE": "PERSON",
              "ARTEFACTS": "ARTEFACT", "VOCABULARY": "VOCABULARY"}
+
+    args = [a for a in sys.argv[1:] if not a.startswith("-")]
+    if "--history" in sys.argv[1:]:
+        return scan_history(root, by_length, args[0] if args else "HEAD", label)
 
     hits = []
     for path in files(root):
@@ -147,6 +239,7 @@ def main():
 
     if not hits:
         print("clean — no engagement identifiers, vocabulary or artefacts found")
+        print("       (working tree only — run --history before publishing)")
         return 0
 
     by_kind = {}
