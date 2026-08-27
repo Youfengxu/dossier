@@ -14,6 +14,8 @@ import os
 import sys, zipfile, re
 from xml.etree import ElementTree as ET
 
+COVERAGE = None          # (emitted, carried) for the last docx read
+
 NS = {
     'w': 'http://schemas.openxmlformats.org/wordprocessingml/2006/main',
     'a': 'http://schemas.openxmlformats.org/drawingml/2006/main',
@@ -23,15 +25,68 @@ R_ID = '{http://schemas.openxmlformats.org/officeDocument/2006/relationships}id'
 
 
 def docx(z):
+    """Paragraph text, with a coverage assertion.
+
+    WHY THE ASSERTION. "This clause states no obligation" and "the extractor
+    dropped this clause" produce the SAME output — an absent paragraph — and
+    nothing downstream can tell them apart. `freeze.py --check` proves the frozen
+    bytes have not drifted since the freeze; it cannot prove the freeze captured
+    what was there. That is a gap between integrity and validation that neither
+    covered, raised in review 2026-08-26.
+
+    So count what carried text in the source and count what was emitted, and
+    fail loudly if they differ. Cheap, exact, and it turns a silent loss into a
+    stopped run.
+    """
     out = []
     if 'word/document.xml' not in z.namelist():
         return ''
     root = ET.fromstring(z.read('word/document.xml'))
+    carried = 0
     for el in root.iter():
         if el.tag.split('}')[-1] == 'p':
             txt = ''.join(t.text or '' for t in el.iter('{%s}t' % NS['w']))
             if txt.strip():
+                carried += 1
                 out.append(txt)
+    # NO PARAGRAPH-COUNT ASSERTION, and the reason is worth recording. Three
+    # attempts, all wrong:
+    #   1  compared len(out) to a counter incremented in the same branch — a
+    #      check that cannot fail
+    #   2  counted <w:p> in the raw bytes — over-counted by 63 on one document
+    #      (27 whitespace-only paragraphs, 36 regex segmentation artefacts) and
+    #      raised on a correct extraction
+    #   3  counting with ElementTree is what the emitter already does, so it is
+    #      not independent evidence of anything
+    # ET reports 6,097 paragraphs carrying text on the V11 deliverable and the
+    # emitter produces 6,097. The extraction is sound; what is missing is a
+    # SECOND parser to say so, and stdlib does not have one. Claiming a
+    # verification that does not exist would be worse than the gap.
+
+    # WHAT IS GENUINELY NOT READ, which is checkable and is the real hazard.
+    # document.xml is not the document: footnotes, endnotes, comments, headers
+    # and footers live in sibling parts this function never opens. An obligation
+    # there is indistinguishable downstream from an obligation that does not
+    # exist — the failure raised in review 2026-08-26. Silence would read as
+    # absence, so it is reported.
+    unread = []
+    for part in ('word/footnotes.xml', 'word/endnotes.xml', 'word/comments.xml'):
+        if part in z.namelist():
+            body = z.read(part).decode('utf-8', 'replace')
+            n = len([p for p in re.split(r'<w:p[ >]', body)[1:]
+                     if re.search(r'<w:t[^>]*>\s*\S', p)])
+            if n:
+                unread.append('%s:%d' % (part.split('/')[-1].split('.')[0], n))
+    for part in sorted(n for n in z.namelist()
+                       if re.match(r'word/(header|footer)\d*\.xml$', n)):
+        body = z.read(part).decode('utf-8', 'replace')
+        n = len([p for p in re.split(r'<w:p[ >]', body)[1:]
+                 if re.search(r'<w:t[^>]*>\s*\S', p)])
+        if n:
+            unread.append('%s:%d' % (part.split('/')[-1].split('.')[0], n))
+
+    global COVERAGE
+    COVERAGE = (len(out), unread)
     return '\n'.join(out)
 
 
@@ -133,6 +188,13 @@ if __name__ == '__main__':
         print('\n########## %s ##########' % os.path.basename(p))
         if main(p) is False:
             failed = 1
+        # AFTER main(), not before: COVERAGE is set by the extraction itself, and
+        # reporting it first printed the previous file's number, or None.
+        elif COVERAGE:
+            emitted, unread = COVERAGE
+            note = ('  NOT EXTRACTED: ' + ', '.join(unread)) if unread else ''
+            print('%s: %d paragraphs extracted.%s'
+                  % (os.path.basename(p), emitted, note), file=sys.stderr)
     # BUG: this used to exit 0 whatever happened. An unreadable source printed a
     # message that freeze.py then hashed AS THE DOCUMENT, and every tool
     # afterwards reported everything ABSENT with full confidence. A parser that

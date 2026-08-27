@@ -268,17 +268,26 @@ the assurance case, and they are why the verification half is unusually strong.
 > **Verification is stronger than most production ML systems. Validation has a
 > hole where the target should be.**
 
-**Two independent routes reached the same conclusion**, which is the strongest
-thing in this document. The gaps in §3 came from a bottom-up inventory — placing
+**Two routes reached the same conclusion — but they are not independent, and an
+earlier draft of this section overstated them as such.** The gaps in §3 came from a bottom-up inventory — placing
 51 modules and seeing what had no home. The standards in §2.7 came top-down from
 three published frameworks. They agree: ISO/IEC 25059 identifies *accuracy* as the
 one quality characteristic with no target (G1); NIST AI RMF finds MEASURE present
 but untracked (G2, G3). Only GOVERN (G8) appeared from the top down and not from
 the bottom up, and it is the one gap that is arguably correct as it stands.
 
-Convergence from two directions is not proof, but a bottom-up audit and three
-standards independently landing on *the same missing baseline* is much better
-evidence than either alone.
+**Both routes were produced by the same model, on the same repository, in one
+session.** A separate pre-registered experiment (1,628 auditing records, 8 models
+across 7 vendors) measured what that is worth: varying the *prompt* while holding
+weights fixed moves error-consistency κ by **+0.012**, and two same-model passes
+are worth **1.16 independent auditors, not 2**. Re-framing the question is not a
+second opinion.
+
+So this is **corroboration, not independent replication**. The conclusion still
+looks right on its own merits — G1 is visible from either direction — but the
+evidential weight is one careful pass, not two. Genuine replication would need a
+different reader, ideally a different vendor's weights, and would be worth having
+before the numbers go in a public README.
 
 Every gap above is in validation, integrity, release or governance. That is a coherent
 pattern, not an accident: verification is checkable from inside the repo, and the
