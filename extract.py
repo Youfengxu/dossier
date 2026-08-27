@@ -20,6 +20,7 @@ NS = {
     'w': 'http://schemas.openxmlformats.org/wordprocessingml/2006/main',
     'a': 'http://schemas.openxmlformats.org/drawingml/2006/main',
     's': 'http://schemas.openxmlformats.org/spreadsheetml/2006/main',
+    'm': 'http://schemas.openxmlformats.org/officeDocument/2006/math',
 }
 R_ID = '{http://schemas.openxmlformats.org/officeDocument/2006/relationships}id'
 
@@ -43,9 +44,21 @@ def docx(z):
         return ''
     root = ET.fromstring(z.read('word/document.xml'))
     carried = 0
+    # BOTH w:t AND m:t. The wordprocessing namespace is not the only one that
+    # carries text: OfficeMath equations use officeDocument/2006/math, and
+    # reading only {w}t dropped every formula in the corpus silently — 179 runs
+    # in the V10/V11 architecture deliverables, including the model's own
+    # opinion-update and distance equations. A reviewer asking how a quantity is
+    # specified got "absent", with a locator proving it.
+    #
+    # Found 2026-08-27 by counting with xmllint, which is libxml2 in C and so a
+    # genuinely different parser; ElementTree cannot audit an emitter that is
+    # itself ElementTree. lxml would not have worked either — same libxml2 under
+    # a Python skin.
     for el in root.iter():
         if el.tag.split('}')[-1] == 'p':
-            txt = ''.join(t.text or '' for t in el.iter('{%s}t' % NS['w']))
+            txt = ''.join(t.text or '' for t in el.iter()
+                          if t.tag in ('{%s}t' % NS['w'], '{%s}t' % NS['m']))
             if txt.strip():
                 carried += 1
                 out.append(txt)
