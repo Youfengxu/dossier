@@ -79,6 +79,10 @@ PATTERNS = [
         (?:\bin\s+(?:VALID|ORDER|SCALE|ALLOWED)\b
            |\bnot\s+None\b
            |!=\s*["']error["']
+           |["']error["']\s+not\s+in\b          # synthesize.py dropped every
+                                                # section that failed with this
+                                                # spelling, and the gate read
+                                                # the line on every push
            |\.get\(["']verdict["']\)\s*(?:in|is\s+not)\b)
      """),
      "votes filtered before tallying",

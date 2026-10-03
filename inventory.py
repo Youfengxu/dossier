@@ -170,6 +170,128 @@ def split_sections(lines, min_lines=4, max_lines=90, max_chars=1200):
     return sections
 
 
+# What a section is asked for. The fallback asks for three of them.
+FIELDS = ("capabilities", "identifiers", "deferred", "evidence_claims",
+          "authority", "defers_to", "consumes", "produces")
+
+
+def merge(target, extra):
+    """Union by content, so a second pass adds what the first missed."""
+    for key in FIELDS:
+        seen = {json.dumps(x, sort_keys=True) for x in target.get(key, [])}
+        for item in extra.get(key, []):
+            mark = json.dumps(item, sort_keys=True)
+            if mark not in seen:
+                seen.add(mark)
+                target.setdefault(key, []).append(item)
+    return target
+
+
+def minimal_validate(obj):
+    if not isinstance(obj, dict):
+        return "reply must be a JSON object"
+    for key in ("capabilities", "authority", "defers_to"):
+        if not isinstance(obj.get(key), list):
+            return f"'{key}' must be an array"
+    for item in obj["authority"]:
+        if isinstance(item, dict) and \
+                item.get("polarity") not in ("owns", "excludes"):
+            return "each authority entry needs polarity owns/excludes"
+    return None
+
+
+def catalogue(section, doc, clients):
+    """One section's entry: what every pass that answered said, and how many did.
+
+    synthesize.py asserts absences over this file, so an entry has to say how
+    much of its section was read, not only what was found there:
+
+      error        nothing was. The entry still carries the heading and the
+                   lines; without them the inventory can say that a section is
+                   missing and not which one.
+      degraded     the first pass fell back to the three-field schema.
+      full_passes  how many passes used the whole schema. At 0, the five fields
+                   the fallback never asks for are empty because nothing asked,
+                   not because the section has none.
+      passes       how many of the passes asked for answered at all. --runs
+                   exists because one pass misses things. A pass that failed
+                   used to be swallowed here, and a section read once looked
+                   the same as one read three times.
+    """
+    locator = f"{doc}:{section['start']}-{section['end']}"
+    user = (f"SECTION: {section['heading']}\n"
+            f"LOCATOR: {locator}\n\n"
+            f"{section['text']}\n\nCatalogue this section.")
+    degraded = False
+    try:
+        reply = clients[0].ask(SYSTEM, user, validate=validate,
+                               label=f"inv:{section['start']}")
+        passes = full = 1
+    except LLMError:
+        # Falling back to a three-field schema keeps the ownership signal —
+        # which is what D5 and D6 are built on — instead of losing the
+        # section entirely. A quarter of a real document was dropped this
+        # way before the fallback existed.
+        try:
+            reply = clients[0].ask(MINIMAL_SYSTEM, user,
+                                   validate=minimal_validate,
+                                   label=f"inv-min:{section['start']}")
+        except LLMError as exc:
+            return {"error": str(exc), "heading": section["heading"],
+                    "locator": locator}
+        degraded, passes, full = True, 1, 0
+    # Only the fields that were asked for are taken from a reply. The keys
+    # below this line say how the section was read, and a reply that happens to
+    # carry "error" or "degraded" of its own must not be able to say it for us.
+    entry = {key: reply[key] if isinstance(reply.get(key), list) else []
+             for key in FIELDS}
+    for extra_client in clients[1:]:
+        try:
+            more = extra_client.ask(SYSTEM, user, validate=validate,
+                                    label=f"inv:{section['start']}")
+        except LLMError:
+            continue                # not merged, and not counted: see `passes`
+        entry = merge(entry, more)
+        passes, full = passes + 1, full + 1
+    if degraded:
+        entry["degraded"] = True
+    entry["passes"], entry["full_passes"] = passes, full
+    entry["heading"] = section["heading"]
+    entry["locator"] = locator
+    return entry
+
+
+def limited(sections, doc, limit):
+    """(the sections to read, entries for the ones --limit stops before).
+
+    --limit used to cut the list and say nothing: the inventory held the first
+    N sections, the line above them read "reading 100% of the document", and
+    synthesize.py reported a pointer to section N+1 as a pointer to a section
+    that does not exist. The sections left out are still sections of the
+    document, so they go into the inventory as what they are: not read.
+    """
+    if not limit:
+        return sections, []
+    beyond = [
+        {"error": f"not read: --limit {limit} stopped before this section",
+         "skipped": True, "heading": section["heading"],
+         "locator": f"{doc}:{section['start']}-{section['end']}"}
+        for section in sections[limit:]]
+    return sections[:limit], beyond
+
+
+def shortfall(results, runs):
+    """How far a run fell short of reading every section `runs` times: the
+    sections that failed, that fell back, that got fewer passes, and that
+    --limit stopped before."""
+    skipped = sum(1 for r in results if r and r.get("skipped"))
+    failed = sum(1 for r in results if r and "error" in r) - skipped
+    degraded = sum(1 for r in results if r and r.get("degraded"))
+    short = sum(1 for r in results if r and r.get("passes", runs) < runs)
+    return {"failed": failed, "degraded": degraded, "short": short,
+            "skipped": skipped}
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -198,13 +320,20 @@ def main():
 
     project = os.path.abspath(os.path.expanduser(args.project))
     doc, lines = load_doc(project, args.doc)
-    sections = split_sections(lines, max_chars=args.max_chars)
-    if args.limit:
-        sections = sections[:args.limit]
+    everything = split_sections(lines, max_chars=args.max_chars)
+    sections, beyond = limited(everything, args.doc, args.limit)
 
     total_chars = sum(len(s["text"]) for s in sections)
     print(f"{args.doc}: {len(sections)} sections, {total_chars:,} characters")
-    print(f"reading 100% of the document at concurrency {args.concurrency}\n")
+    if beyond:
+        # This line read "reading 100% of the document" under --limit as well.
+        print(f"reading the first {len(sections)} of {len(everything)} sections "
+              f"(--limit) at concurrency {args.concurrency}: NOT the whole "
+              f"document.\nThe other {len(beyond)} go into the inventory as not "
+              f"read.\n")
+    else:
+        print(f"reading 100% of the document at concurrency "
+              f"{args.concurrency}\n")
 
     clients = [Client(project, model=args.model, url=args.url,
                       prompt_version=f"{PROMPT_VERSION}/r{r}",
@@ -213,61 +342,9 @@ def main():
                for r in range(args.runs)]
     client = clients[0]
 
-    def merge(target, extra):
-        """Union by content, so a second pass adds what the first missed."""
-        for key in ("capabilities", "identifiers", "deferred", "evidence_claims",
-                    "authority", "defers_to", "consumes", "produces"):
-            seen = {json.dumps(x, sort_keys=True) for x in target.get(key, [])}
-            for item in extra.get(key, []):
-                mark = json.dumps(item, sort_keys=True)
-                if mark not in seen:
-                    seen.add(mark)
-                    target.setdefault(key, []).append(item)
-        return target
-
     def work(item):
         index, section = item
-        user = (f"SECTION: {section['heading']}\n"
-                f"LOCATOR: {args.doc}:{section['start']}-{section['end']}\n\n"
-                f"{section['text']}\n\nCatalogue this section.")
-        try:
-            reply = client.ask(SYSTEM, user, validate=validate,
-                               label=f"inv:{section['start']}")
-        except LLMError:
-            # Falling back to a three-field schema keeps the ownership signal —
-            # which is what D5 and D6 are built on — instead of losing the
-            # section entirely. A quarter of a real document was dropped this
-            # way before the fallback existed.
-            def minimal_validate(obj):
-                if not isinstance(obj, dict):
-                    return "reply must be a JSON object"
-                for key in ("capabilities", "authority", "defers_to"):
-                    if not isinstance(obj.get(key), list):
-                        return f"'{key}' must be an array"
-                for item in obj["authority"]:
-                    if isinstance(item, dict) and \
-                            item.get("polarity") not in ("owns", "excludes"):
-                        return "each authority entry needs polarity owns/excludes"
-                return None
-            try:
-                reply = client.ask(MINIMAL_SYSTEM, user, validate=minimal_validate,
-                                   label=f"inv-min:{section['start']}")
-                reply["degraded"] = True
-                for key in ("identifiers", "deferred", "evidence_claims",
-                            "consumes", "produces"):
-                    reply.setdefault(key, [])
-            except LLMError as exc:
-                return index, {"error": str(exc)}
-        for extra_client in clients[1:]:
-            try:
-                more = extra_client.ask(SYSTEM, user, validate=validate,
-                                        label=f"inv:{section['start']}")
-                reply = merge(reply, more)
-            except LLMError:
-                pass
-        reply["heading"] = section["heading"]
-        reply["locator"] = f"{args.doc}:{section['start']}-{section['end']}"
-        return index, reply
+        return index, catalogue(section, args.doc, clients)
 
     started = time.time()
     results = [None] * len(sections)
@@ -286,20 +363,23 @@ def main():
                 print(f"  {index+1}/{len(sections)}")
     elapsed = time.time() - started
 
-    failed = sum(1 for r in results if r and "error" in r)
-    degraded = sum(1 for r in results if r and r.get("degraded"))
+    results += beyond
+    short = shortfall(results, args.runs)
+    # aggregation-ok: failed sections are counted by shortfall(), printed first
     counts = {k: sum(len(r.get(k, [])) for r in results if r and "error" not in r)
-              for k in ("capabilities", "identifiers", "deferred",
-                        "evidence_claims", "authority", "defers_to",
-                        "consumes", "produces")}
+              for k in FIELDS}
 
     with open(os.path.join(project, args.out), "w", encoding="utf-8") as handle:
         json.dump({"doc": args.doc, "source_sha256": doc["source_sha256"],
-                   "sections": results}, handle, indent=1)
+                   "runs": args.runs, "sections": results}, handle, indent=1)
 
     print(f"\n{client.summary()}")
     print(f"  {elapsed:.0f}s wall clock, {len(sections)/elapsed:.2f} sections/s"
-          f"  ({failed} failed, {degraded} degraded to the minimal schema)")
+          f"  ({short['failed']} failed, {short['degraded']} degraded to the "
+          f"minimal schema,")
+    print(f"  {short['short']} read in fewer than the {args.runs} passes "
+          f"asked for"
+          + (f", {short['skipped']} not read: --limit" if beyond else "") + ")")
     print("  " + "  ".join(f"{k}={v}" for k, v in counts.items()))
     print(f"\nwrote {args.out}")
     return 0

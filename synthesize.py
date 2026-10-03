@@ -18,6 +18,20 @@ property of the document as a whole rather than of any obligation:
 Absence becomes legitimate here for the first time. A section agent never
 asserts it; this queries an inventory built by reading 100% of the document.
 
+WHEN THE INVENTORY DID NOT READ 100% OF IT. That sentence is a premise, and for
+a long time nothing checked it. A section whose extraction failed was dropped on
+the way in, and a section read by the fallback schema arrived with five fields
+nobody had asked it for. Three of the four classes then assert an absence over
+what is left, so an unread section was not merely unreported: a pointer to it
+became "no such section in the document", and whatever it owned or consumed
+became an ownership gap and an orphan. The run exited 0 and the only trace was a
+section count one lower than it should have been.
+
+So the inventory line now says how many sections were read, names the ones that
+were not, and every finding that asserts an absence one of those could answer is
+marked `unverifiable` and says which. It is still listed: a reviewer is owed the
+question, not a verdict the tool could not reach.
+
     ./synthesize.py --project . --inventory inventory.json
     ./synthesize.py --project . --inventory inventory.json --ground-truth ground-truth.yaml
 """
@@ -33,6 +47,12 @@ from collections import defaultdict
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import llm                                                   # noqa: E402
 from llm import Client, Embedder, LLMError, cosine        # noqa: E402
+import vocabulary                                            # noqa: E402
+
+# The words score-register.py reads a candidate's verdict in. `unverifiable` is
+# off the scale on purpose: "could not check" is not a degree of unmet.
+COVERAGE = vocabulary.load(name="coverage")
+UNMET, UNVERIFIABLE = COVERAGE.scale[0], COVERAGE.unknown
 
 STOP = set("""the a an and or of to in for on with by is are be been shall must
 should may not that this these those it its as at from any all each every per
@@ -112,6 +132,9 @@ Reply with JSON only:
   a missed one costs you."""
 
 
+UNJUDGED = object()         # a pair whose adjudication call failed
+
+
 def adjudicate_pairs(client, entries, key, concurrency=1, groups=None,
                      cap=900):
     """Cross-section pairs with differing owners, reduced by clustering first.
@@ -122,6 +145,11 @@ def adjudicate_pairs(client, entries, key, concurrency=1, groups=None,
     slot. That reintroduces a similarity assumption the fixture warned about,
     so the clusters are deliberately loose and every exact-string collision is
     admitted regardless of cluster.
+
+    Returns (pairs attempted, pairs that could not be judged, conflicts). A call
+    that fails has not said "no conflict". It used to come back as None, which
+    is what a pair judged free of conflict comes back as, and the line printed
+    afterwards counted it as adjudicated.
     """
     from concurrent.futures import ThreadPoolExecutor
     pairs, seen = [], set()
@@ -197,7 +225,7 @@ def adjudicate_pairs(client, entries, key, concurrency=1, groups=None,
                 else "need boolean 'same_slot' and 'conflict'"),
                 label=f"pair:{len(pairs)}")
         except LLMError:
-            return None
+            return UNJUDGED
         return (a, b, reply) if reply.get("conflict") else None
 
     if concurrency > 1:
@@ -205,7 +233,13 @@ def adjudicate_pairs(client, entries, key, concurrency=1, groups=None,
             results = list(pool.map(check, pairs))
     else:
         results = [check(p) for p in pairs]
-    return len(pairs), [r for r in results if r]
+    unjudged, conflicts = 0, []
+    for result in results:
+        if result is UNJUDGED:
+            unjudged += 1
+        elif result:
+            conflicts.append(result)
+    return len(pairs), unjudged, conflicts
 
 
 
@@ -265,6 +299,13 @@ def load_components(path):
     try:
         import yaml
     except ImportError:
+        # A project with no components file is an ordinary project. One whose
+        # file is there and went unread is a different run from the one that
+        # was asked for, and it used to look the same.
+        print(f"{os.path.basename(path)} is present and was NOT read: PyYAML "
+              f"is not installed. Owners are compared as free text, which is "
+              f"--no-normalise and not the shipped configuration.",
+              file=sys.stderr)
         return {}, set()
     data = yaml.safe_load(open(path, encoding="utf-8")) or {}
     comps = {k: [k.lower()] + [a.lower() for a in (v or [])]
@@ -352,6 +393,99 @@ def reached(defect, kind, label, members):
     return False
 
 
+def read_inventory(data):
+    """(sections read, sections not read, sections read in part, short).
+
+    Every entry of the inventory is a section of the document. One whose
+    extraction failed carries "error" and nothing that was extracted. Those
+    used to be filtered out here, and a section count one lower than it should
+    have been was the only sign that anything had gone unread.
+
+      unread   {"position", "of", "heading", "locator", "why"}. An inventory
+               written before a failure kept its heading has "" for both, and
+               its position is all that can be said about it. `why` is
+               "extraction failed", or what inventory.py wrote when --limit
+               stopped it before the section.
+      partial  read by the fallback schema and by no full pass. What it says of
+               capabilities, authority and deferrals is a reading. Its
+               produces, consumes and evidence claims are empty because nothing
+               asked for them.
+      short    read in fewer passes than the inventory asked for.
+    """
+    entries, runs = data["sections"], data.get("runs")
+    sections, unread, partial, short = [], [], [], []
+    for position, entry in enumerate(entries, 1):
+        if not entry or "error" in entry:
+            entry = entry or {}
+            unread.append({"position": position, "of": len(entries),
+                           "heading": entry.get("heading") or "",
+                           "locator": entry.get("locator") or "",
+                           "why": (str(entry.get("error")) if entry.get("skipped")
+                                   else "extraction failed")})
+            continue
+        sections.append(entry)
+        if entry.get("degraded") and not fully_read(entry):
+            partial.append(entry)
+        if runs and entry.get("passes", runs) < runs:
+            short.append(entry)
+    return sections, unread, partial, short
+
+
+# The five fields the fallback schema does not ask for.
+UNASKED = ("identifiers", "deferred", "evidence_claims", "consumes", "produces")
+
+
+def fully_read(entry):
+    """Whether any pass read this section with the whole schema.
+
+    An entry says so since inventory.py began recording `full_passes`. One
+    written before that does not, and the fallback may or may not have been
+    followed by a full pass that was merged in. If any field the fallback
+    never asks for holds something, a full pass put it there. If all five are
+    empty there is no sign of one, and none is assumed.
+    """
+    if "full_passes" in entry:
+        return bool(entry["full_passes"])
+    return any(entry.get(key) for key in UNASKED)
+
+
+def named(section):
+    """A section as a reader can find it, whether or not it was read."""
+    heading, locator = section.get("heading"), section.get("locator")
+    if heading:
+        return f"{heading} ({locator})" if locator else heading
+    if locator:
+        return f"the section at {locator}, which has no heading"
+    if section.get("position"):
+        return (f"section {section['position']} of {section['of']}, which the "
+                f"inventory does not name")
+    return "a section the inventory does not name"
+
+
+def open_question(sections, what):
+    """Why an absence cannot be asserted: the sections that could answer it.
+
+    "" when there are none, and that is the whole difference between a finding
+    and a question. A reviewer is owed the question either way, so the finding
+    is still listed; it is listed as unverifiable, with this beside it.
+    """
+    if not sections:
+        return ""
+    names = "; ".join(named(section) for section in sections[:3])
+    if len(sections) > 3:
+        names += f"; and {len(sections) - 3} more"
+    return f"{what}: {names}"
+
+
+def pointed_at(heading, numbers, appendices):
+    """Whether a pointer naming these section numbers, or these appendix
+    letters, names the section with this heading."""
+    key = re.sub(r"\s+", " ", heading or "").lower()
+    if any(f"appendix {letter.lower()}" in key for letter in appendices):
+        return True
+    return any(re.match(rf"^{re.escape(n)}\b", key) for n in numbers)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -408,8 +542,9 @@ def main():
     args = parser.parse_args()
 
     project = os.path.abspath(os.path.expanduser(args.project))
-    data = json.load(open(os.path.join(project, args.inventory), encoding="utf-8"))
-    sections = [s for s in data["sections"] if s and "error" not in s]
+    with open(os.path.join(project, args.inventory), encoding="utf-8") as handle:
+        data = json.load(handle)
+    sections, unread, partial, short = read_inventory(data)
     # Needed by D6, and by --authority-as-dataflow to attribute a produces entry
     # to somebody, so it is resolved once here rather than at either use.
     owners_by_section = section_owner_map(sections)
@@ -498,10 +633,44 @@ def main():
     if folded:
         print(f"           {len(folded)} produces/consumes entries re-admitted "
               f"as ownership claims")
-    print(f"inventory: {len(sections)} sections, {len(authority)} authority "
-          f"assertions, {len(defers)} deferrals,\n"
+    print(f"inventory: {len(sections)} of {len(data['sections'])} sections "
+          f"read, {len(authority)} authority assertions, {len(defers)} "
+          f"deferrals,\n"
           f"           {len(produces)} produces / {len(consumes)} consumes, "
-          f"{len(claims)} evidence claims\n")
+          f"{len(claims)} evidence claims")
+    # What the counts above do not rest on. Said here, before any finding,
+    # because every absence below is an absence in what WAS read.
+    pad = " " * 11
+
+    def listed(sections, note):
+        # The count above each list is exact. The list itself stops at twelve:
+        # a quarter of a real document has failed at this stage before, and
+        # seventy names here would bury the findings they qualify.
+        for section in sections[:12]:
+            print(f"{pad}    {named(section)}{note(section)}")
+        if len(sections) > 12:
+            print(f"{pad}    and {len(sections) - 12} more, all of them in "
+                  f"{args.inventory}")
+
+    if unread:
+        print(f"{pad}NOT READ: {len(unread)} section(s)")
+        listed(unread, lambda s: f"  [{s['why']}]")
+    if partial:
+        print(f"{pad}READ IN PART, by the fallback schema only, which asks for "
+              f"no produces,\n{pad}consumes or evidence claims: {len(partial)} "
+              f"section(s)")
+        listed(partial, lambda s: "")
+    if short:
+        # Counted and named, and no finding is put in doubt by it: every
+        # extraction is a sample (DESIGN 3.27), and this one is a smaller one.
+        print(f"{pad}READ IN FEWER than the {data['runs']} passes the "
+              f"inventory asked for: {len(short)} section(s)")
+        listed(short, lambda s: f"  [{s.get('passes')} of {data['runs']}]")
+    if unread or partial:
+        print(f"{pad}A finding that asserts an absence one of the sections not "
+              f"read, or read in\n{pad}part, could answer is marked "
+              f"{UNVERIFIABLE} below, and says which.")
+    print()
 
     embedder = None
     if not args.no_embed:
@@ -526,6 +695,10 @@ def main():
         print(f"components: {len(comps)} named, {kept}/{len(authority)} authority "
               f"assertions resolve to one\n")
 
+    # (class, label, the entries it rests on, doubt). `doubt` is "" for a
+    # finding the inventory establishes: two owners found, a cycle found, or
+    # an absence in an inventory that read every section the absence is about.
+    # It is the open question otherwise, and the finding is then unverifiable.
     findings = []
 
     # -- D5: two COMPONENTS asserting the same RIGHT over the same thing -----
@@ -557,7 +730,7 @@ def main():
                 label = f"{group['label']}"
                 if sub.get("label"):
                     label += f"  [{sub['label']}]"
-                findings.append(("D5", label, list(owners.values())))
+                findings.append(("D5", label, list(owners.values()), ""))
 
     # -- D6: a capability every component passes on, owned by none -----------
     #
@@ -585,7 +758,7 @@ def main():
         if cycles:
             names = " -> ".join(" ".join(sorted(n)) for n in cycles[0])
             findings.append(("D6", f"{group['label']}  [cycle: {names}]",
-                             labelled))
+                             labelled, ""))
             continue
         if embedder is not None and owned_vectors:
             query = embedder.embed([group["label"]])[0]
@@ -594,13 +767,27 @@ def main():
         elif any(similar(group["tokens"], norm(e.get("capability", "")))
                  for e in authority):
             continue
-        findings.append(("D6", group["label"], group["members"]))
+        # "Owned nowhere" is a statement about every section. The fallback
+        # schema does ask for authority, so only a section that was not read
+        # at all can be holding the owner. Under --authority-as-dataflow
+        # ownership is also taken from produces and consumes, which the
+        # fallback never asks for, and a section read in part can hold it too.
+        owners_unseen = unread + (partial if args.authority_as_dataflow else [])
+        findings.append(("D6", group["label"], group["members"], open_question(
+            owners_unseen, "a section that was not read could own it")))
 
     # -- D8: produced and never consumed -------------------------------------
+    #
+    # "Never consumed" needs every section's consumes. A section read by the
+    # fallback alone has none recorded, and it was never asked for any.
     consumed = [norm(e.get("value", "")) for e in consumes]
     for group in group_by_concept(produces, "value", embedder):
         if not any(similar(group["tokens"], c, 0.6) for c in consumed if c):
-            findings.append(("D8", group["label"], group["members"][:2]))
+            findings.append(("D8", group["label"], group["members"][:2],
+                             open_question(unread + partial,
+                                           "a section that was not read, or "
+                                           "was read without its consumes, "
+                                           "could consume it")))
 
     # -- D3: evidence claim pointing somewhere that holds no such thing ------
     by_heading = {}
@@ -638,7 +825,12 @@ def main():
 
     seen_d3 = set()
     for claim in claims:
-        target = (claim.get("points_to") or "").strip()
+        # The extraction schema does not say the pointer must be one string,
+        # and "Section 3 and Appendix B" has come back as a list of two.
+        target = claim.get("points_to") or ""
+        if isinstance(target, (list, tuple)):
+            target = " and ".join(str(place) for place in target)
+        target = str(target).strip()
         if not target or not LOCATION.search(target):
             continue
         if SELF_REF.search(target) and not re.search(r"\d", target):
@@ -651,64 +843,98 @@ def main():
         # The claim is only untrue if NONE of them holds the content.
         numbers = re.findall(r"(\d+(?:\.\d+)*)", target)
         appendices = re.findall(r"appendix\s+([a-z])\b", target, re.I)
-        hits = []
-        for key, section in by_heading.items():
-            if any(f"appendix {letter.lower()}" in key for letter in appendices):
-                hits.append(section)
-            elif any(re.match(rf"^{re.escape(n)}\b", key) for n in numbers):
-                hits.append(section)
+        hits = [section for key, section in by_heading.items()
+                if pointed_at(key, numbers, appendices)]
         # Deduplicate on what the finding actually is: this claim, these places.
         fingerprint = (" ".join(sorted(content_words(claim.get("claim", "")))),
                        tuple(sorted(numbers)), tuple(sorted(appendices)))
         if fingerprint in seen_d3:
             continue
         seen_d3.add(fingerprint)
+        # With a section unread, neither form of this finding is asserted. No
+        # unread section can be ruled out by its heading: the inventory keeps
+        # the FIRST heading of each chunk, and a chunk also holds whatever
+        # headings followed too soon to start one of their own, so an unread
+        # "3. Calibration Register" may hold 3.1, a table can sit in any
+        # section, and a heading may be spelled "Section 3: ...". An earlier
+        # version compared the pointer with each unread heading and let the
+        # finding stand where they differed; a review broke that seven ways.
+        if not hits and unread:
+            # This used to read "no such section in the document", about a
+            # section that is in the document and failed at extraction.
+            findings.append(("D3", f"{target} — not among the sections that "
+                                   f"were read", [claim], open_question(
+                unread, "a section that was not read could be, or could hold, "
+                        "the place it points to")))
+            continue
         if not hits:
             findings.append(("D3", f"{target} — no such section in the document",
-                             [claim]))
+                             [claim], ""))
             continue
         wanted = norm(claim.get("claim", ""))
         present = set()
         for section in hits:
             for capability in section.get("capabilities", []):
-                present |= norm(capability.get("name", ""))
+                # The fallback's validator accepts a capability as a bare
+                # string, where the full schema requires {"name": ...}.
+                present |= norm(capability.get("name", "")
+                                if isinstance(capability, dict) else str(capability))
         if wanted and not similar(wanted, present, 0.34):
             findings.append(("D3", f"{claim.get('claim','')[:50]} -> {target}",
-                             [claim]))
+                             [claim], open_question(
+                unread, "a section that was not read could hold it, as part "
+                        "of the place the pointer names")))
 
     if args.adjudicate:
         client = Client(project, model=args.model, url=args.url,
                         prompt_version="pair-1", quiet=args.concurrency > 1)
         auth_groups = group_by_concept(authority, "capability", embedder)
-        count, conflicts = adjudicate_pairs(client, authority, "capability",
-                                            args.concurrency, auth_groups,
-                                            args.cap)
-        print(f"adjudicated {count} authority pairs -> {len(conflicts)} conflicts")
+        def judged(tried, lost, kind, found, what):
+            # How many pairs were JUDGED, not how many were tried. The two were
+            # one number, and the client's total of failed calls two lines down
+            # was the only sign that they differed.
+            line = (f"adjudicated {tried - lost} of {tried} {kind} pairs -> "
+                    f"{found} {what}")
+            if lost:
+                line += (f"\n            {lost} could not be judged: the call "
+                         f"failed, which is not a verdict of no conflict")
+            print(line)
+
+        count, lost, conflicts = adjudicate_pairs(
+            client, authority, "capability", args.concurrency, auth_groups,
+            args.cap)
+        judged(count, lost, "authority", len(conflicts), "conflicts")
         for a, b, reply in conflicts:
             findings.append(("D5", f"{a.get('capability','')} vs "
-                                   f"{b.get('capability','')}", [a, b]))
+                                   f"{b.get('capability','')}", [a, b], ""))
         defer_groups = group_by_concept(defers, "capability", embedder)
-        dcount, dconf = adjudicate_pairs(client, defers, "capability",
-                                         args.concurrency, defer_groups,
-                                         args.cap)
-        print(f"adjudicated {dcount} deferral pairs -> {len(dconf)} same-slot "
-              f"chains")
+        dcount, dlost, dconf = adjudicate_pairs(
+            client, defers, "capability", args.concurrency, defer_groups,
+            args.cap)
+        judged(dcount, dlost, "deferral", len(dconf), "same-slot chains")
         for a, b, reply in dconf:
             findings.append(("D6", f"{a.get('capability','')} deferred to "
                                    f"{a.get('to','')}, and to {b.get('to','')}",
-                             [a, b]))
+                             [a, b], ""))
         print(f"{client.summary()}\n")
 
     order = {"D5": 0, "D6": 1, "D8": 2, "D3": 3}
     findings.sort(key=lambda f: order.get(f[0], 9))
-    counts = defaultdict(int)
-    for kind, _, _ in findings:
+    counts, doubted = defaultdict(int), 0
+    for kind, _, _, doubt in findings:
         counts[kind] += 1
+        doubted += bool(doubt)
     print(f"-- candidate defects: " +
-          ", ".join(f"{k}={counts[k]}" for k in sorted(counts)) + "\n")
+          ", ".join(f"{k}={counts[k]}" for k in sorted(counts)))
+    if doubted:
+        print(f"   {UNVERIFIABLE}: {doubted} of these {len(findings)}. Each "
+              f"asserts an absence that a section the\n   inventory did not "
+              f"read, or read only in part, could answer. Those are\n   "
+              f"questions for a reviewer, not findings.")
+    print()
 
     shown = defaultdict(int)
-    for kind, label, members in findings:
+    for kind, label, members, doubt in findings:
         if shown[kind] >= args.show:
             continue
         shown[kind] += 1
@@ -717,6 +943,8 @@ def main():
             who = entry.get("owner") or entry.get("to") or entry.get("points_to") or ""
             print(f"      {entry.get('_locator',''):22} {entry.get('_heading','')[:30]:32}"
                   f" {who[:26]}")
+        if doubt:
+            print(f"      {UNVERIFIABLE}: {doubt}")
 
     if args.out:
         import csv as _csv
@@ -726,7 +954,7 @@ def main():
             writer.writerow(["obligation", "source_ref", "modality",
                              "requirement", "verdict", "quote", "locator",
                              "reason", "requirement_locator"])
-            for position, (kind, label, members) in enumerate(findings, 1):
+            for position, (kind, label, members, doubt) in enumerate(findings, 1):
                 first = members[0] if members else {}
                 # Every locator the finding rests on, so a reader can go
                 # straight to the passages rather than back to the tool.
@@ -736,10 +964,12 @@ def main():
                 writer.writerow([
                     # "unmet" is score-register.py's vocabulary for a flagged
                     # row; the discovery class is carried in source_ref so the
-                    # per-class breakdown still works.
+                    # per-class breakdown still works. A finding in doubt is
+                    # "unverifiable", which that scale keeps off its ranks and
+                    # score-register.py still counts as flagged.
                     f"{kind}-{position:03d}", kind, "",
-                    label, "unmet", quote, where,
-                    " | ".join(filter(None, [
+                    label, UNVERIFIABLE if doubt else UNMET, quote, where,
+                    " | ".join(filter(None, [doubt] + [
                         str(m.get("_heading", "")) for m in members[:4]])),
                     ""])
         print(f"\nwrote {out_path} ({len(findings)} candidates)")
@@ -748,9 +978,15 @@ def main():
         try:
             import yaml
         except ImportError:
-            return 0
-        gt = yaml.safe_load(open(os.path.join(project, args.ground_truth),
-                                 encoding="utf-8"))
+            # This was `return 0`: asked for a score, printed none, and exited
+            # clean. A score that could not be computed is not a result.
+            print(f"NOT SCORED against {args.ground_truth}: PyYAML is not "
+                  f"installed, so the ground truth could not be read.",
+                  file=sys.stderr)
+            return 1
+        with open(os.path.join(project, args.ground_truth),
+                  encoding="utf-8") as handle:
+            gt = yaml.safe_load(handle)
         wanted = [d for d in gt["defects"]
                   if d["class"] in ("D3", "D5", "D6", "D8")]
         print(f"\n-- against ground truth ({len(wanted)} planted "
@@ -766,7 +1002,7 @@ def main():
                       f"{defect.get('title','')[:52]}  (no anchor or line span)")
                 continue
             match = next(
-                (i for i, (kind, label, members) in enumerate(findings)
+                (i for i, (kind, label, members, _) in enumerate(findings)
                  if i not in claimed and reached(defect, kind, label, members)),
                 None)
             if match is not None:
@@ -785,6 +1021,14 @@ def main():
         if unscorable:
             print(f"  {unscorable} defect(s) not auto-scorable — no anchor, no "
                   f"line span; read them by hand")
+        if unread or partial or short:
+            # The score is of the inventory, not of the document.
+            print(f"  scored over an inventory that left {len(unread)} "
+                  f"section(s) unread, {len(partial)} read in part and "
+                  f"{len(short)} read in\n  fewer passes than asked: a miss "
+                  f"may be a defect it never saw, and "
+                  f"{sum(1 for i in claimed if findings[i][3])} of the hits "
+                  f"rest on\n  a finding marked {UNVERIFIABLE}")
     return 0
 
 

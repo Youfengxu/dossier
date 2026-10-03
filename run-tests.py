@@ -624,6 +624,264 @@ MUTATIONS = [
             "test_a_tie_is_said_to_be_one",
         ],
     },
+    # What a tool may say about a document it did not read all of. synthesize.py
+    # asserts absences over an inventory, and three places upstream of it
+    # reported a failure as a result.
+    {
+        "what": "synthesize.read_inventory — the sections that failed are forgotten",
+        "why": "the defect as it shipped: `[s for s in data[\"sections\"] if s "
+               "and \"error\" not in s]`. On a sound three-section document "
+               "one failed section produced a false D3, D6 or D8, an exit "
+               "status of 0, and a section count one lower as the only trace",
+        "module": "synthesize",
+        "old": '    return sections, unread, partial, short',
+        "new": '    return sections, [], partial, short',
+        "tests": [
+            "tests.test_unread_sections.WhatTheInventoryLineSays."
+            "test_a_section_that_failed_is_counted_and_named",
+            "tests.test_unread_sections.AnAbsenceAnUnreadSectionCouldAnswer."
+            "test_a_pointer_to_an_unread_section_is_not_called_a_missing_section",
+            "tests.test_unread_sections.AnAbsenceAnUnreadSectionCouldAnswer."
+            "test_an_ownership_gap_the_unread_section_may_close",
+            "tests.test_unread_sections.AnAbsenceAnUnreadSectionCouldAnswer."
+            "test_an_orphan_the_unread_section_may_consume",
+        ],
+    },
+    {
+        "what": "synthesize.read_inventory — a section read by the fallback "
+                "alone counts as read",
+        "why": "the fallback schema never asks what a section consumes. Taken "
+               "as a full reading, the consumer's silence makes an orphan of "
+               "whatever it consumes",
+        "module": "synthesize",
+        "old": '        if entry.get("degraded") and not fully_read(entry):',
+        "new": '        if False:',
+        "tests": [
+            "tests.test_unread_sections.WhatTheInventoryLineSays."
+            "test_a_section_read_by_the_fallback_alone_is_named_as_read_in_part",
+            "tests.test_unread_sections.AnAbsenceAnUnreadSectionCouldAnswer."
+            "test_an_orphan_when_the_consumer_was_read_without_its_consumes",
+        ],
+    },
+    {
+        "what": "synthesize.fully_read — an old inventory's fallback entries "
+                "are taken as read",
+        "why": "an entry written before `full_passes` existed does not say "
+               "whether a full pass followed the fallback. With five empty "
+               "fields and no sign of one, assuming it did turns \"nothing "
+               "asked\" back into \"consumes nothing\"",
+        "module": "synthesize",
+        "old": '    return any(entry.get(key) for key in UNASKED)',
+        "new": '    return True',
+        "tests": [
+            "tests.test_unread_sections.WhatTheInventoryLineSays."
+            "test_an_old_inventory_is_read_in_part_only_where_it_shows_no_full_pass",
+        ],
+    },
+    {
+        "what": "synthesize — a pointer to an unread section is a missing "
+                "section again",
+        "why": "\"Section 3 — no such section in the document\", printed about "
+               "a section that is in the document and failed at extraction: "
+               "the tool's own failure, reported as the author's defect",
+        "module": "synthesize",
+        "old": '        if not hits and unread:',
+        "new": '        if False:',
+        "tests": [
+            "tests.test_unread_sections.AnAbsenceAnUnreadSectionCouldAnswer."
+            "test_a_pointer_to_an_unread_section_is_not_called_a_missing_section",
+            "tests.test_unread_sections.AnAbsenceAnUnreadSectionCouldAnswer."
+            "test_nor_when_the_inventory_cannot_say_which_section_went_unread",
+            "tests.test_unread_sections.AnAbsenceAnUnreadSectionCouldAnswer."
+            "test_no_pointer_is_cleared_by_what_an_unread_heading_says",
+        ],
+    },
+    {
+        "what": "synthesize.open_question — no absence is ever in doubt",
+        "why": "nothing owns it, nothing consumes it: each is a claim about "
+               "every section of the document, made over the ones that "
+               "happened to be read",
+        "module": "synthesize",
+        "old": '    if not sections:\n        return ""',
+        "new": '    if True:\n        return ""',
+        "tests": [
+            "tests.test_unread_sections.AnAbsenceAnUnreadSectionCouldAnswer."
+            "test_an_ownership_gap_the_unread_section_may_close",
+            "tests.test_unread_sections.AnAbsenceAnUnreadSectionCouldAnswer."
+            "test_an_orphan_the_unread_section_may_consume",
+            "tests.test_unread_sections.AnAbsenceAnUnreadSectionCouldAnswer."
+            "test_an_orphan_when_the_consumer_was_read_without_its_consumes",
+            "tests.test_unread_sections.AnAbsenceAnUnreadSectionCouldAnswer."
+            "test_the_summary_counts_them_apart",
+        ],
+    },
+    {
+        "what": "synthesize.open_question — an absence is in doubt with "
+                "every section read",
+        "why": "marking that cries wolf is marking nobody reads. When nothing "
+               "went unread the absence is the inventory's to assert, and "
+               "the finding has to stand as one",
+        "module": "synthesize",
+        "old": '    if not sections:\n        return ""',
+        "new": '    if False:\n        return ""',
+        "tests": [
+            "tests.test_unread_sections.AnAbsenceAnUnreadSectionCouldAnswer."
+            "test_and_so_is_a_claim_the_section_it_names_does_not_hold",
+            "tests.test_unread_sections.AnAbsenceAnUnreadSectionCouldAnswer."
+            "test_the_fallback_does_not_put_an_ownership_finding_in_doubt",
+        ],
+    },
+    {
+        "what": "synthesize — the dataflow flag forgets the sections read "
+                "in part",
+        "why": "--authority-as-dataflow takes ownership from produces and "
+               "consumes. The fallback never asks for either, so under the "
+               "flag a section read in part can be hiding the owner, and "
+               "the ownership gap was asserted over it",
+        "module": "synthesize",
+        "old": '        owners_unseen = unread + (partial if args.authority_as_dataflow else [])',
+        "new": '        owners_unseen = unread',
+        "tests": [
+            "tests.test_unread_sections.AnAbsenceAnUnreadSectionCouldAnswer."
+            "test_under_the_dataflow_flag_a_section_read_in_part_may_be_the_owner",
+        ],
+    },
+    {
+        "what": "synthesize — the candidate file calls a finding in doubt unmet",
+        "why": "the CSV is what score-register.py reads and what a reviewer is "
+               "handed. `unverifiable` is the coverage scale's own word for "
+               "evidence that could not be reached; `unmet` there would be a "
+               "verdict nobody reached",
+        "module": "synthesize",
+        "old": '                    label, UNVERIFIABLE if doubt else UNMET, quote, where,',
+        "new": '                    label, UNMET, quote, where,',
+        "tests": [
+            "tests.test_unread_sections.AnAbsenceAnUnreadSectionCouldAnswer."
+            "test_the_candidate_file_carries_the_verdict",
+        ],
+    },
+    {
+        "what": "synthesize.adjudicate_pairs — a call that failed says no conflict",
+        "why": "DESIGN §0.1's first example, a second time: the lens that "
+               "errored defaulted to not refuted. Here the pair came back as "
+               "None, which is what a pair judged clear comes back as, and "
+               "was counted in \"adjudicated N pairs\"",
+        "module": "synthesize",
+        "old": '            return UNJUDGED',
+        "new": '            return None',
+        "tests": [
+            "tests.test_unread_sections.APairThatCouldNotBeJudged."
+            "test_a_failed_call_is_counted_as_failed",
+            "tests.test_unread_sections.APairThatCouldNotBeJudged."
+            "test_and_a_run_where_every_call_failed_has_judged_nothing",
+            "tests.test_unread_sections.TheAdjudicationLine."
+            "test_it_says_how_many_pairs_were_judged_not_how_many_were_tried",
+        ],
+    },
+    {
+        "what": "synthesize — a score that could not be computed exits clean",
+        "why": "--ground-truth without PyYAML returned 0 and printed no score. "
+               "Asked for a measurement, it reported nothing and called that "
+               "success",
+        "module": "synthesize",
+        "old": '                  file=sys.stderr)\n            return 1',
+        "new": '                  file=sys.stderr)\n            return 0',
+        "tests": [
+            "tests.test_unread_sections.WithoutPyYAML."
+            "test_a_score_that_cannot_be_computed_is_not_a_clean_exit",
+        ],
+    },
+    {
+        "what": "inventory.catalogue — a section that failed loses its name",
+        "why": "{\"error\": ...} and nothing else is what was stored. The "
+               "inventory could say that a section had gone unread and not "
+               "which, and a pointer to it could not be told from a pointer "
+               "to a section the document does not have",
+        "module": "inventory",
+        "old": ('            return {"error": str(exc), "heading": section["heading"],\n'
+                '                    "locator": locator}'),
+        "new": '            return {"error": str(exc)}',
+        "tests": [
+            "tests.test_inventory.ASectionThatFailed.test_it_is_still_named",
+            "tests.test_inventory.ASectionThatFailed."
+            "test_and_holds_nothing_that_reads_as_content",
+        ],
+    },
+    {
+        "what": "inventory.catalogue — a pass that failed counts as one that "
+                "answered",
+        "why": "--runs defaults to 3 because one pass misses things: at one "
+               "pass the fixture's deferral cycle is invisible. A failed pass "
+               "was swallowed, so a section read once looked the same as one "
+               "read three times",
+        "module": "inventory",
+        "old": '            continue                # not merged, and not counted: see `passes`',
+        "new": '            more = {}',
+        "tests": [
+            "tests.test_inventory.ThePassesBehindAnEntry."
+            "test_a_pass_that_failed_is_not",
+        ],
+    },
+    {
+        "what": "inventory.catalogue — the fallback schema recorded as a full pass",
+        "why": "the fallback asks for three fields and stores the other five "
+               "as empty lists. Recorded as a full pass, `consumes: []` reads "
+               "as \"consumes nothing\" when nothing asked",
+        "module": "inventory",
+        "old": '        degraded, passes, full = True, 1, 0',
+        "new": '        degraded, passes, full = True, 1, 1',
+        "tests": [
+            "tests.test_inventory.ThePassesBehindAnEntry."
+            "test_the_fallback_is_one_pass_and_says_which_schema_it_used",
+        ],
+    },
+    {
+        "what": "inventory.limited — --limit leaves no record of what it "
+                "left out",
+        "why": "the inventory held the first N sections under a line that "
+               "read \"reading 100% of the document\", and synthesize.py "
+               "called a pointer to section N+1 a pointer to a section that "
+               "does not exist",
+        "module": "inventory",
+        "old": '    return sections[:limit], beyond',
+        "new": '    return sections[:limit], []',
+        "tests": [
+            "tests.test_inventory.ARunToldToStopEarly."
+            "test_the_sections_it_stopped_before_are_recorded_as_not_read",
+        ],
+    },
+    {
+        "what": "claim.judged — a pair nobody judged is dropped",
+        "why": "\"judged 200/200, 0 contradictions\" is what a run printed "
+               "when every call had been refused. The pair was skipped by "
+               "`if result:` and the progress line went on counting it",
+        "module": "claim",
+        "old": '                unjudged.append(candidates[index - 1])',
+        "new": '                pass',
+        "tests": [
+            "tests.test_claim.APairNobodyJudged."
+            "test_it_is_kept_and_counted_apart",
+            "tests.test_claim.APairNobodyJudged."
+            "test_the_progress_line_counts_what_was_judged_not_what_was_tried",
+            "tests.test_claim.APairNobodyJudged."
+            "test_a_run_whose_calls_all_failed_judged_nothing",
+        ],
+    },
+    {
+        "what": "check-aggregation — the gate forgets `\"error\" not in`",
+        "why": "it knew `!= \"error\"` and not this spelling, so "
+               "synthesize.py's first line dropped every failed section in "
+               "plain view of a gate that read it on every push",
+        "module": "check-aggregation",
+        "old": ('           |["\']error["\']\\s+not\\s+in\\b          '
+                '# synthesize.py dropped every'),
+        "new": ('                                                '
+                '# synthesize.py dropped every'),
+        "tests": [
+            "tests.test_aggregation.AFilterThatDropsTheFailures."
+            "test_keeping_only_the_entries_that_carry_no_error",
+        ],
+    },
 ]
 
 

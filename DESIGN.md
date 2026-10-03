@@ -467,6 +467,30 @@ evidence claims, 20 authority assertions, 8 deferrals, 24 produces / 31 consumes
 **Every one of the six planted D3/D5/D6/D8 defects has its evidence in the
 inventory.** The extraction stage is not the hard part.
 
+> **"A finished inventory" was a premise nothing checked, until 2026-10-04.**
+> `inventory.py` records a section it could not read as an error, and
+> `synthesize.py` dropped those on the way in. A section read by the fallback
+> schema arrived with its produces, consumes and evidence claims empty, because
+> that schema does not ask for them. The three classes that assert an absence
+> then asserted it over what was left. On a sound three-section document, one
+> failed section produced "no such section in the document", an ownership gap
+> or an orphan, depending on which section it was, with exit status 0 and a
+> section count one lower as the only trace. This is §0.1 again, in the one
+> place this document says absence is legitimate.
+>
+> `synthesize.py` now says how many sections were read and names the rest, and
+> a finding that an unread section could answer is listed as `unverifiable`
+> with the sections that could answer it. It is still listed: the reviewer is
+> owed the question. No unread section is ruled out by its heading, because
+> the inventory keeps only the first heading of each chunk and a chunk also
+> holds the headings that followed too soon to start one of their own: with
+> any section unread, no absence is asserted at all.
+>
+> The committed inventory (`inv-ablation.json`, 74 sections) has no failed and
+> no degraded section, so no number re-derived from it moves. The earlier
+> inventory quoted in this section is not in the repository, and whether it had
+> any cannot be checked.
+
 > **§3.22–§3.31 were re-measured on 2026-08-19 and the numbers below are the old
 > ones.** Every "N of 6" in this range was produced by a scorer that has since
 > been deleted: it joined every reported finding into one string and counted a

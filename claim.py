@@ -394,6 +394,34 @@ def pair_up(group, embedder, max_pairs):
     return [(a, b) for _, a, b in scored[:max_pairs]]
 
 
+def judged(candidates, judge, concurrency):
+    """Ask `judge` about every candidate pair: (findings, unjudged).
+
+    `judge` returns None when its call failed. That used to be dropped by
+    `if result:` while the progress line went on counting the pair, so a run in
+    which every call was refused printed "judged 200/200, 0 contradictions". A
+    pair nobody judged is not a pair judged consistent. It is kept, counted
+    apart, and written out beside the findings.
+    """
+    findings, unjudged = [], []
+    with ThreadPoolExecutor(max_workers=max(1, concurrency)) as pool:
+        for index, result in enumerate(pool.map(judge, candidates), 1):
+            if result is None:
+                unjudged.append(candidates[index - 1])
+            else:
+                findings.append(result)
+            if index % 25 == 0 or index == len(candidates):
+                hits = sum(1 for f in findings
+                           if f["verdict"] == "contradiction")
+                line = (f"  {index}/{len(candidates)}: judged "
+                        f"{len(findings)} of {index}, {hits} contradictions")
+                if unjudged:
+                    line += (f"; {len(unjudged)} could not be judged "
+                             f"(the call failed)")
+                print(line)
+    return findings, unjudged
+
+
 def main():
     parser = argparse.ArgumentParser(
         description=__doc__,
@@ -529,15 +557,7 @@ def main():
                 "confidence": reply["confidence"], "reason": reply["reason"],
                 "a": a, "b": b}
 
-    findings = []
-    with ThreadPoolExecutor(max_workers=max(1, args.concurrency)) as pool:
-        for index, result in enumerate(pool.map(judge, candidates), 1):
-            if result:
-                findings.append(result)
-            if index % 25 == 0 or index == len(candidates):
-                hits = sum(1 for f in findings
-                           if f["verdict"] == "contradiction")
-                print(f"  judged {index}/{len(candidates)}, {hits} contradictions")
+    findings, unjudged = judged(candidates, judge, args.concurrency)
 
     wanted = ["contradiction"] + (["tension"] if args.include_tension else [])
     hits = [f for f in findings if f["verdict"] in wanted]
@@ -552,6 +572,12 @@ def main():
 
     print("\n" + "=" * 74)
     print(f"{len(unique)} finding(s)")
+    if unjudged:
+        # Said with the count of findings, not after them: "0 finding(s)" over
+        # pairs that were never judged is not a clean document.
+        print(f"{len(unjudged)} of {len(candidates)} candidate pairs could NOT "
+              f"be judged: the call failed. They are in no finding above or "
+              f"below, and that is not a verdict.")
     print("=" * 74)
     for finding in unique:
         a, b = finding["a"], finding["b"]
@@ -572,7 +598,10 @@ def main():
         temporary = f"{path}.{os.getpid()}.tmp"
         with open(temporary, "w", encoding="utf-8") as handle:
             json.dump({"doc": args.doc, "claims": claims,
-                       "findings": findings}, handle, indent=1)
+                       "findings": findings,
+                       "unjudged": [{"subject": subject, "a": a, "b": b}
+                                    for subject, a, b in unjudged]},
+                      handle, indent=1)
         os.replace(temporary, path)
         print(f"\nwrote {path}")
     print(f"model calls: {client.stats}")

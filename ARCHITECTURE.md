@@ -293,6 +293,10 @@ ownership-gap, orphan-workstream and untrue-self-claim queries then run in code
 over a finished inventory (`DESIGN` §3.21). `synthesize.py`'s docstring says it
 plainly: absence becomes legitimate there for the first time, because the
 inventory was built by reading 100% of the document rather than a sample.
+That is a premise, and `synthesize.py` checks it: a section whose extraction
+failed, or that was read by the fallback schema alone, is counted and named on
+the inventory line, and a finding it could answer is listed as `unverifiable`
+rather than asserted.
 
 ### Where it does not
 

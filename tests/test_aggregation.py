@@ -261,6 +261,26 @@ class StringsAreNotCode(unittest.TestCase):
         self.assertEqual(found(source), [(1, FILTERED)])
 
 
+class AFilterThatDropsTheFailures(unittest.TestCase):
+    """The endings the filter pattern knows, and the one it learned late.
+
+    synthesize.py opened its inventory by keeping the sections that carried no
+    error, and reported what was left as the document. The gate read that line
+    on every push and had no word for it: it knew `!= "error"` and did not know
+    `"error" not in`."""
+
+    def test_keeping_only_the_entries_that_carry_no_error(self):
+        source = ('sections = [s for s in data["sections"]\n'
+                  '            if s and "error" not in s]\n')
+        self.assertEqual(found(source), [(1, FILTERED)])
+
+    def test_counting_the_failures_is_not_dropping_them(self):
+        """The same words without the `not` select the failures, which is how
+        they get counted. Flagging that would teach people to stop counting."""
+        source = 'failed = sum(1 for r in results if r and "error" in r)\n'
+        self.assertEqual(found(source), [])
+
+
 class AFileNotReadToItsEnd(OnDisk):
     """What was not read was not checked, and the gate has to say so."""
 
