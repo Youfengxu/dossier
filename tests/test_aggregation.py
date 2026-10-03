@@ -23,7 +23,9 @@ that a statement reached them whole.
 The gate is imported by name, hyphen and all, so that this is the same module
 object run-tests.py --mutate breaks. test_checkers.load() builds a private copy,
 which a mutation never reaches: every entry would read NOT CAUGHT however good
-the test was.
+the test was. tests.support.script() would do the same here, for a different
+reason: the harness sends only names with a slash through it, and imports a
+top-level tool by name.
 """
 
 import ast
@@ -537,15 +539,15 @@ class TheTreeItself(unittest.TestCase):
         """The tests above hand the gate its files. CI hands it a folder, and
         what it reads is then decided by the walk.
 
-        The two exclusions are written out here, not read from SKIP_DIRS: an
-        expectation built from the constant it checks cannot fail, and what
-        the gate leaves unread is a decision someone should have to make
-        twice. Stated as a subset, because the walk also reads untracked files.
+        The one exclusion, the gate's own file, is written out here and not
+        read from the gate: an expectation built from the constant it checks
+        cannot fail, and what the gate leaves unread is a decision someone
+        should have to make twice. fixtures/ was the other, until the day the
+        gate could first see what was in it. Stated as a subset, because the
+        walk also reads untracked files.
         """
         meant = {os.path.relpath(path, ROOT) for path in self.files}
-        meant = {name for name in meant
-                 if not name.startswith("fixtures" + os.sep)
-                 and name != "check-aggregation.py"}
+        meant.discard("check-aggregation.py")
         walked = {os.path.relpath(path, ROOT)
                   for path in GATE.sources(ROOT, [])}
         self.assertGreater(len(meant), 50)

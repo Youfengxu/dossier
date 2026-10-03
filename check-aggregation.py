@@ -56,7 +56,10 @@ import sys
 import tokenize
 import warnings
 
-SKIP_DIRS = {".git", "__pycache__", "node_modules", ".venv", "fixtures"}
+# What the walk does not enter. fixtures/ was here from the first commit, for
+# no recorded reason. Its sixteen scripts tally verdicts and print the baselines
+# the documents quote, and one of them held a tie decided by order.
+SKIP_DIRS = {".git", "__pycache__", "node_modules", ".venv"}
 MARKER = re.compile(r"#\s*aggregation-ok\b")
 
 PATTERNS = [

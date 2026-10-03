@@ -47,6 +47,18 @@ def score(records, truth, policy):
     return hits, seen, confusion
 
 
+def majority(counts):
+    """Every class tied for the most labels, and how many that is.
+
+    This was counts.most_common(1)[0], which names whichever class labels.json
+    lists first. The count is the same either way, so the baseline was right;
+    the class printed beside it, as the answer to give, was decided by the
+    order of a file.
+    """
+    most = max(counts.values())
+    return sorted(k for k, n in counts.items() if n == most), most
+
+
 def main():
     if len(sys.argv) < 2:
         print(__doc__.strip())
@@ -54,12 +66,13 @@ def main():
     labels = json.load(open(os.path.join(HERE, "labels.json"), encoding="utf-8"))
     truth = {k: v["verdict"] for k, v in labels["labels"].items()}
     counts = collections.Counter(truth.values())
-    majority, majority_n = counts.most_common(1)[0]
+    classes, majority_n = majority(counts)
     baseline = majority_n / len(truth)
 
     print(f"  {len(truth)} labelled, {len(labels['excluded'])} excluded "
           f"({', '.join(f'{v} {k}' for k, v in counts.items())})")
-    print(f"  majority-class baseline: answer {majority!r} to everything "
+    print(f"  majority-class baseline: answer "
+          f"{' or '.join(repr(c) for c in classes)} to everything "
           f"-> {majority_n}/{len(truth)} = {baseline:.1%}")
 
     for path in sys.argv[1:]:

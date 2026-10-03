@@ -591,6 +591,39 @@ MUTATIONS = [
             "test_nor_is_one_given_beside_a_path_that_does_hold_some",
         ],
     },
+    {
+        "what": "check-aggregation — fixtures/ goes unread again",
+        "why": "sixteen scripts that tally verdicts and print the baselines "
+               "the documents quote were skipped from the gate's first "
+               "commit, for no recorded reason, and one of them held the "
+               "first shape the gate names",
+        "module": "check-aggregation",
+        "old": 'SKIP_DIRS = {".git", "__pycache__", "node_modules", ".venv"}',
+        "new": ('SKIP_DIRS = {".git", "__pycache__", "node_modules", ".venv", '
+                '"fixtures"}'),
+        "tests": [
+            "tests.test_aggregation.TheTreeItself."
+            "test_the_default_walk_reaches_everything_it_is_meant_to",
+        ],
+    },
+    {
+        "what": "fixtures/ntsb — a tied majority named by whichever came first",
+        "why": "the site the aggregation gate found on the day it first read "
+               "fixtures/. The baseline is the same count either way; the "
+               "class printed beside it as the answer to give was decided by "
+               "the order of labels.json",
+        "module": "fixtures/ntsb/score-ntsb",
+        "old": "    return sorted(k for k, n in counts.items() if n == most), most",
+        "new": "    return [max(counts, key=counts.get)], most",
+        "tests": [
+            "tests.test_ntsb_fixture.TheMajorityClass."
+            "test_a_tie_names_every_class_in_it",
+            "tests.test_ntsb_fixture.TheMajorityClass."
+            "test_and_does_not_depend_on_which_was_counted_first",
+            "tests.test_ntsb_fixture.TheLineItPrints."
+            "test_a_tie_is_said_to_be_one",
+        ],
+    },
 ]
 
 
