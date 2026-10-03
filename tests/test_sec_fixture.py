@@ -157,7 +157,7 @@ class ReissueOutsideTheCitingSentence(unittest.TestCase):
         """The staff reissued something and the reader cannot say what. No row
         can be made of it; a note can."""
         labels, notes = fetch.classify(staff_letter(
-            "We note your response to comment 12. As we are unable to locate "
+            "We note the table on page 3. As we are unable to locate "
             "responsive disclosure, we reissue our comment."))
         self.assertEqual(labels, {})
         self.assertEqual(notes, [(
@@ -276,6 +276,38 @@ class WhichNumbersAreCited(unittest.TestCase):
 
     def cited(self, sentence):
         return fetch.cites(sentence, "2024-04-17")[0]
+
+    def test_a_number_spelled_out(self):
+        """One letter in a wider slice spells every one of them, and read with
+        digits only it had two reissues and no comment for either."""
+        self.assertEqual(verdicts(staff_letter(
+            "We note your response to prior comment one, including your added "
+            "disclosure. Please revise.",
+            "We note your response to prior comment five and reissue it in part.",
+            "We note your responses to prior comments seven and seventeen, "
+            "which we reissue.")),
+            {1: "addressed", 5: "partial", 7: "not_addressed", 17: "not_addressed"})
+
+    def test_a_comment_cited_without_the_word_prior(self):
+        """Six of the 375 rows of a 40-letter slice: three in the default
+        slice, and among the other three a reissue."""
+        self.assertEqual(verdicts(staff_letter(
+            "We note your response to comment 4 and reissue it in part.",
+            "We continue to evaluate your response to comment 31 and may have "
+            "further comments.",
+            "We note your responses to comments 18 and 21. Please revise.")),
+            {4: "partial", 31: "addressed", 18: "addressed", 21: "addressed"})
+
+    def test_but_not_every_mention_of_a_numbered_comment(self):
+        labels, notes = fetch.classify(staff_letter(
+            "Please revise your disclosure consistent with your September 8, "
+            "2023 response to comment 59 in our May 24, 2023 letter.",
+            "Please refer to comment 1 of our letter dated November 14, 2023.",
+            "Also in connection with comment 12, please clarify who owns the "
+            "shares. We note your response to comments from the exchange."))
+        self.assertEqual(labels, {})
+        self.assertEqual([what for what, _ in notes],
+                         ["citation of another letter's comment"])
 
     def test_lists_and_ranges(self):
         for sentence, want in (
@@ -557,6 +589,55 @@ class WhichLetterIsBeingAnswered(unittest.TestCase):
         self.assertEqual((upload["accession"], reply, why),
                          ("0000000000-24-000001",
                           {"date": None, "accession": None}, ""))
+
+
+class AskingEdgar(unittest.TestCase):
+    """The search endpoint answers 500 now and then and is fine a moment later.
+    It did on the run that re-pinned this fixture."""
+
+    class Response:
+        headers = {}
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+        def read(self):
+            return b"the letter"
+
+    def ask(self, codes):
+        """get() against a server that fails with each code in turn, then answers."""
+        waits, pending = [], list(codes)
+
+        def urlopen(request, timeout):
+            self.assertEqual(request.get_header("User-agent"), "Test Runner")
+            if pending:
+                raise fetch.urllib.error.HTTPError(
+                    request.full_url, pending.pop(0), "no", {}, None)
+            return self.Response()
+
+        for owner, name, value in ((fetch.urllib.request, "urlopen", urlopen),
+                                   (fetch.time, "sleep", waits.append)):
+            self.addCleanup(setattr, owner, name, getattr(owner, name))
+            setattr(owner, name, value)
+        return fetch.get("https://example.org/letter", "Test Runner"), waits
+
+    def test_a_server_error_is_asked_again_and_the_waits_grow(self):
+        body, waits = self.ask([500, 503])
+        self.assertEqual((body, waits), ("the letter", [2, 4, 0.2]))
+
+    def test_it_gives_up_after_three_more_tries(self):
+        with self.assertRaises(fetch.urllib.error.HTTPError):
+            self.ask([500, 500, 500, 500])
+
+    def test_a_refusal_is_not_asked_again(self):
+        """403 is the SEC declining the user-agent. Asking again is not the
+        answer, and main() has something to say about it."""
+        with self.assertRaises(fetch.urllib.error.HTTPError) as refused:
+            self.ask([403])
+        self.assertEqual(refused.exception.code, 403)
 
 
 class TheWholeRun(unittest.TestCase):

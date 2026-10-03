@@ -313,6 +313,31 @@ MUTATIONS = [
         ],
     },
     {
+        "what": "fixtures/sec — only a comment called \"prior\" is cited",
+        "why": "\"We note your response to comment 4 and reissue it in part\" "
+               "is then a reissue of nothing: no row, and one negative fewer",
+        "module": "fixtures/sec/fetch",
+        "old": '    r"\\b(?:prior comments?|responses? to comments?)\\s+(?:(?:nos?\\.?|numbers?)\\s+)?"',
+        "new": '    r"\\b(?:prior comments?)\\s+(?:(?:nos?\\.?|numbers?)\\s+)?"',
+        "tests": [
+            "tests.test_sec_fixture.WhichNumbersAreCited."
+            "test_a_comment_cited_without_the_word_prior",
+        ],
+    },
+    {
+        "what": "fixtures/sec — a comment number spelled out is not a number",
+        "why": "\"prior comment five and reissue it in part\" cites nothing, so "
+               "a letter that spells its numbers keeps its follow-ups and loses "
+               "its reissues",
+        "module": "fixtures/sec/fetch",
+        "old": 'NUM = r"(?:\\d{1,3}(?![\\d%%]|,\\d{3}|\\.\\d)|(?:%s)\\b)" % "|".join(WORDS)',
+        "new": 'NUM = r"(?:\\d{1,3}(?![\\d%%]|,\\d{3}|\\.\\d)|(?:%s)\\b)" % "zero"',
+        "tests": [
+            "tests.test_sec_fixture.WhichNumbersAreCited."
+            "test_a_number_spelled_out",
+        ],
+    },
+    {
         "what": "fixtures/sec — running text that starts with a number opens a comment",
         "why": "a line wrapped before \"18. Please revise\" takes comment 18's "
                "place and the real one is folded into it; one letter of the "

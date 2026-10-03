@@ -181,7 +181,7 @@ in one call.
 **The revised prompt is kept**, because asking about the outcome rather than the
 method is more correct regardless of the score. It is not kept because the number
 moved: +1 of 24 is inside the noise this fixture warns about, and the change has
-not been validated anywhere else. Validate on SEC (100 rows) before believing it.
+not been validated anywhere else. Validate on SEC (102 rows) before believing it.
 
 ## Screening five models on the enriched slice — 2026-08-22
 
@@ -257,7 +257,7 @@ alternate-route number alone would have read as a clear win.
 
 **The subset is deliberately enriched** — 63% positives against a natural 35% —
 so the overall column is not comparable to the 98-row figures above, and a model
-biased toward `addressed` flatters itself here. Validate on SEC (100 rows,
+biased toward `addressed` flatters itself here. Validate on SEC (102 rows,
 representative) before adopting.
 
 Not adopted. Worth refining rather than discarding: it is the only intervention

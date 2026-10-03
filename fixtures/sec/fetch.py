@@ -93,10 +93,18 @@ PARTIAL = re.compile(
     r"|\b(?:first|second|third|last|final) (?:sentence|paragraph)\b", re.I)
 WHOLE = re.compile(r"\bin full\b|\bin (?:its|their) entirety\b", re.I)
 
-# A comment number, but not the head of "1,802,444 shares", "10%" or "2023".
-NUM = r"\d{1,3}(?![\d%]|,\d{3}|\.\d)"
+# A comment number, but not the head of "1,802,444 shares", "10%" or "2023". Some
+# letters spell it: "We note your response to prior comment five and reissue it in
+# part." Read with digits only, that letter has a reissue and no comment for it.
+WORDS = ("one two three four five six seven eight nine ten eleven twelve thirteen "
+         "fourteen fifteen sixteen seventeen eighteen nineteen twenty").split()
+NUM = r"(?:\d{1,3}(?![\d%%]|,\d{3}|\.\d)|(?:%s)\b)" % "|".join(WORDS)
+# A comment of the earlier letter is cited as "prior comment 7", and now and then
+# as "your response to comment 7": 6 of the 375 rows of a 40-letter slice. It
+# carries reissues like the first: "We note your response to comment 4 and
+# reissue it in part."
 CITE = re.compile(
-    r"\bprior comments?\s+(?:(?:nos?\.?|numbers?)\s+)?"
+    r"\b(?:prior comments?|responses? to comments?)\s+(?:(?:nos?\.?|numbers?)\s+)?"
     r"(%(n)s(?:(?:\s*,\s*(?:(?:and|or)\s+)?|\s+(?:and|or|through)\s+"
     r"|\s*&\s*|\s*[-–]\s*)%(n)s)*)" % {"n": NUM}, re.I)
 # "prior comment 15 of our letter dated March 14, 2023" names a comment of that
@@ -130,7 +138,7 @@ NOT_OURS = "sentence with the word, not read as the staff reissuing a comment"
 NOTHING_CITED = "reissue with no prior comment cited beside it"
 REPLY = ("CORRESP", "DRSLTR")   # a reply to comments on a draft is a DRSLTR
 
-PINNED = "47c2bb05579c3a7b"
+PINNED = "50dd7efde5fa3081"
 
 
 def agent():
@@ -148,10 +156,20 @@ def agent():
 
 def get(url, ua, pause=0.2):
     request = urllib.request.Request(url, headers={"User-Agent": ua})
-    with urllib.request.urlopen(request, timeout=45) as response:
-        body = response.read()
-        if response.headers.get("Content-Encoding") == "gzip":
-            body = gzip.decompress(body)
+    for wait in (2, 4, 8, None):
+        try:
+            with urllib.request.urlopen(request, timeout=45) as response:
+                body = response.read()
+                if response.headers.get("Content-Encoding") == "gzip":
+                    body = gzip.decompress(body)
+            break
+        except urllib.error.HTTPError as exc:
+            # EDGAR's search answers 500 now and then and is fine a moment
+            # later. Left alone, one of those inside the loop below drops a
+            # letter and the slice moves for no reason of the SEC's.
+            if exc.code not in (429, 500, 502, 503) or wait is None:
+                raise
+            time.sleep(wait)
     time.sleep(pause)                      # SEC's ceiling is 10/s; this is well under
     return body.decode("utf-8", "replace")
 
@@ -275,13 +293,14 @@ def sentences(text):
 
 
 def numbers(group):
-    """The comment numbers in "3, 4 and 7" or "5 through 8"."""
+    """The comment numbers in "3, 4 and 7", "5 through 8" or "five and seven"."""
     out, previous, span = [], None, False
-    for token in re.findall(r"\d+|through|[-–]", group):
-        if not token.isdigit():
+    for token in re.findall(r"\d+|through|[-–]|%s" % "|".join(reversed(WORDS)),
+                            group.lower()):
+        if token in ("through", "-", "–"):
             span = True
             continue
-        number = int(token)
+        number = int(token) if token.isdigit() else WORDS.index(token) + 1
         if span and previous is not None and previous < number <= previous + 30:
             out.extend(range(previous + 1, number + 1))
         else:
