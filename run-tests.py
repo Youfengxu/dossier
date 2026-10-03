@@ -264,6 +264,190 @@ MUTATIONS = [
             "tests.test_chunking.TraceChunk.test_the_character_cap_splits_unwrapped_prose",
         ],
     },
+    # check-aggregation.py. The module name has a hyphen, which `import` cannot
+    # spell and __import__ can; tests/test_aggregation.py loads it the same way,
+    # so the tests and these mutations hold one module object between them.
+    {
+        "what": "check-aggregation — brackets inside a string literal counted again",
+        "why": "the gate as it shipped: one regex literal with an unmatched "
+               "\"(\" holds its statement open to the end of the file. It read "
+               "50 of llm.py's 595 lines and printed clean over the rest, and "
+               "24 of the 52 top-level files ended the same way",
+        "module": "check-aggregation",
+        "old": '            if token.type == tokenize.NEWLINE:',
+        "new": ('            if token.type == tokenize.NEWLINE and '
+                'sum(t.string.count(c) for t in pending for c in "([{") <= '
+                'sum(t.string.count(c) for t in pending for c in ")]}"):'),
+        "tests": [
+            "tests.test_aggregation.TheReportedFailure."
+            "test_a_site_below_a_regex_literal_is_reported",
+            "tests.test_aggregation.TheReportedFailure."
+            "test_and_nothing_else_is_said_about_that_file",
+            "tests.test_aggregation.WhereAStatementEnds."
+            "test_a_bracket_inside_a_string_does_not_hold_a_statement_open",
+            "tests.test_aggregation.TheTreeItself."
+            "test_every_file_is_read_to_its_end",
+            "tests.test_aggregation.TheTreeItself."
+            "test_the_statements_are_the_ones_the_parser_sees",
+        ],
+    },
+    {
+        "what": "check-aggregation — a line break inside a statement ends it",
+        "why": "the first version of the gate, which read line by line: a "
+               "comprehension whose filter sits on its second line is two "
+               "halves, and neither half is a filtered tally",
+        "module": "check-aggregation",
+        "old": '            if token.type == tokenize.NEWLINE:',
+        "new": '            if token.type in (tokenize.NEWLINE, tokenize.NL):',
+        "tests": [
+            "tests.test_aggregation.WhereAStatementEnds."
+            "test_a_filter_on_the_second_line_belongs_to_its_comprehension",
+            "tests.test_aggregation.WhereAStatementEnds."
+            "test_a_closing_bracket_inside_a_string_does_not_end_one_early",
+            "tests.test_aggregation.TheTreeItself."
+            "test_the_statements_are_the_ones_the_parser_sees",
+        ],
+    },
+    {
+        "what": "check-aggregation — the statement still open at the end of a "
+                "file is dropped",
+        "why": "the other half of the same defect. The loop kept a statement "
+               "when it closed, and one that never closed was thrown away "
+               "with everything it had swallowed, unscanned and unmentioned",
+        "module": "check-aggregation",
+        "old": '    if pending:\n        # Still open when the tokens ran out.',
+        "new": '    if False:\n        # Still open when the tokens ran out.',
+        "tests": [
+            "tests.test_aggregation.AFileNotReadToItsEnd."
+            "test_a_statement_still_open_at_the_end_is_scanned",
+            "tests.test_aggregation.AFileNotReadToItsEnd."
+            "test_and_the_file_is_reported_from_the_line_that_opened_it",
+            "tests.test_aggregation.AFileNotReadToItsEnd."
+            "test_an_open_statement_fails_the_gate_with_no_site_in_it",
+        ],
+    },
+    {
+        "what": "check-aggregation — a scan the tokenizer abandons says nothing",
+        "why": "every statement above the break is closed, so nothing is left "
+               "pending to give it away, and the parser does not always "
+               "object either: under 3.12 and 3.14 the tokenizer gives up on "
+               "one VALID f-string. The gate reads to that line, stops, and "
+               "reports on what it read as though that were the file",
+        "module": "check-aggregation",
+        "old": '        stopped = (line or reached, f"not read past this line: {reason}")',
+        "new": '        stopped = None',
+        "tests": [
+            "tests.test_aggregation.AFileNotReadToItsEnd."
+            "test_a_scan_that_stops_between_statements_says_where",
+            "tests.test_aggregation.AFileNotReadToItsEnd."
+            "test_whatever_the_tokenizer_raises_the_file_is_reported",
+        ],
+    },
+    {
+        "what": "check-aggregation — a file that cannot be read is skipped",
+        "why": "this was `continue`. A folder holding one undecodable file "
+               "beside a readable one was reported clean on the strength of "
+               "the readable one",
+        "module": "check-aggregation",
+        "old": '                unread.append((path, 0, f"could not be read ({said(error)})"))',
+        "new": '                pass',
+        "tests": [
+            "tests.test_aggregation.AFileNotReadToItsEnd."
+            "test_a_file_that_cannot_be_decoded_is_reported_not_skipped",
+        ],
+    },
+    {
+        "what": "check-aggregation — a file not read to its end still passes",
+        "why": "CI consumes the exit status and nothing else. A report that "
+               "names the unread file and exits 0 is a paragraph nobody is "
+               "shown",
+        "module": "check-aggregation",
+        "old": '    if not hits and not unread:',
+        "new": '    if not hits:',
+        "tests": [
+            "tests.test_aggregation.AFileNotReadToItsEnd."
+            "test_an_open_statement_fails_the_gate_with_no_site_in_it",
+            "tests.test_aggregation.AFileNotReadToItsEnd."
+            "test_a_scan_that_stops_between_statements_says_where",
+            "tests.test_aggregation.AFileNotReadToItsEnd."
+            "test_a_file_that_cannot_be_decoded_is_reported_not_skipped",
+            "tests.test_aggregation.AFileNotReadToItsEnd."
+            "test_a_path_that_does_not_exist_is_not_clean",
+        ],
+    },
+    {
+        "what": "check-aggregation — string literals blanked out of the statement",
+        "why": "the tidy way to stop a docstring matching, and it disarms the "
+               "gate: two of the filter pattern's four endings name a literal, "
+               "so with the strings gone neither can match anything",
+        "module": "check-aggregation",
+        "old": '            for n, piece in enumerate(token.string.split("\\n")):',
+        "new": ('            for n, piece in enumerate((\'""\' if literal(token) '
+                'else token.string).split("\\n")):'),
+        "tests": [
+            "tests.test_aggregation.StringsAreNotCode."
+            "test_a_literal_the_pattern_names_still_counts",
+        ],
+    },
+    {
+        "what": "check-aggregation — an acknowledgement reaches the statement "
+                "above it",
+        "why": "the window as it was: one line past the statement's first. An "
+               "`# aggregation-ok` written for one site then silences the "
+               "site on the line above it, which nobody looked at",
+        "module": "check-aggregation",
+        "old": '    rows = range(statement.line, statement.end + 1)',
+        "new": '    rows = range(statement.line, statement.end + 2)',
+        "tests": [
+            "tests.test_aggregation.TheAcknowledgement."
+            "test_one_written_for_the_next_statement_does_not_reach_back",
+        ],
+    },
+    {
+        "what": "check-aggregation — a file this Python cannot parse is trusted",
+        "why": "a tokenizer older than the file does not refuse it. It cuts an "
+               "f-string that reuses its own quote into two plain strings, "
+               "and the site between the braces is read as text: clean under "
+               "3.9 to 3.11, where the bracket counter had flagged it",
+        "module": "check-aggregation",
+        "old": '    return hits, len(found), stopped or unparsed(source)',
+        "new": '    return hits, len(found), stopped',
+        "tests": [
+            "tests.test_aggregation.AFileNotReadToItsEnd."
+            "test_a_file_this_python_cannot_parse_is_not_called_clean",
+        ],
+    },
+    {
+        "what": "check-aggregation — a line break inside a call is a space",
+        "why": "the lines of a statement were joined by a space wherever the "
+               "break fell, and the patterns allow none in `.most_common(` or "
+               "`.get(\"verdict\")`: a site wrapped after its dot, or inside "
+               "its call, read as clean",
+        "module": "check-aggregation",
+        "old": '    a = before.string if before.type == tokenize.OP else ""',
+        "new": '    return False',
+        "tests": [
+            "tests.test_aggregation.WhereAStatementEnds."
+            "test_a_line_break_inside_a_call_does_not_hide_it",
+            "tests.test_aggregation.WhereAStatementEnds."
+            "test_nor_does_one_inside_the_literal_a_pattern_names",
+        ],
+    },
+    {
+        "what": "check-aggregation — an argument with nothing to read passes",
+        "why": "a folder with no Python under it, named beside one that has "
+               "some, is covered by its neighbour: the mistyped argument, "
+               "reported as checked",
+        "module": "check-aggregation",
+        "old": '            unread.append((argument, 0, "no Python source here"))',
+        "new": '            pass',
+        "tests": [
+            "tests.test_aggregation.AFileNotReadToItsEnd."
+            "test_a_folder_holding_no_python_is_not_clean",
+            "tests.test_aggregation.AFileNotReadToItsEnd."
+            "test_nor_is_one_given_beside_a_path_that_does_hold_some",
+        ],
+    },
 ]
 
 

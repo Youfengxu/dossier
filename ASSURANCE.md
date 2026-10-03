@@ -70,8 +70,8 @@ product, not a presentation afterthought.
 
 | tier | artefact | count | industry term |
 |---|---|---|---|
-| 1 | `tests/` | 215 | unit tests |
-| 2 | `run-tests.py --mutate` | 15/15 | **mutation testing** |
+| 1 | `tests/` | 266 | unit tests |
+| 2 | `run-tests.py --mutate` | 26/26 | **mutation testing** |
 | 3 | `conformance.py` | 6/6 | **contract testing**, proved by mutation |
 | 3 | `smoke.py` | 27/27 | integration / E2E |
 | 0 | `doctor.py` | — | preflight / environment check |
@@ -128,7 +128,7 @@ vocabulary.
 
 | 25059-style characteristic | where dossier already evidences it | strength |
 |---|---|---|
-| Functional correctness | 215 unit tests, 15 mutations, 6 contract checks | **strong** |
+| Functional correctness | 266 unit tests, 26 mutations, 6 contract checks | **strong** |
 | Robustness | fixtures carry deliberate decoys; adversarial checker tests | moderate |
 | Transparency / explicability | every finding carries `slug:line` + verbatim quote | **strong** — this is the thesis |
 | Accuracy (task-level) | eval suite on 5 labelled corpora | **weak — no human baseline (G1)** |
