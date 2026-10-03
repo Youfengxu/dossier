@@ -15,10 +15,17 @@ rather than because a test suite normally needs them:
                 extract.py and matrix.py were written because no OOXML library
                 was installable on the review machine; testing them against a
                 library-generated file would test the library.
+
+  script()      imports a script that lives below the top level. A fixture's
+                fetch.py reads its labels out of documents by pattern, which is
+                a checker like any other, and it sits where `import` cannot
+                reach it.
 """
 
+import importlib.util
 import io
 import os
+import re
 import sys
 import types
 import zipfile
@@ -53,6 +60,29 @@ def lift(module, outer, inner):
             f"{code.co_freevars}; it cannot be lifted out of its frame. Promote "
             f"it to module level or pass those values as arguments.")
     return types.FunctionType(code, module.__dict__, inner)
+
+
+_SCRIPTS = {}
+
+
+def script(relative):
+    """Import a script by its path from the repository root, once.
+
+    Every caller gets the SAME module object, and that is the point of going
+    through here. run-tests.py --mutate breaks a module in place and requires
+    the named tests to fail; a test holding a private copy of the module would
+    go on testing the unbroken code, and the mutation would read as NOT CAUGHT
+    however good the test was.
+    """
+    if relative not in _SCRIPTS:
+        root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        name = re.sub(r"\W+", "_", os.path.splitext(relative)[0])
+        spec = importlib.util.spec_from_file_location(
+            name, os.path.join(root, relative))
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        _SCRIPTS[relative] = module
+    return _SCRIPTS[relative]
 
 
 def _find_code(code, name):

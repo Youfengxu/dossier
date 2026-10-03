@@ -21,4 +21,8 @@ cd fixtures && shasum -a 256 -c --quiet backup/2026-10-03.MANIFEST.sha256
 Every fixture can also fetch its data again at its pinned version (`fetch.py`, which checks a digest), as long as the
 upstream source stays up. The caches and run outputs cannot be fetched again.
 
+**Superseded since the copy.** `sec/comments.csv` and `sec/labels.json` in the archive are the SEC fixture's labels as
+they stood until later on 3 October, when they were read again and re-pinned: 4 of the 100 were wrong (`sec/README.md`).
+The archive keeps them as the record of what the fixture said until then. For the current labels run `sec/fetch.py`.
+
 **Still to do.** After the Borg run of 4 October 02:00, confirm with `borg list` and a one-file extract-and-compare.

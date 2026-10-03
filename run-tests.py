@@ -254,6 +254,149 @@ MUTATIONS = [
         ],
     },
     {
+        "what": "fixtures/sec — the reissue pattern loses its misspelling",
+        "why": "\"We resissue prior comment 30 in full\" is then read as the "
+               "staff accepting the response: the wrong label, in the direction "
+               "that flatters whatever is scored against it",
+        "module": "fixtures/sec/fetch",
+        "old": 'REISSUE = re.compile(r"\\bre-?s?issu\\w*|\\breiterat\\w*", re.I)',
+        "new": 'REISSUE = re.compile(r"\\bre-?issu\\w*|\\breiterat\\w*", re.I)',
+        "tests": [
+            "tests.test_sec_fixture.TheWordsForReissuing."
+            "test_the_misspelling_one_letter_uses",
+        ],
+    },
+    {
+        "what": "fixtures/sec — a reissue reaches only the sentence it is in",
+        "why": "\"We note your response to prior comment 24. We reissue the "
+               "first bullet of the prior comment in part.\" is then addressed, "
+               "because the number and the reissue are a full stop apart",
+        "module": "fixtures/sec/fetch",
+        "old": "        for number in here or sorted(at):",
+        "new": "        for number in here:",
+        "tests": [
+            "tests.test_sec_fixture.ReissueOutsideTheCitingSentence."
+            "test_a_reissue_in_the_next_sentence_reaches_the_comment_cited_before_it",
+            "tests.test_sec_fixture.ReissueOutsideTheCitingSentence."
+            "test_a_reissue_further_on_is_quoted_with_the_gap_marked",
+            "tests.test_sec_fixture.ReissueOutsideTheCitingSentence."
+            "test_one_that_names_none_reaches_every_comment_cited_around_it",
+        ],
+    },
+    {
+        "what": "fixtures/sec — any use of the word reissues the comments around it",
+        "why": "a question about a reissued audit report then reissues every "
+               "prior comment its numbered comment cites; reading across "
+               "sentences is only safe while this guard holds",
+        "module": "fixtures/sec/fetch",
+        "old": '            ours = OURS.search(parts[i]) or re.search(r"\\bcomments?\\b", parts[i], re.I)',
+        "new": '            ours = True',
+        "tests": [
+            "tests.test_sec_fixture.ReissueOutsideTheCitingSentence."
+            "test_the_word_used_of_something_else_reissues_nothing",
+        ],
+    },
+    {
+        "what": "fixtures/sec — a comment of an older letter counted as this one's",
+        "why": "\"prior comment 15 of our letter dated March 14, 2023\" becomes a "
+               "row about comment 15 of a letter that never said it",
+        "module": "fixtures/sec/fetch",
+        "old": "        if other and iso(other) != first:",
+        "new": "        if False:",
+        "tests": [
+            "tests.test_sec_fixture.ACommentOfAnotherLetter."
+            "test_a_comment_of_an_older_letter_is_not_a_comment_of_this_one",
+            "tests.test_sec_fixture.ACommentOfAnotherLetter."
+            "test_reissuing_another_letters_comment_reissues_nothing_here",
+            "tests.test_sec_fixture.TheWholeRun."
+            "test_what_is_labelled_and_what_is_set_aside",
+        ],
+    },
+    {
+        "what": "fixtures/sec — only a comment called \"prior\" is cited",
+        "why": "\"We note your response to comment 4 and reissue it in part\" "
+               "is then a reissue of nothing: no row, and one negative fewer",
+        "module": "fixtures/sec/fetch",
+        "old": '    r"\\b(?:prior comments?|responses? to comments?)\\s+(?:(?:nos?\\.?|numbers?)\\s+)?"',
+        "new": '    r"\\b(?:prior comments?)\\s+(?:(?:nos?\\.?|numbers?)\\s+)?"',
+        "tests": [
+            "tests.test_sec_fixture.WhichNumbersAreCited."
+            "test_a_comment_cited_without_the_word_prior",
+        ],
+    },
+    {
+        "what": "fixtures/sec — a comment number spelled out is not a number",
+        "why": "\"prior comment five and reissue it in part\" cites nothing, so "
+               "a letter that spells its numbers keeps its follow-ups and loses "
+               "its reissues",
+        "module": "fixtures/sec/fetch",
+        "old": 'NUM = r"(?:\\d{1,3}(?![\\d%%]|,\\d{3}|\\.\\d)|(?:%s)\\b)" % "|".join(WORDS)',
+        "new": 'NUM = r"(?:\\d{1,3}(?![\\d%%]|,\\d{3}|\\.\\d)|(?:%s)\\b)" % "zero"',
+        "tests": [
+            "tests.test_sec_fixture.WhichNumbersAreCited."
+            "test_a_number_spelled_out",
+        ],
+    },
+    {
+        "what": "fixtures/sec — running text that starts with a number opens a comment",
+        "why": "a line wrapped before \"18. Please revise\" takes comment 18's "
+               "place and the real one is folded into it; one letter of the "
+               "default slice's eight does this",
+        "module": "fixtures/sec/fetch",
+        "old": 'NUMBER = re.compile(r"^\\s{0,12}(\\d{1,3})\\.(?:\\s{2,}|\\s*$)")',
+        "new": 'NUMBER = re.compile(r"^\\s{0,12}(\\d{1,3})\\.(?!\\d)")',
+        "tests": [
+            "tests.test_sec_fixture.WhereACommentStarts."
+            "test_a_wrapped_line_that_starts_with_the_next_number_opens_nothing",
+            "tests.test_sec_fixture.WhereACommentStarts."
+            "test_a_numbered_heading_from_the_filing_opens_nothing",
+        ],
+    },
+    {
+        "what": "fixtures/sec — a letter whose numbering breaks is labelled anyway",
+        "why": "every comment after the lost number is read as one, and a "
+               "reissue in any of them lands on prior comments it never named",
+        "module": "fixtures/sec/fetch",
+        "old": "    if not starts or any(found and int(found.group(1)) == want + 1",
+        "new": "    if not starts or any(False and int(found.group(1)) == want + 1",
+        "tests": [
+            "tests.test_sec_fixture.WhereACommentStarts."
+            "test_a_letter_whose_numbering_breaks_is_set_aside_not_labelled",
+            "tests.test_sec_fixture.TheWholeRun."
+            "test_what_is_labelled_and_what_is_set_aside",
+        ],
+    },
+    {
+        "what": "fixtures/sec — the first-round letter taken without reading its date",
+        "why": "the staff letter nearest the date named is then the first-round "
+               "letter whatever is printed on it, which is how a closing notice "
+               "came to stand for a comment letter",
+        "module": "fixtures/sec/fetch",
+        "old": "        if dated(text) != first or not comments:",
+        "new": "        if False:",
+        "tests": [
+            "tests.test_sec_fixture.WhichLetterIsBeingAnswered."
+            "test_a_letter_filed_the_day_after_the_date_printed_on_it",
+            "tests.test_sec_fixture.WhichLetterIsBeingAnswered."
+            "test_a_notice_dated_the_same_day_is_not_the_comment_letter",
+        ],
+    },
+    {
+        "what": "fixtures/sec — a page header left inside a sentence",
+        "why": "its \"Corp.\" ends the sentence, \"which we reissue\" and \"in "
+               "part\" land in different ones, and a partial reissue is read "
+               "as a full one",
+        "module": "fixtures/sec/fetch",
+        "old": "    return \"\\n\".join(line for i, line in enumerate(lines) if i not in drop",
+        "new": "    return \"\\n\".join(line for i, line in enumerate(lines) if True",
+        "tests": [
+            "tests.test_sec_fixture.PageHeaders."
+            "test_a_header_inside_the_reissuing_sentence_does_not_end_it",
+            "tests.test_sec_fixture.PageHeaders."
+            "test_nor_does_the_plain_header_of_a_later_page",
+        ],
+    },
+    {
         "what": "trace.chunk — the character cap disabled",
         "why": "one passage then holds most of an unwrapped contract, useless "
                "to retrieve and too large to send",
@@ -510,6 +653,22 @@ def run(names, verbosity):
     return report(result, time.time() - started)
 
 
+def imported(name):
+    """The module object a mutation is applied to.
+
+    A top-level tool imports by name. A script below the top level
+    ("fixtures/sec/fetch") cannot, so it comes from tests.support.script, which
+    hands the tests and the mutation the same object. Loading a second copy here
+    would break a module no test is looking at, and every mutation of it would
+    read NOT CAUGHT — the subprocess trap described above MUTATIONS, by another
+    route.
+    """
+    if "/" in name:
+        from tests.support import script
+        return script(name + ".py")
+    return __import__(name)
+
+
 def mutate():
     """Break one function at a time and require the named tests to notice.
 
@@ -532,7 +691,7 @@ def mutate():
             missed.append(("STALE ANCHOR", mutation["what"]))
             continue
 
-        module = __import__(mutation["module"])
+        module = imported(mutation["module"])
         # Compile the ORIGINAL before touching anything. Several sessions edit
         # this repository at once, and reading a file mid-write would otherwise
         # mutate the module and then fail to put it back.
