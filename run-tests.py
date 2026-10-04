@@ -878,6 +878,8 @@ MUTATIONS = [
             "test_no_line_of_the_fixture_that_holds_text_is_in_no_section",
             "tests.test_unread_lines.WhatALocatorSays."
             "test_the_committed_inventory_differs_from_a_fresh_cut_in_one_section",
+            "tests.test_unread_lines.OnDocumentsNobodyChose."
+            "test_every_line_with_text_is_in_one_section_and_no_locator_lies",
         ],
     },
     {
@@ -904,6 +906,8 @@ MUTATIONS = [
             # floor back it no longer says it reads the whole document.
             "tests.test_unread_lines.ARun."
             "test_it_reads_the_whole_document_and_the_inventory_says_so",
+            "tests.test_unread_lines.OnDocumentsNobodyChose."
+            "test_every_line_with_text_is_in_one_section_and_no_locator_lies",
         ],
     },
     {
@@ -918,6 +922,24 @@ MUTATIONS = [
         "tests": [
             "tests.test_unread_lines.ASectionOfAFewWords."
             "test_a_heading_with_nothing_under_it_is_kept",
+            "tests.test_unread_lines.OnDocumentsNobodyChose."
+            "test_every_line_with_text_is_in_one_section_and_no_locator_lies",
+        ],
+    },
+    {
+        "what": "inventory.split_sections — the piece after a size cut starts "
+                "one line early",
+        "why": "its locator then names a line its text does not hold, and "
+               "that line is in two sections. Everything downstream takes a "
+               "locator for what a call was shown: unread_lines() is the one "
+               "place that checks, and the documents in the fixture are never "
+               "cut for size, so only generated ones reach this",
+        "module": "inventory",
+        "old": '                current, start, opened = [], number + 1, False',
+        "new": '                current, start, opened = [], number, False',
+        "tests": [
+            "tests.test_unread_lines.OnDocumentsNobodyChose."
+            "test_every_line_with_text_is_in_one_section_and_no_locator_lies",
         ],
     },
     {
@@ -1024,7 +1046,7 @@ MUTATIONS = [
                "would be doubted over its blank lines, and one that found "
                "some would be reported as a guess",
         "module": "synthesize",
-        "old": '    if isinstance(recorded, list):',
+        "old": '    if line_numbers(record):',
         "new": '    if False:',
         "tests": [
             "tests.test_unread_lines.TheInventoryLine."
@@ -1061,6 +1083,160 @@ MUTATIONS = [
             "test_the_committed_inventory_has_two",
         ],
     },
+    # What an independent review of the entries above found, each reproduced
+    # before it was fixed. Four mutations it tried were caught by no test.
+    {
+        "what": "synthesize.line_numbers — a list of anything is the "
+                "inventory's own account",
+        "why": "entries that were not line numbers were dropped one by one "
+               "and what was left was the record: [21.0, 22.0] read as \"no "
+               "line left out\", and the absences were asserted over lines "
+               "21 and 22",
+        "module": "synthesize",
+        "old": '    return all(type(n) is int and n > 0 for n in value)',
+        "new": '    return True',
+        "tests": [
+            "tests.test_unread_lines.TheInventoryLine."
+            "test_a_list_that_is_not_line_numbers_is_not_taken_as_the_record",
+            "tests.test_unread_lines.WhatAnInventorySaysOfItsLines."
+            "test_a_list_holding_numbers_that_are_not_line_numbers_is_no_record",
+        ],
+    },
+    {
+        "what": "synthesize.lines_left_out — a locator that runs backwards "
+                "holds lines",
+        "why": "\"d:40-23\" was read as reaching line 23, and the gap after "
+               "it was then counted twice: \"36 line(s) ... lines 21-39, "
+               "24-40\", of twenty",
+        "module": "synthesize",
+        "old": '        if found and int(found.group(1)) <= int(found.group(2)):',
+        "new": '        if found:',
+        "tests": [
+            "tests.test_unread_lines.WhatAnInventorySaysOfItsLines."
+            "test_a_locator_that_runs_backwards_names_no_lines",
+        ],
+    },
+    {
+        "what": "synthesize.lines_left_out — a section inside another ends "
+                "the outer one",
+        "why": "the lines between the end of the inner section and the end "
+               "of the outer are then a gap, reported as lines no call was "
+               "shown, and every absence is marked over them",
+        "module": "synthesize",
+        "old": '        reached = max(reached, last)',
+        "new": '        reached = last',
+        "tests": [
+            "tests.test_unread_lines.WhatAnInventorySaysOfItsLines."
+            "test_nor_is_a_section_inside_another",
+        ],
+    },
+    {
+        "what": "synthesize.lines_left_out — no locator to read is no gap "
+                "found",
+        "why": "\"going by its sections' line numbers there is none\", "
+               "printed over an inventory none of whose sections gave a line "
+               "number. Nothing was looked at, and it read as a look that "
+               "found nothing",
+        "module": "synthesize",
+        "old": '    return gaps, BY_LOCATOR if spans else NOT_KNOWN',
+        "new": '    return gaps, BY_LOCATOR',
+        "tests": [
+            "tests.test_unread_lines.WhatAnInventorySaysOfItsLines."
+            "test_with_no_locator_that_can_be_read_nothing_is_known",
+            "tests.test_unread_lines.TheInventoryLine."
+            "test_an_inventory_whose_sections_name_no_lines_says_so",
+        ],
+    },
+    {
+        "what": "synthesize — a cycle of deferrals is put in doubt by lines "
+                "no call was shown",
+        "why": "a cycle is three deferrals found, and what was not read "
+               "cannot unfind them. Marked with the rest, the one D6 the "
+               "inventory establishes would read as a question",
+        "module": "synthesize",
+        "old": '                             labelled, ""))',
+        "new": ('                             labelled, '
+                'line_question(no_section, "could own it")))'),
+        "tests": [
+            "tests.test_unread_lines.AnAbsenceALineInNoSectionCouldAnswer."
+            "test_so_is_a_cycle_of_deferrals_and_the_header_does_not_say_otherwise",
+        ],
+    },
+    {
+        "what": "inventory.unread_lines — a section that starts before the "
+                "first line is taken at its word",
+        "why": "a start of 0 is a slice from the end of the list. It read as "
+               "the last line, the text matched, and every line of the "
+               "range counted as shown: the check, fooled by the thing it "
+               "checks",
+        "module": "inventory",
+        "old": '        if not 1 <= start <= end <= len(lines):',
+        "new": '        if False:',
+        "tests": [
+            "tests.test_unread_lines.WhatTheRunChecks."
+            "test_nor_one_whose_lines_the_text_does_not_have",
+        ],
+    },
+    {
+        "what": "inventory.unread_lines — a section's first line is taken "
+                "for its heading",
+        "why": "a section whose text is every line after its first shows "
+               "that first line only if it IS the heading. The test that "
+               "was meant to hold this passed with the comparison deleted",
+        "module": "inventory",
+        "old": ('        headed = "\\n".join(span[1:]) == section["text"] and \\\n'
+                '            span[0].strip().lstrip("#").strip() == section["heading"]'),
+        "new": '        headed = "\\n".join(span[1:]) == section["text"]',
+        "tests": [
+            "tests.test_unread_lines.WhatTheRunChecks."
+            "test_nor_does_one_whose_heading_is_not_the_line_it_starts_on",
+        ],
+    },
+    {
+        "what": "inventory.py — the lines of a section --limit stopped "
+                "before are counted as lines in no section",
+        "why": "they are in a section, and the section is recorded as not "
+               "read. Counted again as lines the splitter lost, a run told "
+               "to stop early blames the splitter for it. No test ran "
+               "main() with --limit",
+        "module": "inventory",
+        "old": ('    left_out = unread_lines(lines, everything)\n'
+                '    sections, beyond = limited(everything, args.doc, args.limit)'),
+        "new": ('    sections, beyond = limited(everything, args.doc, args.limit)\n'
+                '    left_out = unread_lines(lines, sections)'),
+        "tests": [
+            "tests.test_unread_lines.ARun."
+            "test_a_section_limit_stopped_before_is_not_lines_in_no_section",
+        ],
+    },
+    {
+        "what": "inventory.py — a run with nothing to read divides by the "
+                "time it took",
+        "why": "older than the rest of this block: an empty document wrote "
+               "its inventory and then died of ZeroDivisionError in the "
+               "line that reports the rate, in more than half of 200 runs",
+        "module": "inventory",
+        "old": '    rate = len(sections) / elapsed if elapsed else 0.0',
+        "new": '    rate = len(sections) / elapsed',
+        "tests": [
+            "tests.test_unread_lines.ARun."
+            "test_a_document_with_nothing_in_it_is_read_as_that",
+        ],
+    },
+    {
+        "what": "inventory.reading — a document with no text is read 100%",
+        "why": "nothing was read. \"100% of the document\" over no sections "
+               "is true the way an empty tally is unanimous",
+        "module": "inventory",
+        "old": '    if not everything and not left_out:',
+        "new": '    if False:',
+        "tests": [
+            "tests.test_unread_lines.WhatTheRunSays."
+            "test_a_document_with_no_text_is_not_read_one_hundred_percent",
+            "tests.test_unread_lines.ARun."
+            "test_a_document_with_nothing_in_it_is_read_as_that",
+        ],
+    },
     {
         "what": "synthesize — every inventory is taken to have left no line "
                 "out",
@@ -1068,8 +1244,8 @@ MUTATIONS = [
                "in none of the 74, and said nothing for as long as there "
                "were two",
         "module": "synthesize",
-        "old": '    left_out, recorded = lines_left_out(data)',
-        "new": '    left_out, recorded = [], True',
+        "old": '    no_section, line_record = lines_left_out(data)',
+        "new": '    no_section, line_record = [], RECORDED',
         "tests": [
             "tests.test_unread_lines.TheInventoryLine."
             "test_lines_the_inventory_left_out_are_counted_and_named",
@@ -1088,15 +1264,33 @@ MUTATIONS = [
         "why": "\"1 line(s)\" over lines 284-285: a count of something other "
                "than what it names",
         "module": "synthesize",
-        "old": '    count = sum(last - first + 1 for first, last in left_out)',
-        "new": '    count = len(left_out)',
+        "old": '    return sum(last - first + 1 for first, last in left_out)',
+        "new": '    return len(left_out)',
         "tests": [
             "tests.test_unread_lines.TheInventoryLine."
             "test_lines_the_inventory_left_out_are_counted_and_named",
             "tests.test_unread_lines.TheInventoryLine."
             "test_an_older_inventory_shows_them_as_a_gap_between_its_sections",
+            "tests.test_unread_lines.TheInventoryLine."
+            "test_a_long_list_is_cut_and_its_count_is_not",
             "tests.test_unread_lines.AnAbsenceALineInNoSectionCouldAnswer."
             "test_a_score_says_what_the_inventory_did_not_read",
+        ],
+    },
+    {
+        "what": "synthesize — a score counts the pairs it adjudicated as "
+                "lines in no section",
+        "why": "main() is one long namespace and already keeps a `count`: "
+               "the pairs adjudicate_pairs tried. The first version of the "
+               "score line kept its own under that name, and with "
+               "--adjudicate printed \"has 1 line(s) in no section\" under a "
+               "header that said 3",
+        "module": "synthesize",
+        "old": '                  f"{how_many(no_section)} line(s) in no section: a miss may "',
+        "new": '                  f"{count} line(s) in no section: a miss may "',
+        "tests": [
+            "tests.test_unread_lines.AnAbsenceALineInNoSectionCouldAnswer."
+            "test_and_says_the_same_after_pairs_were_adjudicated",
         ],
     },
     {
@@ -1106,7 +1300,7 @@ MUTATIONS = [
                "two lines the committed inventory left out is \"SF ingests "
                "telemetry and applies quality flags.\"",
         "module": "synthesize",
-        "old": 'line_question(left_out, "could consume it")',
+        "old": 'line_question(no_section, "could consume it")',
         "new": '""',
         "tests": [
             "tests.test_unread_lines.AnAbsenceALineInNoSectionCouldAnswer."
@@ -1128,7 +1322,7 @@ MUTATIONS = [
                "document, and the owner can be named on one that is in no "
                "section",
         "module": "synthesize",
-        "old": 'line_question(left_out, "could own it")',
+        "old": 'line_question(no_section, "could own it")',
         "new": '""',
         "tests": [
             "tests.test_unread_lines.AnAbsenceALineInNoSectionCouldAnswer."
@@ -1165,7 +1359,7 @@ MUTATIONS = [
                "been shown one of that defect's corroborating anchors, with "
                "nothing beside it to say so",
         "module": "synthesize",
-        "old": '        if unread or partial or short or left_out:',
+        "old": '        if unread or partial or short or no_section:',
         "new": '        if unread or partial or short:',
         "tests": [
             "tests.test_unread_lines.AnAbsenceALineInNoSectionCouldAnswer."

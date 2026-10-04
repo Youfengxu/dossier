@@ -534,6 +534,20 @@ inventory.** The extraction stage is not the hard part.
 > cannot be told from the inventory, so a pointer to a section an older
 > inventory dropped is still reported as a pointer to no section.
 >
+> **It makes one thing worse for as long as D3 reads headings from the
+> inventory.** D3 finds a section by the heading of a chunk, and a heading
+> that is text of another chunk is invisible to it: 15 of the fixture's 88
+> headings already are, each for arriving within `min_lines` of the one
+> before. A sub-heading on the line straight after its parent, which is how
+> `extract.py` lays out a `.docx`, used to replace the parent and head the
+> chunk. It is now the parent's first line of text, and a pointer to it reads
+> "no such section in the document", asserted and unmarked. An independent
+> review found this by running it. On the fixture the set of headings that
+> head no chunk is the same 15. Over the thirteen frozen documents of the
+> floodtwin, kep, cm1, cuad and ntsb fixtures it is 156 of 621 marked headings
+> before and 154 now, three of them new. The remedy is D3's, not the
+> splitter's: read the headings from the document.
+>
 > The committed inventory was cut the old way and has the two lines in no
 > section. It records no `unread_lines`, so `synthesize.py` reads them off the
 > gap between its sections' line numbers, and says that it cannot see past the

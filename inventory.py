@@ -159,7 +159,8 @@ def split_sections(lines, min_lines=4, max_lines=90, max_chars=1200):
     line of text, which is what a heading arriving within `min_lines` already
     did; and a section is kept if it has a heading line of its own or any
     text. What is still left out is blank lines with no heading over them.
-    unread_lines() checks all of this against the text on every run.
+    unread_lines() checks on every run that no line which holds text is left
+    out. That no line is in two sections is checked by the tests alone.
     """
     sections, current, heading, start = [], [], "(front matter)", 1
     opened = False      # the pending section starts on its own heading line
@@ -203,16 +204,21 @@ def unread_lines(lines, sections):
     Worked out from the text each section carries, not from its line numbers
     alone: the claim is about what a call is shown, and a locator is the
     splitter's own account of that. A section whose text is not the lines its
-    locator names shows none of them, as far as this can tell.
+    locator names shows none of them, as far as this can tell, and nor does
+    one whose lines the text does not have: a start of 0 is a slice from the
+    end of the list in Python, and was read as the last line.
     """
     shown = set()
     for section in sections:
-        span = lines[section["start"] - 1:section["end"]]
+        start, end = section["start"], section["end"]
+        if not 1 <= start <= end <= len(lines):
+            continue
+        span = lines[start - 1:end]
         whole = "\n".join(span) == section["text"]
-        headed = bool(span) and "\n".join(span[1:]) == section["text"] and \
+        headed = "\n".join(span[1:]) == section["text"] and \
             span[0].strip().lstrip("#").strip() == section["heading"]
         if whole or headed:
-            shown.update(range(section["start"], section["end"] + 1))
+            shown.update(range(start, end + 1))
     return [number for number, line in enumerate(lines, 1)
             if line.strip() and number not in shown]
 
@@ -363,8 +369,12 @@ def reading(sections, everything, beyond, left_out, concurrency):
 
     "100% of the document" was a constant: printed under --limit, and printed
     over a splitter that left lines in no section. It is said now only when
-    no section is held back and unread_lines() finds no line left out.
+    no section is held back and unread_lines() finds no line left out. A
+    document with no text in it is not read 100%: there is nothing to read,
+    and the run says that.
     """
+    if not everything and not left_out:
+        return "nothing to read: no line of the document holds text"
     if not beyond and not left_out:
         return (f"reading 100% of the document at concurrency {concurrency}: "
                 f"every line that holds text is in a section")
@@ -460,8 +470,11 @@ def main():
                    "runs": args.runs, "unread_lines": left_out,
                    "sections": results}, handle, indent=1)
 
+    # With nothing to read the loop above takes no time, and a rate is a
+    # division by it: an empty document wrote its inventory and then crashed.
+    rate = len(sections) / elapsed if elapsed else 0.0
     print(f"\n{client.summary()}")
-    print(f"  {elapsed:.0f}s wall clock, {len(sections)/elapsed:.2f} sections/s"
+    print(f"  {elapsed:.0f}s wall clock, {rate:.2f} sections/s"
           f"  ({short['failed']} failed, {short['degraded']} degraded to the "
           f"minimal schema,")
     print(f"  {short['short']} read in fewer than the {args.runs} passes "

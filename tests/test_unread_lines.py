@@ -20,7 +20,8 @@ GT-D5-001. The inventory DESIGN 3.24-3.30 quote from was cut that way.
 The splitter now keeps both kinds. That is one claim. The other is that the
 run CHECKS what its splitter left out, writes it into the inventory, and that
 synthesize.py does not assert an absence over lines nothing read. Each is
-tested here, in process, on documents small enough to read and on the fixture.
+tested here, in process, on documents small enough to read, on the fixture,
+and on six hundred that a seeded generator wrote.
 
 No model: the client in ARun answers every section and finds nothing in it.
 """
@@ -31,6 +32,7 @@ import hashlib
 import io
 import json
 import os
+import random
 import shutil
 import sys
 import tempfile
@@ -40,6 +42,7 @@ from unittest import mock
 import inventory
 import llm
 import synthesize
+from llm import LLMError
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FLOODTWIN = os.path.join(ROOT, "fixtures", "floodtwin")
@@ -74,6 +77,20 @@ def shown(lines):
     for section in inventory.split_sections(lines):
         out += [section["heading"]] + section["text"].split("\n")
     return out
+
+
+def told(lines, part):
+    """(whether a section's text is every line of its range, whether it is
+    its heading line and then every line after it). One of the two is what a
+    locator promises. A section cut for size starts on no heading and carries
+    the one before, and its first line can read the same as that heading (a
+    bare "#" has the heading "", and so does a blank line), so the heading
+    alone does not say which of the two a section is."""
+    span = lines[part["start"] - 1:part["end"]]
+    whole = "\n".join(span) == part["text"]
+    headed = bool(span) and "\n".join(span[1:]) == part["text"] and \
+        span[0].strip().lstrip("#").strip() == part["heading"]
+    return whole, headed
 
 
 def in_no_section(lines):
@@ -180,9 +197,7 @@ class WhatALocatorSays(unittest.TestCase):
         for slug in ("deliverable-v1", "deliverable-v2", "requirements"):
             lines, held = frozen(slug), []
             for section in inventory.split_sections(lines):
-                span = lines[section["start"] - 1:section["end"]]
-                opens = span[0].strip().lstrip("#").strip() == section["heading"]
-                if "\n".join(span[1:] if opens else span) != section["text"]:
+                if not any(told(lines, section)):
                     wrong.append((slug, section["start"]))
                 held += range(section["start"], section["end"] + 1)
             if len(held) != len(set(held)):
@@ -209,6 +224,56 @@ class WhatALocatorSays(unittest.TestCase):
             [pair for pair in now if pair not in then],
             [("deliverable-v1:284-293",
               "2. SF ingests telemetry and applies quality flags.")])
+
+
+class OnDocumentsNobodyChose(unittest.TestCase):
+    """The cases above were written by someone who knew where the splitter
+    had failed. These are headings, steps, stubs, blank lines and long lines
+    in whatever order a seeded generator puts them, cut under three sets of
+    limits. The splitter as it was left text in no section in nine of ten."""
+
+    PIECES = (
+        lambda r: "",
+        lambda r: "",
+        lambda r: "   ",
+        lambda r: "#" * r.randint(1, 4) + f" {r.randint(1, 30)}. Calibration",
+        lambda r: "## Glossary",
+        lambda r: "#",
+        lambda r: f"{r.randint(1, 9)}. SF ingests telemetry.",
+        lambda r: f"{r.randint(1, 9)}.{r.randint(1, 9)} Drift limits",
+        lambda r: f"{r.randint(2, 40)} of the gauges failed in the first year.",
+        lambda r: "Appendix " + r.choice("ABC") + " Interfaces",
+        lambda r: "To be written.",
+        lambda r: "The twin models the drainage network. " * r.randint(1, 4),
+        lambda r: "telemetry " * r.randint(60, 200),
+        lambda r: "| IF-PA-001 | Operator telemetry pull | in |",
+        lambda r: "9. " + "z" * r.randint(90, 120),    # too long for a heading
+    )
+
+    def test_every_line_with_text_is_in_one_section_and_no_locator_lies(self):
+        chooser, wrong = random.Random(20261004), []
+        for trial in range(600):
+            lines = [chooser.choice(self.PIECES)(chooser)
+                     for _ in range(chooser.randint(0, 50))]
+            limits = ({}, {"max_chars": 200, "max_lines": 10},
+                      {"max_chars": 40, "max_lines": 3})[trial % 3]
+            held, before = [], None
+            for part in inventory.split_sections(lines, **limits):
+                whole, headed = told(lines, part)
+                if not (whole or headed):
+                    wrong.append((trial, part["start"], "text is not its lines"))
+                if not headed and part["heading"] not in ("(front matter)",
+                                                          before):
+                    wrong.append((trial, part["start"], "heading is elsewhere"))
+                if held and part["start"] <= held[-1]:
+                    wrong.append((trial, part["start"], "a line in two sections"))
+                held += range(part["start"], part["end"] + 1)
+                before = part["heading"]
+            inside = set(held)
+            wrong += [(trial, number, "text in no section")
+                      for number, line in enumerate(lines, 1)
+                      if line.strip() and number not in inside]
+        self.assertEqual(wrong[:5], [])
 
 
 def section(heading, start, end, lines, headed=True):
@@ -250,13 +315,26 @@ class WhatTheRunChecks(unittest.TestCase):
         self.assertEqual(inventory.unread_lines(self.LINES, sections), [1, 2, 4])
 
     def test_nor_does_one_whose_heading_is_not_the_line_it_starts_on(self):
-        """A section that kept its heading and moved its start back over the
-        line before would show that line a call under the wrong account of
-        where it is."""
+        """Its text is every line after its first, as a section that starts
+        on its heading has it, and its first line is not its heading: line 4
+        is in its range and was shown to nobody. A first version of this test
+        gave the section a text that matched neither way, and passed with the
+        comparison of the heading deleted."""
         moved = {"heading": "2. Hydrology Model", "start": 4, "end": 6,
-                 "text": "\n".join([self.LINES[3], self.LINES[5]])}
+                 "text": "\n".join(self.LINES[4:6])}
         sections = [section("1. Sensor Fabric", 1, 3, self.LINES), moved]
         self.assertEqual(inventory.unread_lines(self.LINES, sections), [4, 5, 6])
+
+    def test_nor_one_whose_lines_the_text_does_not_have(self):
+        """A start of 0 is a slice from the end of the list: it read as the
+        last line, the text matched it, and lines 1 to 3 counted as shown."""
+        lines = ["alpha", "beta", "gamma"]
+        before = {"heading": "(front matter)", "start": 0, "end": 3,
+                  "text": "gamma"}
+        self.assertEqual(inventory.unread_lines(lines, [before]), [1, 2, 3])
+        beyond = {"heading": "(front matter)", "start": 2, "end": 9,
+                  "text": "beta\ngamma"}
+        self.assertEqual(inventory.unread_lines(lines, [beyond]), [1, 2, 3])
 
     def test_it_finds_the_two_lines_the_committed_inventory_left_out(self):
         """The check on the case it was written for: the sections of
@@ -316,6 +394,17 @@ class WhatTheRunSays(unittest.TestCase):
         self.assertIn("1 line(s) that hold text are in no section", said)
         self.assertIn("line 7", said)
 
+    def test_a_document_with_no_text_is_not_read_one_hundred_percent(self):
+        """Nothing was read, which is not the whole of anything."""
+        said = inventory.reading([], [], [], [], 1)
+        self.assertIn("nothing to read", said)
+        self.assertNotIn("100%", said)
+
+    def test_no_sections_over_lines_that_hold_text_is_not_nothing_to_read(self):
+        said = inventory.reading([], [], [], [1, 2], 1)
+        self.assertIn("NOT the whole document", said)
+        self.assertIn("lines 1-2", said)
+
 
 class Answering:
     """A client that reads every section and finds nothing in it."""
@@ -336,7 +425,10 @@ class ARun(unittest.TestCase):
     def setUp(self):
         self.project = tempfile.mkdtemp()
         os.mkdir(os.path.join(self.project, "parsed"))
-        raw = ("\n".join(STUB) + "\n").encode("utf-8")
+        self.freeze(STUB)
+
+    def freeze(self, lines):
+        raw = ("\n".join(lines) + "\n").encode("utf-8")
         with open(os.path.join(self.project, "parsed", "d.txt"), "wb") as handle:
             handle.write(raw)
         with open(os.path.join(self.project, "parsed", "MANIFEST.json"),
@@ -397,6 +489,33 @@ class ARun(unittest.TestCase):
         with self.leaky():
             said, _ = self.run_main()
         self.assertIn("2 line(s) in no section", said.split("wall clock")[1])
+
+    def test_a_section_limit_stopped_before_is_not_lines_in_no_section(self):
+        """Its lines are in a section, and the section is recorded as not
+        read. Counting them a second time as lines in no section would say the
+        splitter had lost what --limit was told to leave."""
+        said, written = self.run_main("--limit", "1")
+        self.assertIn("reading the first 1 of 3 sections (--limit)", said)
+        self.assertNotIn("in no section", said)
+        self.assertEqual(written.get("unread_lines"), [])
+        self.assertEqual([bool(entry.get("skipped"))
+                          for entry in written["sections"]],
+                         [False, True, True])
+
+    def test_a_document_with_nothing_in_it_is_read_as_that(self):
+        """It printed "reading 100% of the document", wrote an inventory, and
+        then divided by the time the reading had taken, which was none."""
+        self.freeze(["", "   ", ""])
+        try:
+            with mock.patch.object(inventory.time, "time", return_value=1000.0):
+                said, written = self.run_main()
+        except ZeroDivisionError:
+            self.fail("a run with nothing to read divided by the time it took")
+        self.assertIn("nothing to read", said)
+        self.assertNotIn("100%", said)
+        self.assertEqual((written["sections"], written["unread_lines"]),
+                         ([], []))
+        self.assertEqual(self.status, 0)
 
 
 FABRIC = {
@@ -496,12 +615,35 @@ class TheInventoryLine(Synthesized):
         self.assertNotIn("no line that holds text is outside", head)
 
     def test_a_long_list_is_cut_and_its_count_is_not(self):
-        odd = list(range(101, 131, 2))                  # fifteen runs of one
-        head = self.head(self.run_on(SECTIONS, unread_lines=odd))
-        self.assertIn("NOT IN ANY SECTION: 15 line(s)", head)
-        self.assertIn("123", head)
-        self.assertNotIn("125", head)
-        self.assertIn("and 3 more", head)
+        """Fifteen runs of two lines: twelve are named and the other three
+        are six lines. A first version used runs of one line, where a count
+        of runs and a count of lines are the same number."""
+        pairs = [line for first in range(101, 161, 4)
+                 for line in (first, first + 1)]
+        head = self.head(self.run_on(SECTIONS, unread_lines=pairs))
+        self.assertIn("NOT IN ANY SECTION: 30 line(s)", head)
+        self.assertIn("145-146", head)
+        self.assertNotIn("149-150", head)
+        self.assertIn("and 6 more", head)
+
+    def test_a_list_that_is_not_line_numbers_is_not_taken_as_the_record(self):
+        """[21.0, 22.0] had its entries dropped for not being whole numbers,
+        and what was left, nothing, was read as "no line left out"."""
+        head = self.head(self.run_on(SECTIONS, unread_lines=[21.0, 22.0]))
+        self.assertIn("`unread_lines` is not a list of line numbers", head)
+        self.assertNotIn("no line that holds text is outside", head)
+        self.assertIn("NOT IN ANY SECTION: 2 line(s), going by the sections' "
+                      "own line", head)
+
+    def test_an_inventory_whose_sections_name_no_lines_says_so(self):
+        """It said "going by its sections' line numbers there is none", and
+        had read no line number at all."""
+        placeless = [{k: v for k, v in entry.items() if k != "locator"}
+                     for entry in SECTIONS]
+        head = self.head(self.run_on(placeless))
+        self.assertIn("sections says which lines it holds", head)
+        self.assertIn("is in no section is not known here", head)
+        self.assertNotIn("there is none before the last of them", head)
 
 
 class AnAbsenceALineInNoSectionCouldAnswer(Synthesized):
@@ -547,6 +689,23 @@ class AnAbsenceALineInNoSectionCouldAnswer(Synthesized):
                              unread_lines=[21, 22])
         self.assertNotIn("unverifiable", " ".join(self.findings(report)["D5"]))
 
+    def test_so_is_a_cycle_of_deferrals_and_the_header_does_not_say_otherwise(self):
+        """A cycle is three deferrals found. The header said that "an
+        ownership gap (D6)" is marked, over a D6 that was not and should not
+        be; it now says which findings by what they rest on."""
+        def deferring(entry, to):
+            return dict(entry, produces=[], defers_to=[
+                {"capability": "threshold adjudication", "to": to}])
+        report = self.run_on([deferring(FABRIC, "Hydrology Model"),
+                              deferring(HYDROLOGY, "Calibration Register"),
+                              deferring(REGISTER, "Sensor Fabric")],
+                             unread_lines=[21, 22])
+        d6 = " ".join(self.findings(report)["D6"])
+        self.assertIn("[cycle:", d6)
+        self.assertNotIn("unverifiable", d6)
+        self.assertIn("rests on nothing owning a capability (D6)",
+                      self.head(report))
+
     def test_a_section_not_read_and_a_line_in_none_are_both_named(self):
         unread = {"error": "no schema-valid reply after 2 attempts",
                   "heading": REGISTER["heading"], "locator": REGISTER["locator"]}
@@ -584,6 +743,28 @@ class AnAbsenceALineInNoSectionCouldAnswer(Synthesized):
         self.assertIn("A pointer (D3)", self.head(report))
         self.assertIn("NOT marked", self.head(report))
 
+    def test_bug_a_sub_heading_straight_under_its_parent_is_no_section_to_d3(self):
+        """BUG (reported, not fixed here), and one this change widens. D3
+        finds a section by the heading of a chunk. "5.1 Responsibility" on
+        the line after "5. Runtime Orchestrator" used to replace it and head
+        the chunk; it is now that chunk's first line of text, as a heading
+        within min_lines of the one before always was, and a pointer to it is
+        called a pointer to no section. Nothing is unread, so nothing marks
+        it. The remedy is to read the headings from the document."""
+        lines = [PROSE, PROSE, PROSE, PROSE,
+                 "5. Runtime Orchestrator", "5.1 Responsibility", PROSE, PROSE]
+        self.assertEqual(cut(lines), [(1, 4, "(front matter)"),
+                                      (5, 8, "5. Runtime Orchestrator")])
+        claim = dict(FABRIC, locator="d:1-4", evidence_claims=[
+            {"claim": "Tick scheduling duties are described",
+             "points_to": "Section 5.1", "quote": "q"}])
+        parent = dict(HYDROLOGY, heading="5. Runtime Orchestrator",
+                      locator="d:5-8")
+        report = self.run_on([claim, parent], unread_lines=[])
+        d3 = " ".join(self.findings(report)["D3"])
+        self.assertIn("Section 5.1 — no such section in the document", d3)
+        self.assertNotIn("unverifiable", d3)
+
     def test_a_score_says_what_the_inventory_did_not_read(self):
         with open(os.path.join(self.project, "ground-truth.yaml"), "w") as handle:
             handle.write("defects: []\n")
@@ -592,60 +773,129 @@ class AnAbsenceALineInNoSectionCouldAnswer(Synthesized):
         self.assertIn("has 2 line(s) in no section", report)
         self.assertIn("a miss may be a defect it", report)
 
+    def test_and_says_the_same_after_pairs_were_adjudicated(self):
+        """main() counts the pairs it adjudicates too, and the first version
+        of the line above kept its count under the same name: with
+        --adjudicate the score said "has 1 line(s) in no section", the one
+        being a pair of owners, under a header that said 3."""
+        class Refusing:
+            def __init__(self, *args, **kwargs):
+                pass
+
+            def ask(self, *args, **kwargs):
+                raise LLMError("endpoint call failed")
+
+            def summary(self):
+                return "every call refused by the test"
+
+        def owning(entry, owner):
+            return dict(entry, authority=[
+                {"capability": "threshold adjudication", "action": "decides",
+                 "owner": owner, "polarity": "owns", "quote": "q"}])
+        with open(os.path.join(self.project, "ground-truth.yaml"), "w") as handle:
+            handle.write("defects: []\n")
+        with mock.patch.object(synthesize, "Client", Refusing):
+            report = self.run_on(
+                [FABRIC, owning(HYDROLOGY, "Hydrology Model"),
+                 owning(REGISTER, "Alerting Service")],
+                "--adjudicate", "--ground-truth", "ground-truth.yaml",
+                unread_lines=[21, 22, 70])
+        self.assertIn("adjudicated 0 of 1 authority pairs", report)
+        self.assertIn("NOT IN ANY SECTION: 3 line(s)", report)
+        self.assertIn("has 3 line(s) in no section", report)
+
 
 class WhatAnInventorySaysOfItsLines(unittest.TestCase):
-    """synthesize.lines_left_out -> (runs of lines, whether it was recorded)."""
+    """synthesize.lines_left_out -> (runs of lines, how they are known)."""
+
+    RECORDED, BY_LOCATOR = synthesize.RECORDED, synthesize.BY_LOCATOR
 
     def test_the_inventorys_own_list_is_taken_first(self):
         data = {"unread_lines": [22, 21, 70], "sections": SECTIONS}
         self.assertEqual(synthesize.lines_left_out(data),
-                         ([(21, 22), (70, 70)], True))
+                         ([(21, 22), (70, 70)], self.RECORDED))
 
     def test_and_an_empty_list_is_an_answer(self):
         self.assertEqual(synthesize.lines_left_out(
-            {"unread_lines": [], "sections": SECTIONS}), ([], True))
+            {"unread_lines": [], "sections": SECTIONS}), ([], self.RECORDED))
 
-    def test_only_line_numbers_are_taken_from_it(self):
-        data = {"unread_lines": [22, "x", True, -3, None, 21, 21],
-                "sections": SECTIONS}
-        self.assertEqual(synthesize.lines_left_out(data), ([(21, 22)], True))
+    def test_a_list_holding_numbers_that_are_not_line_numbers_is_no_record(self):
+        """A float is what a line number becomes in somebody else's JSON. The
+        entries used to be dropped one by one and the empty remainder read as
+        "no line left out"."""
+        whole = [FABRIC, dict(HYDROLOGY, locator="d:21-40"), REGISTER]
+        self.assertEqual(
+            [synthesize.lines_left_out({"unread_lines": listed,
+                                        "sections": whole})
+             for listed in ([21.0, 22.0], [21, 22.5], [0], [-3])],
+            [([], self.BY_LOCATOR)] * 4)
 
-    def test_a_list_that_is_not_one_is_no_record(self):
-        data = {"unread_lines": "none", "sections": SECTIONS}
-        self.assertEqual(synthesize.lines_left_out(data), ([(21, 22)], False))
+    def test_nor_is_one_holding_anything_else(self):
+        self.assertEqual(
+            [synthesize.lines_left_out({"unread_lines": listed,
+                                        "sections": SECTIONS})
+             for listed in (["21", "22"], [[21, 22]], [21, None], [True],
+                            "none", None, {"21": 22})],
+            [([(21, 22)], self.BY_LOCATOR)] * 7)
 
     def test_without_one_the_gaps_between_the_sections_are_all_there_is(self):
         self.assertEqual(synthesize.lines_left_out({"sections": SECTIONS}),
-                         ([(21, 22)], False))
+                         ([(21, 22)], self.BY_LOCATOR))
 
     def test_lines_before_the_first_section_are_a_gap(self):
         late = [dict(FABRIC, locator="d:5-20"), HYDROLOGY, REGISTER]
         self.assertEqual(synthesize.lines_left_out({"sections": late}),
-                         ([(1, 4), (21, 22)], False))
+                         ([(1, 4), (21, 22)], self.BY_LOCATOR))
 
     def test_sections_out_of_order_or_overlapping_are_no_gap(self):
         mixed = [REGISTER, dict(HYDROLOGY, locator="d:15-40"), FABRIC]
         self.assertEqual(synthesize.lines_left_out({"sections": mixed}),
-                         ([], False))
+                         ([], self.BY_LOCATOR))
+
+    def test_nor_is_a_section_inside_another(self):
+        """The lines after the inner one are still inside the outer one."""
+        nested = [dict(FABRIC, locator="d:1-40"),
+                  dict(HYDROLOGY, locator="d:5-10"), REGISTER]
+        self.assertEqual(synthesize.lines_left_out({"sections": nested}),
+                         ([], self.BY_LOCATOR))
+
+    def test_a_locator_that_runs_backwards_names_no_lines(self):
+        """"d:40-23" was read as holding up to line 23, and the gap was then
+        reported twice over: "lines 21-39, 24-40", thirty-six lines of
+        twenty."""
+        back = [FABRIC, dict(HYDROLOGY, locator="d:40-23"), REGISTER]
+        self.assertEqual(synthesize.lines_left_out({"sections": back}),
+                         ([(21, 40)], self.BY_LOCATOR))
 
     def test_an_entry_with_no_locator_leaves_its_lines_as_a_gap(self):
         """A failed section, as it was once recorded: {"error": ...} and
         nothing else. Nothing places it, so its lines are in no section that
         the inventory can show."""
         data = {"sections": [FABRIC, {"error": "x"}, None, REGISTER]}
-        self.assertEqual(synthesize.lines_left_out(data), ([(21, 40)], False))
+        self.assertEqual(synthesize.lines_left_out(data),
+                         ([(21, 40)], self.BY_LOCATOR))
+
+    def test_with_no_locator_that_can_be_read_nothing_is_known(self):
+        """Not "no gap": there was nothing to find a gap between."""
+        for sections in ([{"heading": "1. Sensor Fabric"}],
+                         [dict(FABRIC, locator="d:1")],
+                         [dict(FABRIC, locator=None), {"error": "x"}, None],
+                         []):
+            self.assertEqual(synthesize.lines_left_out({"sections": sections}),
+                             ([], synthesize.NOT_KNOWN))
 
     def test_a_line_number_no_document_has_costs_nothing_to_read(self):
         far = [FABRIC, dict(HYDROLOGY, locator="d:23-40"),
                dict(REGISTER, locator="d:900000000-999999999")]
         self.assertEqual(synthesize.lines_left_out({"sections": far}),
-                         ([(21, 22), (41, 899999999)], False))
+                         ([(21, 22), (41, 899999999)], self.BY_LOCATOR))
 
     def test_the_committed_inventory_has_two(self):
         with open(os.path.join(FLOODTWIN, "inv-ablation.json"),
                   encoding="utf-8") as handle:
             data = json.load(handle)
-        self.assertEqual(synthesize.lines_left_out(data), ([(284, 285)], False))
+        self.assertEqual(synthesize.lines_left_out(data),
+                         ([(284, 285)], self.BY_LOCATOR))
 
 
 if __name__ == "__main__":
