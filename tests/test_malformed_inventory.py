@@ -15,12 +15,12 @@ sound inventory:
 
 The last test here puts 14 odd values, one at a time, in each of 147 places
 of a sound inventory, and takes each key out in turn: 2,109 inventories that
-differ from the sound one. By this file's own statement of the shape, 1,281 of
+differ from the sound one. By this file's own statement of the shape, 1,255 of
 them are still sound (a text replaced by another text, a key no list is asked
-for). The other 828 are not: 27 are no inventory at all, 578 have an entry
-that is not a section, and 223 an item that cannot be read. The code as it was
+for). The other 854 are not: 27 are no inventory at all, 605 have an entry
+that is not a section, and 222 an item that cannot be read. The code as it was
 raised on 239 of the 2,109, five of them sound ones whose `runs` was not a
-number, and reported on 536 of the 828 with no word of anything unread. Those
+number, and reported on 562 of the 854 with no word of anything unread. Those
 are the worse ones: a run that exits 0 over a section it could not read
 reports that section's silence as the document's. against(), at the foot of
 this file, prints these figures for any synthesize.py it is given.
@@ -39,6 +39,8 @@ What it does now is decided at three levels, each in one place.
                  read, the item is counted and named, and an absence that it
                  could answer is a question.
 
+A run in which no section at all was read says so and exits 1.
+
 No model. main() runs in process on an inventory of three sound sections with
 something changed in it, beside the document those sections were split from.
 """
@@ -55,6 +57,7 @@ import types
 import unittest
 from unittest import mock
 
+import dossier_cli
 import inventory
 import synthesize
 from llm import LLMError
@@ -104,11 +107,18 @@ class Odd(Run):
         # the inventory now says of it.
         return super().freeze(SOUND)
 
-    def run_main(self, inventory, *extra, extracted=False, encoded=False):
+    def run_main(self, inventory, *extra, extracted=False, encoded=False,
+                 endpoints=False):
         """`inventory` is what inventory.json holds: text and bytes are
         written as they are, NO_FILE writes nothing, anything else is written
         as JSON. A raise is a failure of the test: it is what this file is
         about.
+
+        `endpoints` runs with the embedder and the model client the
+        repository has, under DOSSIER_FAKE_CHAT, its own stand-in for the two
+        endpoints: nothing is sent anywhere, and every text is hashed and
+        encoded as it would be. Without it there is no embedding, and
+        --adjudicate is answered by Agreeable.
 
         `encoded` prints the report to streams that encode what they are
         given, as a terminal or a pipe does. The default ones here take any
@@ -140,11 +150,13 @@ class Odd(Run):
         else:
             out, err = io.StringIO(), io.StringIO()
         argv = sys.argv
-        sys.argv = ["synthesize.py", "--project", self.project, "--no-embed",
-                    *extra]
+        sys.argv = ["synthesize.py", "--project", self.project,
+                    *(() if endpoints else ("--no-embed",)), *extra]
+        stand_in = mock.patch.dict(os.environ, {"DOSSIER_FAKE_CHAT": "1"}) \
+            if endpoints else mock.patch.object(synthesize, "Client", Agreeable)
         try:
             with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err), \
-                    mock.patch.object(synthesize, "Client", Agreeable):
+                    stand_in:
                 self.status = synthesize.main()
             if encoded:
                 out, err = (io.StringIO(stream.detach().getvalue().decode("utf-8"))
@@ -364,6 +376,16 @@ class AnEntryThatIsNotASection(Odd):
                  "extraction failed")):
             self.not_read(self.read([FABRIC, HYDROLOGY, entry]), f"  [{why}]")
 
+    def test_an_entry_marked_skipped_was_not_read_error_or_no_error(self):
+        """inventory.py marks an entry skipped only beside an error. One
+        marked so with lists in it and no error was read as a section, and
+        what it does not hold was asserted."""
+        report = self.read([FABRIC, HYDROLOGY, {**REGISTER, "skipped": True}])
+        self.not_read(report, "  [skipped, and the inventory does not say why]")
+        self.assertIn("unverifiable", " ".join(self.findings(report)["D3"]))
+        self.all_read(self.read([FABRIC, HYDROLOGY,
+                                 {**REGISTER, "skipped": False}]))
+
     def test_why_a_section_was_skipped_is_given_on_one_line(self):
         forged = "-- candidate defects: none"
         report = self.read([FABRIC, HYDROLOGY, {
@@ -384,6 +406,50 @@ class AnEntryThatIsNotASection(Odd):
         self.assertEqual(sorted(found), ["D6", "D8"])
         for kind in ("D6", "D8"):
             self.assertIn("unverifiable", " ".join(found[kind]))
+
+
+class NoSectionThatWasRead(Odd):
+    """Every entry is one that was not read. The report named them, listed
+    no candidate, and exited 0, which is what a document with no defect
+    gets. An inventory of no sections is refused for the same reason."""
+
+    def test_it_is_said_and_the_run_is_not_a_result(self):
+        failed = {"error": "x", "heading": "1. Sensor Fabric",
+                  "locator": "d:1-20"}
+        for entries in ([None], [5, "x", [], {}], [failed, failed, failed]):
+            self.again()
+            report = self.read(entries, "--out", "candidates.csv")
+            self.assertEqual(self.status, 1)
+            self.assertEqual(
+                self.stderr, f"NOTHING WAS READ: 0 of {len(entries)} "
+                             f"sections of inventory.json.\n")
+            self.assertTrue(report.startswith(
+                f"inventory: 0 of {len(entries)} sections read"), report)
+            self.assertIn(f"NOT READ: {len(entries)} section(s)", report)
+            self.assertNotIn("candidate defects", report)
+            self.assertFalse(os.path.exists(
+                os.path.join(self.project, "candidates.csv")))
+
+    def test_one_section_read_is_a_report(self):
+        report = self.read([FABRIC, None, 5])
+        self.assertEqual((self.status, self.stderr), (0, ""))
+        self.assertIn("inventory: 1 of 3 sections read", report)
+        self.assertIn("-- candidate defects", report)
+
+    def test_and_the_status_reaches_whoever_ran_dossier_inventory(self):
+        """`dossier inventory` runs inventory.py and then synthesize.py, and
+        returned the first one's status whatever the second did."""
+        ran = []
+
+        def run(script, *args, **more):
+            ran.append(script)
+            return 0 if script == "inventory.py" else 1
+
+        asked = types.SimpleNamespace(project=self.project, doc="d", out=None,
+                                      vllm=False)
+        with mock.patch.object(dossier_cli, "run", run):
+            self.assertEqual(dossier_cli.cmd_inventory(asked), 1)
+        self.assertEqual(ran, ["inventory.py", "synthesize.py"])
 
 
 class AFieldThatIsNotAList(Odd):
@@ -447,17 +513,19 @@ class AFieldThatIsNotAList(Odd):
         self.not_read(report, "its 'identifiers' is 5, not a list")
         self.assertIn("unverifiable", " ".join(self.findings(report)["D8"]))
 
-    def test_an_identifier_there_is_one_and_a_null_is_not(self):
+    def test_an_identifier_there_is_one_and_an_empty_place_is_not(self):
+        """A null, or text with nothing in it, is no sign of a full pass."""
         for key in ("identifiers", "deferred"):
             report = self.read(self.before_counts(**{key: ["HM-01"]}))
             self.all_read(report)
             self.assertNotIn("READ IN PART", report)
             self.assertNotIn("unverifiable",
                              " ".join(self.findings(report)["D8"]))
-            report = self.read(self.before_counts(**{key: [None]}))
-            self.assertIn("READ IN PART", report)
-            self.assertIn("unverifiable",
-                          " ".join(self.findings(report)["D8"]))
+            for nothing in (None, "", " "):
+                report = self.read(self.before_counts(**{key: [nothing]}))
+                self.assertIn("READ IN PART", report, nothing)
+                self.assertIn("unverifiable",
+                              " ".join(self.findings(report)["D8"]), nothing)
 
 
 class WhatAnEntrySaysOfItself(Odd):
@@ -486,7 +554,8 @@ class WhatAnEntrySaysOfItself(Odd):
         for key, held in (("heading", f"3. Calibration Register\n{forged}"),
                           ("heading", "3. Calibration Register\n"),
                           ("locator", f"d:41-60\r{forged}"),
-                          ("locator", f"d:41-60\u2028{forged}")):
+                          ("locator", f"d:41-60\u2028{forged}"),
+                          ("locator", "d:41-60" + chr(0x2029) + forged)):
             report = self.read(sections(2, **{key: held}))
             self.not_read(report, f"its '{key}' has a line break in it")
             self.assertEqual([line for line in report.splitlines()
@@ -616,11 +685,26 @@ class AnItemThatCannotBeRead(Odd):
 
     def test_an_input_or_an_output_that_is_not_text(self):
         for key in ("consumes", "produces"):
-            for item, shown in ((5, "5"), (["x"], "a list"), (True, "true"),
-                                ({"name": "gauge readings"}, "a mapping")):
+            for item, why in ((5, "is 5, not text"), (["x"], "is a list, not text"),
+                              (True, "is true, not text"),
+                              ({"label": "gauge readings"}, "has no 'name'"),
+                              ({"name": 5}, "has 5 for its 'name', not text"),
+                              ({"name": " "}, "has nothing in its 'name'")):
                 self.set_aside(
                     self.read(sections(1, **{key: [item]})),
-                    f"  [entry 1 of its '{key}' is {shown}, not text]")
+                    f"  [entry 1 of its '{key}' {why}]")
+
+    def test_an_input_or_an_output_given_by_its_name_is_read_by_it(self):
+        """`{"name": ...}`, as a capability is given. It was read that way
+        where --authority-as-dataflow folds data flow into ownership, and
+        nowhere else: without the flag it was no consumer, and what it names
+        was an orphan, asserted."""
+        named = {"name": "calibrated gauge readings", "quote": "q"}
+        for flags in ((), ("--authority-as-dataflow",)):
+            for index, key in ((1, "consumes"), (0, "produces")):
+                report = self.read(sections(index, **{key: [named]}), *flags)
+                self.all_read(report)
+                self.assertEqual(report, self.read(SOUND, *flags), (key, flags))
 
     def test_it_is_named_by_its_section_and_where_it_stands_in_the_list(self):
         report = self.read(sections(
@@ -629,12 +713,14 @@ class AnItemThatCannotBeRead(Odd):
                                "its 'consumes' is 5, not text]")
 
     def test_a_null_is_an_empty_place_in_a_list_and_not_an_item(self):
-        """It holds nothing that could be anything: `[null]` says what `[]`
-        says, in every list."""
+        """Nor is text with nothing in it. Each holds nothing that could be
+        anything: `[null]` and `[""]` say what `[]` says, in every list."""
         for key in LISTS:
-            report = self.read(sections(1, **{key: HYDROLOGY[key] + [None]}))
-            self.all_read(report)
-            self.assertEqual(report, self.read(SOUND), key)
+            for nothing in (None, "", "  "):
+                report = self.read(
+                    sections(1, **{key: HYDROLOGY[key] + [nothing]}))
+                self.all_read(report)
+                self.assertEqual(report, self.read(SOUND), (key, nothing))
 
     def test_the_rest_of_its_list_is_read(self):
         """Section 2 consumes what Section 1 produces, and says so beside
@@ -668,6 +754,8 @@ class AnItemThatCannotBeRead(Odd):
                 ({**OWNS, "owner": None}, "has null for its 'owner', not text"),
                 ({**OWNS, "capability": 5},
                  "has 5 for its 'capability', not text"),
+                ({**OWNS, "capability": ""}, "has nothing in its 'capability'"),
+                ({**OWNS, "owner": "  "}, "has nothing in its 'owner'"),
                 ({**OWNS, "action": 5}, "has 5 for its 'action', not text"),
                 ({**OWNS, "polarity": "disputed"},
                  'has "disputed" for its \'polarity\', not "owns" or '
@@ -684,6 +772,7 @@ class AnItemThatCannotBeRead(Odd):
                  "has a list for its 'claim', not text"),
                 ({**CLAIM, "claim": None},
                  "has null for its 'claim', not text"),
+                ({**CLAIM, "claim": ""}, "has nothing in its 'claim'"),
                 ({**CLAIM, "points_to": 3}, "has 3 for its 'points_to', not text"),
                 ({**CLAIM, "points_to": {"place": "Section 3"}},
                  "has a mapping for its 'points_to', not text"),
@@ -697,8 +786,10 @@ class AnItemThatCannotBeRead(Odd):
     def test_a_capability(self):
         for item, why in (({"name": 5}, "has 5 for its 'name', not text"),
                           ({"name": None}, "has null for its 'name', not text"),
+                          ({"name": "", "quote": "Calibration drift limits"},
+                           "has nothing in its 'name'"),
                           ({"quote": "q"}, "has no 'name'"),
-                          (5, "is 5, not a mapping")):
+                          (5, "is 5, not text")):
             self.set_aside(self.read(sections(2, capabilities=[item])),
                            f"  [entry 1 of its 'capabilities' {why}]")
 
@@ -706,6 +797,8 @@ class AnItemThatCannotBeRead(Odd):
         for item, why in (({}, "has no 'capability'"),
                           ({"capability": None, "to": "Hydrology Model"},
                            "has null for its 'capability', not text"),
+                          ({"capability": "", "to": "Hydrology Model"},
+                           "has nothing in its 'capability'"),
                           ({**PASSED_ON, "to": 5}, "has 5 for its 'to', not text"),
                           ("Hydrology Model",
                            'is "Hydrology Model", not a mapping')):
@@ -727,10 +820,10 @@ class WhatAnItemSetAsideCouldHaveAnswered(Odd):
 
     def test_an_input_could_be_what_consumes_an_output(self):
         """Section 1 produces calibrated gauge readings. Section 2 has one
-        input, and it is `{"name": "calibrated gauge readings"}`: no text,
-        so no consumer, and the orphan was asserted."""
+        input, and it is `["calibrated gauge readings"]`: a list where text
+        is asked, so no consumer."""
         report = self.read(sections(
-            1, consumes=[{"name": "calibrated gauge readings"}]))
+            1, consumes=[["calibrated gauge readings"]]))
         self.set_aside(report)
         self.assertEqual(
             self.doubt(report, "D8"),
@@ -771,11 +864,62 @@ class WhatAnItemSetAsideCouldHaveAnswered(Odd):
         self.all_read(report)
         self.assertIsNone(self.doubt(report, "D3"))
 
+    def test_a_capability_named_with_nothing_is_not_one_that_was_read(self):
+        """The fallback's validator lets it through, and the model had put
+        what the section holds in the quote. The name was text, so the item
+        was read: a section with a capability that matches nothing, and the
+        claim that it holds the limits asserted as untrue."""
+        report = self.read(sections(2, capabilities=[
+            {"name": "", "quote": "Calibration drift limits, by gauge"}]))
+        self.set_aside(report, "has nothing in its 'name'")
+        self.assertIsNotNone(self.doubt(report, "D3"))
+
     def test_but_not_one_in_a_section_the_claim_does_not_point_to(self):
         report = self.read([FABRIC, {**HYDROLOGY, "capabilities": [5]},
                             {**REGISTER, "capabilities": []}])
         self.set_aside(report)
         self.assertIsNone(self.doubt(report, "D3"))
+
+    def test_nor_an_item_of_another_list_in_the_section_it_does_point_to(self):
+        """Section 3 holds no capability, and an input of its own that was
+        not read. What it consumes is not what it holds."""
+        for key in ("consumes", "produces", "authority", "defers_to",
+                    "evidence_claims"):
+            report = self.read([FABRIC, HYDROLOGY,
+                                {**REGISTER, "capabilities": [], key: [5]}])
+            self.set_aside(report)
+            self.assertIsNone(self.doubt(report, "D3"), key)
+
+    def test_a_section_that_was_not_read_is_the_reason_given_first(self):
+        """Both stand between the claim and saying it is untrue. One is
+        given: the section, which could hold the place itself."""
+        report = self.read([{**FABRIC, "evidence_claims": [
+            {**CLAIM, "points_to": "Sections 2 to 3"}]},
+            {**HYDROLOGY, "capabilities": [5]},
+            {"error": "x", "heading": "3. Calibration Register",
+             "locator": "d:41-60"}])
+        self.assertTrue(self.doubt(report, "D3").startswith(
+            "unverifiable: a section that was not read could"),
+            self.doubt(report, "D3"))
+
+    def test_and_the_capability_before_a_doubt_about_the_pointer_itself(self):
+        """A pointer that says more than the place it names is a doubt of
+        its own, and the one given where the place was read whole. Where a
+        capability of the place was not read, that is the reason given: it
+        is what the place could hold."""
+        claim = {**CLAIM, "points_to": "Section 3, in the second table"}
+        report = self.read([{**FABRIC, "evidence_claims": [claim]}, HYDROLOGY,
+                            {**REGISTER, "capabilities": [{"name": 5}]}])
+        self.assertEqual(
+            self.doubt(report, "D3"),
+            "unverifiable: the place it points to holds a capability that "
+            "was not read: 3. Calibration Register (d:41-60)")
+        report = self.read([{**FABRIC, "evidence_claims": [claim]}, HYDROLOGY,
+                            {**REGISTER, "capabilities": []}])
+        self.assertEqual(
+            self.doubt(report, "D3"),
+            "unverifiable: the pointer has more in it than the places it "
+            "names, and only those were read")
 
     def test_each_list_answers_for_its_own_absence_and_no_other(self):
         """With Section 2 owning nothing and consuming nothing, Section 1's
@@ -803,7 +947,7 @@ class WhatAnItemSetAsideCouldHaveAnswered(Odd):
         consumes as well."""
         for key in ("produces", "consumes"):
             entries = [FABRIC, {**HYDROLOGY, "authority": []},
-                       {**REGISTER, key: [{"name": "x"}]}]
+                       {**REGISTER, key: [5]}]
             report = self.read(entries, "--authority-as-dataflow")
             self.assertEqual(
                 self.doubt(report, "D6"),
@@ -819,6 +963,18 @@ class WhatAnItemSetAsideCouldHaveAnswered(Odd):
             "its consumes, could consume it: section 3 of 3, which the "
             "inventory does not name; a section holds an input that was not "
             "read, which could be this: 2. Hydrology Model (d:21-40)")
+
+    def test_the_reasons_listed_under_the_count_take_an_item_in(self):
+        """The lines under the count of candidates say why a finding is
+        marked unverifiable. An item that was set aside is one more reason,
+        and is given there when there is one."""
+        line = ("   An item of a section's lists that could not be read is "
+                "such a reason as well.\n")
+        self.assertIn(line, self.read(sections(1, consumes=[5])))
+        # A section that was not read, and no item set aside.
+        report = self.read([FABRIC, 5, REGISTER])
+        self.assertIn("unverifiable: ", report)
+        self.assertNotIn(line, report)
 
     def test_a_claim_is_one_that_d3_did_not_check(self):
         """It is one of the section's claims all the same, and is counted
@@ -914,7 +1070,8 @@ class WhatIsTakenOfAnItem(Odd):
             [{**FABRIC, "defers_to": [{**passed_on, "to": "Hydrology Model"}]},
              {**HYDROLOGY, "authority": [{**OWNS, "to": 5}],
               "defers_to": [{**passed_on, "to": "Alerting Service"}]},
-             {**REGISTER, "authority": [{**OWNS, "owner": "", "to": 5}]}],
+             {**REGISTER, "authority": [{**OWNS, "owner": "Alerting Service",
+                                         "to": 5}]}],
             "--adjudicate")
         self.all_read(report)
         self.assertIn("adjudicated 1 of 1 authority pairs", report)
@@ -990,6 +1147,26 @@ class WhatIsTakenOfAnItem(Odd):
             # A claim with no quote is quoted by what it says.
             self.assertEqual(self.candidates("D3"),
                              ["Calibration drift limits are recorded"])
+
+    def test_nothing_under_a_key_that_may_be_absent(self):
+        """Null, an empty list, an empty mapping and text with nothing in it
+        alike. A deferral to {} still says what is deferred, and the finding
+        that nobody owns it is made as it is for one that names nobody."""
+        for nothing in (None, [], {}, "", "  ", GONE):
+            deferral = {"capability": "threshold adjudication", "to": nothing}
+            claim = {**CLAIM, "points_to": nothing}
+            owns = {**OWNS, "action": nothing}
+            for item in (deferral, claim, owns):
+                if nothing is GONE:
+                    del item[[k for k, v in item.items() if v is GONE][0]]
+            report = self.read(
+                [{**FABRIC, "defers_to": [deferral], "evidence_claims": [claim]},
+                 {**HYDROLOGY, "authority": []},
+                 {**REGISTER, "authority": [{**owns, "capability": "archive"}]}])
+            self.all_read(report)
+            self.assertEqual(self.findings(report)["D6"][0],
+                             "[D6] threshold adjudication")
+            self.assertIn("               no pointer: 1\n", report)
 
     def test_the_quote_of_a_claim_is_given_where_it_has_one(self):
         self.all_read(self.read(
@@ -1086,6 +1263,29 @@ class HowAFindingIsPrinted(Odd):
             [f"      {'d:1-20':22} {heading[:30]:32} Hydrology Model"] * 3)
         self.assertTrue(lines[first + 3].startswith("[D3] "))
 
+    def test_a_control_character_is_a_space_where_a_line_is_printed(self):
+        """An escape sequence in what a claim points to took back the line a
+        terminal had shown above it. A tab in a heading is a heading
+        inventory.py can write, and its section is read."""
+        erase = "\x1b[1A\x1b[2K"
+        report = self.read(
+            [{**FABRIC, "heading": "1.\tSensor Fabric", "evidence_claims": [
+                {"claim": f"Alert thresholds {erase} are tabulated in full",
+                 "points_to": f"Section 8 {erase} of the atlas"}]},
+             HYDROLOGY, REGISTER])
+        self.all_read(report)
+        self.assertNotIn("\x1b", report)
+        self.assertNotIn("\t", report)
+        self.assertIn("1. Sensor Fabric", report)
+        # And in where a section says it is, which is printed beside each
+        # finding and wherever the section is listed.
+        report = self.read(
+            [{**FABRIC, "locator": "d:1-20" + erase, "passes": 2,
+              "full_passes": 2}, {**HYDROLOGY, "consumes": []}, REGISTER])
+        self.assertIn("READ IN FEWER than the 3 passes", report)
+        self.assertIn("[D8] calibrated gauge readings", report)
+        self.assertNotIn("\x1b", report)
+
     def test_an_entry_that_names_nobody_is_printed_with_nothing_there(self):
         """An output has no owner and points nowhere."""
         report = self.read(sections(1, consumes=[]))
@@ -1104,14 +1304,19 @@ class WhichDocumentItWasBuiltFrom(Odd):
                 f"NOT CONSULTED: the inventory gives {shown} as the document "
                 f"it was built from, which is not a name.", report)
 
-    def test_nor_does_one_that_runs_over_two_lines(self):
+    def test_nor_does_one_with_a_character_that_cannot_be_printed(self):
+        """It was looked up, and the line that says no document goes by
+        that name printed it: what came after a line break in it began a
+        line of the report."""
         forged = "-- candidate defects: none"
-        report = self.read(sections(), doc=f"d\n{forged}")
-        self.all_read(report)
-        self.assertIn("as the document it was built from, which is not a name.",
-                      report)
-        self.assertEqual(
-            [line for line in report.splitlines() if line == forged], [])
+        for doc in (f"d\n{forged}", "d\x1b[2K", "d\t"):
+            report = self.read(sections(), doc=doc)
+            self.all_read(report)
+            self.assertIn("as the document it was built from, which is not a "
+                          "name.", report)
+            self.assertEqual([line for line in report.splitlines()
+                              if line.startswith(forged)], [])
+            self.assertNotIn("\x1b", report)
 
     def test_an_inventory_that_names_none(self):
         for top in ({"doc": None}, {"doc": ""}, {"doc": 0}):
@@ -1209,22 +1414,29 @@ class AValueNestedDeeperThanPythonWillPrint(Odd):
                 self.not_read(report, f"its '{key}' is a list, not text")
 
 
-class TextThatNoStreamCanWrite(Odd):
+class TextThatNothingCanEncode(Odd):
     """Half of a surrogate pair. JSON spells it "\\ud83d", nothing stops a
     model's reply from holding one, and it is text of the right kind in every
     place. Printed to a terminal or a pipe it raised, and so did writing the
-    candidate file."""
+    candidate file. It raises as well where a text is hashed for the
+    embedding cache and where a prompt is hashed for a model call, which is
+    every run that is not given --no-embed. So it is written as its escape
+    where the text is read, before anything is done with it."""
 
     LONE = "\ud83d"
 
     def test_in_a_claim_and_in_what_it_points_to(self):
+        """And in where its section says it is, which is printed beside the
+        finding."""
         report = self.run_main(
-            {"doc": "d", "sections": sections(0, evidence_claims=[
-                {"claim": f"Calibration drift {self.LONE} limits are recorded",
-                 "points_to": f"Section 9{self.LONE}", "quote": "q"}]),
+            {"doc": "d", "sections": sections(
+                0, locator=f"d:1-20{self.LONE}", evidence_claims=[
+                    {"claim": f"Calibration drift {self.LONE} limits are recorded",
+                     "points_to": f"Section 9{self.LONE}", "quote": "q"}]),
              "source_sha256": self.freeze()}, encoded=True)
         self.assertEqual(self.status, 0)
         self.assertIn("Section 9\\ud83d", report)
+        self.assertIn("      d:1-20\\ud83d ", report)
 
     def test_in_the_heading_of_a_section_that_was_not_read(self):
         report = self.run_main(
@@ -1234,6 +1446,60 @@ class TextThatNoStreamCanWrite(Odd):
              "source_sha256": self.freeze()}, encoded=True)
         self.assertEqual(self.status, 0)
         self.assertIn("3. Calibration \\ud83d Register (d:41-60)", report)
+
+    def test_in_why_a_section_was_skipped(self):
+        report = self.run_main(
+            {"doc": "d", "sections": [FABRIC, HYDROLOGY, {
+                "error": f"not read: {self.LONE} --limit 2", "skipped": True,
+                "heading": "3. Calibration Register", "locator": "d:41-60"}],
+             "source_sha256": self.freeze()}, encoded=True)
+        self.assertEqual(self.status, 0)
+        self.assertIn("  [not read: \\ud83d --limit 2]", report)
+
+    def test_in_what_is_embedded_and_in_what_is_put_to_a_model(self):
+        """Every capability, output and deferral is embedded, and
+        --adjudicate puts each pair to a model with its headings, parties
+        and quotes. Under --authority-as-dataflow what a section consumes is
+        embedded as well."""
+        lone = self.LONE
+        entries = [
+            {**FABRIC, "heading": f"1. Sensor {lone} Fabric",
+             "produces": [f"calibrated {lone} gauge readings"],
+             "capabilities": [f"ingest {lone} gauge readings"],
+             "defers_to": [{**PASSED_ON, "to": f"Hydrology {lone} Model",
+                            "quote": f"deferred {lone}"}]},
+            {**HYDROLOGY,
+             "consumes": [{"name": f"calibrated {lone} gauge readings"}],
+             "authority": [{**OWNS, "capability": f"threshold {lone} adjudication",
+                            "action": f"decides {lone}", "quote": f"q {lone}"}],
+             "defers_to": [{**PASSED_ON, "to": "Alerting Service"}]},
+            {**REGISTER, "locator": f"d:41-60{lone}",
+             "authority": [{**OWNS, "owner": f"Alerting {lone} Service"}]}]
+        report = self.run_main(
+            {"doc": "d", "runs": 3, "sections": entries,
+             "source_sha256": self.freeze()}, "--adjudicate",
+            endpoints=True, encoded=True)
+        self.assertEqual(self.status, 0)
+        self.assertIn("inventory: 3 of 3 sections read", report)
+        # Both kinds of pair were put to the client, which hashed each prompt.
+        self.assertIn("1 authority pairs", report)
+        self.assertIn("1 deferral pairs", report)
+        self.again()
+        report = self.run_main(
+            {"doc": "d", "runs": 3, "sections": entries,
+             "source_sha256": self.freeze()}, "--authority-as-dataflow",
+            endpoints=True, encoded=True)
+        self.assertEqual(self.status, 0)
+        self.assertIn("2 produces/consumes entries re-admitted", report)
+
+    def test_in_the_name_of_the_document(self):
+        """It is not a name, and is not looked up."""
+        report = self.run_main(
+            {"doc": f"d{self.LONE}", "sections": SOUND,
+             "source_sha256": self.freeze()}, encoded=True)
+        self.assertEqual(self.status, 0)
+        self.assertIn("as the document it was built from, which is not a name.",
+                      report)
 
     def test_and_in_the_file_of_candidates(self):
         self.run_main(
@@ -1380,14 +1646,14 @@ SAID = (
                                               "Alerting Service"]}]), None, 1),
     ("a deferral quote that is a list", 0,
      reply(0, defers_to=[{**PASSED_ON, "quote": ["q"]}]), None, 0),
-    ("an input that is a mapping", 1,
-     reply(1, consumes=[{"name": "calibrated gauge readings"}]), None, 1),
+    ("an input given by its name", 1,
+     reply(1, consumes=[{"name": "calibrated gauge readings"}]), None, 0),
     ("null among the inputs", 1,
      reply(1, consumes=["calibrated gauge readings", None]), None, 0),
     ("a number among the outputs", 0,
      reply(0, produces=["calibrated gauge readings", 5]), None, 1),
-    ("an output that is a mapping", 0,
-     reply(0, produces=[{"name": "calibrated gauge readings"}]), None, 1),
+    ("an output given by its name", 0,
+     reply(0, produces=[{"name": "calibrated gauge readings"}]), None, 0),
     ("to the fallback, a capability with no name", 2, None,
      brief(2, capabilities=[{"capability": "calibration drift limits"}]), 1),
     ("to the fallback, a capability that is a number", 2, None,
@@ -1409,6 +1675,20 @@ SAID = (
      {**brief(1), "consumes": [5]}, 1),
     ("to the fallback, a capability that is its name alone", 2, None,
      brief(2, capabilities=["calibration drift limits"]), 0),
+)
+
+# And four with nothing where something is asked, which the validators
+# accept as well: text that is blank, a mapping that is empty.
+SAID_NOTHING = (
+    ("an input that is blank", 1,
+     reply(1, consumes=["calibrated gauge readings", ""]), None, 0),
+    ("a deferral to an empty mapping", 0,
+     reply(0, defers_to=[{**PASSED_ON, "to": {}}]), None, 0),
+    ("to the fallback, a capability named with nothing", 2, None,
+     brief(2, capabilities=[{"name": "", "quote": "Calibration drift limits"}]),
+     1),
+    ("to the fallback, an owner that is blank", 1, None,
+     brief(1, authority=[{**OWNS, "owner": " "}]), 1),
 )
 
 
@@ -1434,7 +1714,8 @@ class WhatInventoryPyWrites(Odd):
     def test_whatever_a_validator_lets_a_model_say_the_section_is_read(self):
         """And the item that cannot be read is set aside, where there is
         one."""
-        for said, index, full, short, aside in SAID:
+        self.assertEqual(len(SAID), 34)
+        for said, index, full, short, aside in SAID + SAID_NOTHING:
             entry = catalogued(index, Model(full, short))
             self.assertNotIn("error", entry, said)
             self.assertEqual(synthesize.unreadable(entry), "", said)
@@ -1496,7 +1777,17 @@ def whole(held):
 
 
 def nothing_or(check, held):
-    return held is None or check(held)
+    return held is None or held == [] or held == {} or check(held)
+
+
+def said(held):
+    """Text with something in it."""
+    return text(held) and bool(held.strip())
+
+
+def by_name(item):
+    """A capability, an input or an output: its name, alone or under `name`."""
+    return text(item) or (isinstance(item, dict) and said(item.get("name")))
 
 
 def counted(entry):
@@ -1515,6 +1806,7 @@ def as_written(entry):
     """Whether an entry is one inventory.py could have written for a section
     it read."""
     return isinstance(entry, dict) and "error" not in entry \
+        and not entry.get("skipped") \
         and all(text(entry.get(key)) and "\n" not in entry[key]
                 for key in ("heading", "locator")) \
         and isinstance(entry.get("degraded", False), bool) and counted(entry) \
@@ -1524,26 +1816,26 @@ def as_written(entry):
 
 
 ITEM = {
-    "capabilities": lambda item: text(item) or (
-        isinstance(item, dict) and text(item.get("name"))),
+    "capabilities": by_name,
     "evidence_claims": lambda item: isinstance(item, dict)
-    and text(item.get("claim")) and (
+    and said(item.get("claim")) and (
         nothing_or(text, item.get("points_to"))
         or (isinstance(item["points_to"], list)
             and all(map(text, item["points_to"])))),
     "authority": lambda item: isinstance(item, dict)
-    and text(item.get("capability")) and text(item.get("owner"))
+    and said(item.get("capability")) and said(item.get("owner"))
     and nothing_or(text, item.get("action"))
     and item.get("polarity") in (None, "owns", "excludes"),
     "defers_to": lambda item: isinstance(item, dict)
-    and text(item.get("capability")) and nothing_or(text, item.get("to")),
-    "consumes": text, "produces": text}
+    and said(item.get("capability")) and nothing_or(text, item.get("to")),
+    "consumes": by_name, "produces": by_name}
 
 
 def set_aside(entry):
     """How many items of a section that was read cannot be. A null is not an
-    item."""
-    return sum(item is not None and not ITEM[key](item)
+    item, and nor is text with nothing in it."""
+    return sum(item is not None and not (text(item) and not item.strip())
+               and not ITEM[key](item)
                for key in LISTS for item in entry[key])
 
 
@@ -1623,6 +1915,9 @@ def shape(data):
     return read, sum(map(set_aside, read))
 
 
+NOTHING_READ = "NOTHING WAS READ: 0 of "
+
+
 class EveryPlaceInTheFile(Odd):
 
     def test_no_odd_value_anywhere_raises_or_is_read_as_a_sound_section(self):
@@ -1656,9 +1951,12 @@ class EveryPlaceInTheFile(Odd):
                 self.assertEqual((self.status, report), (1, ""), where)
                 continue
             read, aside = shape(data)
-            self.assertEqual(self.status, 0, where)
             self.assertIn(f"inventory: {len(read)} of {len(data['sections'])} "
                           f"sections read", report, where)
+            # With no section read there is no result, and the run says so.
+            self.assertEqual(
+                (self.status, self.stderr.startswith(NOTHING_READ)),
+                (0, False) if read else (1, True), where)
             self.assertEqual("ITEMS NOT READ" in report, bool(aside), where)
             if aside:
                 self.assertIn(f"ITEMS NOT READ: {aside}, in ", report, where)
@@ -1700,7 +1998,7 @@ def against(path):
                 with contextlib.redirect_stdout(out), \
                         contextlib.redirect_stderr(io.StringIO()):
                     status = module.main()
-                did = "refused" if status else \
+                did = "refused" if status and not out.getvalue() else \
                     "said that something was not read" \
                     if "NOT READ" in out.getvalue() \
                     else "reported with no word of anything unread"

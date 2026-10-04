@@ -3213,49 +3213,66 @@ MUTATIONS = [
         ],
     },
     {
-        "what": 'synthesize — text that no stream can write raises where the '
-                'report is printed',
-        "why": 'half of a surrogate pair is text of the right kind in every '
-               'place of an inventory, and JSON spells it "\\ud83d". In a '
-               'heading or in what a claim points to it raised at the first '
-               'line that printed it, and every finding went with it',
-        "module": "synthesize",
-        "old": '            stream.reconfigure(errors="backslashreplace")',
-        "new": '            pass',
-        "tests": [
-            "tests.test_malformed_inventory.TextThatNoStreamCanWrite."
-            "test_in_a_claim_and_in_what_it_points_to",
-            "tests.test_malformed_inventory.TextThatNoStreamCanWrite."
-            "test_in_the_heading_of_a_section_that_was_not_read",
-        ],
-    },
-    {
-        "what": 'synthesize — text that no stream can write raises where the '
-                'candidates are written',
-        "why": 'the same character in the file --out writes. The report had '
-               'been printed by then and the candidate file was left half '
-               'written',
-        "module": "synthesize",
-        "old": '                  errors="backslashreplace") as handle:',
-        "new": '                  ) as handle:',
-        "tests": [
-            "tests.test_malformed_inventory.TextThatNoStreamCanWrite."
-            "test_and_in_the_file_of_candidates",
-        ],
-    },
-    {
         "what": 'synthesize.passes_asked — runs that are text are compared with '
                 "a section's passes",
         "why": '`"runs": "three"` raised where a section\'s passes were '
                'compared with it, and every finding went with it. It decides '
                'one list in the report and no finding',
         "module": "synthesize",
-        "old": '    return runs if isinstance(runs, int) and not '
-               'isinstance(runs, bool) \\',
-        "new": '    return runs if True and not isinstance(runs, bool) \\',
+        "old": '    return asked if isinstance(asked, int) and not '
+               'isinstance(asked, bool) \\',
+        "new": '    return asked if True and not isinstance(asked, bool) \\',
         "tests": [
             "tests.test_malformed_inventory.HowManyPassesWereAskedFor."
             "test_runs_that_are_not_a_whole_number_of_one_or_more",
+        ],
+    },
+    {
+        "what": 'synthesize — a run that read no section goes on to list its '
+                'candidates',
+        "why": 'with every section failed at extraction the report named them, '
+               'listed no candidate and exited 0, which is what a document '
+               'with no defect gets',
+        "module": "synthesize",
+        "old": '    if not sections:\n'
+               '        # Each entry is named above',
+        "new": '    if False:\n'
+               '        # Each entry is named above',
+        "tests": [
+            "tests.test_malformed_inventory.NoSectionThatWasRead."
+            "test_it_is_said_and_the_run_is_not_a_result",
+        ],
+    },
+    {
+        "what": 'synthesize — a run that read no section exits 0',
+        "why": 'it says on stderr that nothing was read. A script that runs '
+               'this and reads its exit status would have, at 0, a document in '
+               'which nothing was found',
+        "module": "synthesize",
+        "old": '              f"{args.inventory}.", file=sys.stderr)\n'
+               '        return 1',
+        "new": '              f"{args.inventory}.", file=sys.stderr)\n'
+               '        return 0',
+        "tests": [
+            "tests.test_malformed_inventory.NoSectionThatWasRead."
+            "test_it_is_said_and_the_run_is_not_a_result",
+        ],
+    },
+    {
+        "what": 'dossier_cli.cmd_inventory — what synthesize.py exits with is '
+                'thrown away',
+        "why": '`dossier inventory` runs inventory.py and then synthesize.py, '
+               "and returned the first one's status whatever the second did: "
+               'an inventory that synthesize.py refuses, or reads no section '
+               'of, came back as 0',
+        "module": "dossier_cli",
+        "old": '        code = run("synthesize.py", "--project", args.project,\n'
+               '                   "--inventory", out)',
+        "new": '        run("synthesize.py", "--project", args.project,\n'
+               '            "--inventory", out)',
+        "tests": [
+            "tests.test_malformed_inventory.NoSectionThatWasRead."
+            "test_and_the_status_reaches_whoever_ran_dossier_inventory",
         ],
     },
     {
@@ -3285,12 +3302,29 @@ MUTATIONS = [
                'the entry goes on to be used as a section, with whatever '
                'lists it has',
         "module": "synthesize",
-        "old": '                why = one_line(said) if isinstance(said, str) and said.strip() \\\n'
+        "old": '                why = one_line(writable(said)) \\\n'
+               '                    if isinstance(said, str) and said.strip() \\\n'
                '                    else "skipped, and the inventory does not say why"',
         "new": '                why = said',
         "tests": [
             "tests.test_malformed_inventory.AnEntryThatIsNotASection."
             "test_an_entry_with_an_error_was_not_read_whatever_the_error_says",
+        ],
+    },
+    {
+        "what": 'synthesize.read_inventory — an entry marked skipped, with no '
+                'error, is read',
+        "why": 'inventory.py marks an entry skipped only beside an error. One '
+               'marked so with no error and its lists empty was read as a '
+               'section that holds nothing, and the claim that it holds '
+               'something was asserted as untrue',
+        "module": "synthesize",
+        "old": '        if isinstance(entry, dict) and ("error" in entry\n'
+               '                                        or entry.get("skipped")):',
+        "new": '        if isinstance(entry, dict) and "error" in entry:',
+        "tests": [
+            "tests.test_malformed_inventory.AnEntryThatIsNotASection."
+            "test_an_entry_marked_skipped_was_not_read_error_or_no_error",
         ],
     },
     {
@@ -3300,7 +3334,7 @@ MUTATIONS = [
                'printed on and begins another, which reads as a line this '
                'program wrote',
         "module": "synthesize",
-        "old": '        if one_line(entry[key]) != entry[key]:',
+        "old": '        if "".join(entry[key].splitlines()) != entry[key]:',
         "new": '        if False:',
         "tests": [
             "tests.test_malformed_inventory.WhatAnEntrySaysOfItself."
@@ -3428,10 +3462,9 @@ MUTATIONS = [
     {
         "what": 'synthesize.read_items — an item that cannot be read is dropped '
                 'without a word',
-        "why": 'a deferral that does not say what is deferred, an output given '
-               'as a mapping: each was passed over where it was used, and '
-               'nothing in the report said that the section holds something '
-               'that was not read',
+        "why": 'a deferral that does not say what is deferred, a number among '
+               "a section's inputs: each is passed over, and nothing in the "
+               'report says that the section holds something that was not read',
         "module": "synthesize",
         "old": '                aside.append({"section": section, "list": key,\n'
                '                              "why": f"entry {position} of its \'{key}\' {why}"})',
@@ -3444,33 +3477,118 @@ MUTATIONS = [
         ],
     },
     {
-        "what": 'synthesize.read_items — a null in a list is an item that could '
-                'not be read',
+        "what": 'synthesize.empty_place — a null in a list is an item',
         "why": 'a null holds nothing that could be anything. Set aside as an '
-               'input that was not read, one null among one section\'s inputs '
+               "input that was not read, one null among one section's inputs "
                'makes a question of every orphan in the document, and beside '
                'each the report says that a section holds an input that was '
                'not read, where no input was',
         "module": "synthesize",
-        "old": '            if item is None:\n'
-               '                continue\n',
-        "new": '',
+        "old": '    return item is None or (isinstance(item, str) and not '
+               'item.strip())',
+        "new": '    return isinstance(item, str) and not item.strip()',
         "tests": [
             "tests.test_malformed_inventory.AnItemThatCannotBeRead."
             "test_a_null_is_an_empty_place_in_a_list_and_not_an_item",
+            "tests.test_malformed_inventory.AFieldThatIsNotAList."
+            "test_an_identifier_there_is_one_and_an_empty_place_is_not",
         ],
     },
     {
-        "what": 'synthesize.not_capability — a capability that is its name '
-                'alone cannot be read',
-        "why": "the fallback's validator lets a capability through as a bare "
-               'string. Set aside, it leaves a claim that points to its '
-               'section a question, where the section holds what the claim '
-               'says',
+        "what": 'synthesize.empty_place — text with nothing in it is an item',
+        "why": '`""` among a section\'s inputs says what a null says. Read as '
+               'an input it is counted among them, and among the identifiers '
+               'of a section the fallback read it is taken for the sign that a '
+               'full pass read the section too',
         "module": "synthesize",
-        "old": '    return "" if isinstance(item, str) else not_texts(item, '
-               '("name",))',
-        "new": '    return not_texts(item, ("name",))',
+        "old": '    return item is None or (isinstance(item, str) and not '
+               'item.strip())',
+        "new": '    return item is None',
+        "tests": [
+            "tests.test_malformed_inventory.AnItemThatCannotBeRead."
+            "test_a_null_is_an_empty_place_in_a_list_and_not_an_item",
+            "tests.test_malformed_inventory.AFieldThatIsNotAList."
+            "test_an_identifier_there_is_one_and_an_empty_place_is_not",
+        ],
+    },
+    {
+        "what": 'synthesize.not_texts — text with nothing in it says what an '
+                'item is asked',
+        "why": 'the fallback\'s validator lets through a capability named "" '
+               'with what the section holds in its quote. Read as a capability '
+               'it matches nothing, and a claim that the section holds it was '
+               'asserted as untrue',
+        "module": "synthesize",
+        "old": '        if key in needed and not held.strip():',
+        "new": '        if False:',
+        "tests": [
+            "tests.test_malformed_inventory.WhatAnItemSetAsideCouldHaveAnswered."
+            "test_a_capability_named_with_nothing_is_not_one_that_was_read",
+            "tests.test_malformed_inventory.AnItemThatCannotBeRead."
+            "test_a_capability",
+        ],
+    },
+    {
+        "what": 'synthesize.not_texts — an empty list or mapping is something, '
+                'under a key that may be absent',
+        "why": 'a deferral to {} still says what is deferred. Set aside, the '
+               'finding that nobody owns it is not made, where it was made '
+               'before this check was written',
+        "module": "synthesize",
+        "old": '        if key in optional and (held is None or held == [] or '
+               'held == {}):',
+        "new": '        if key in optional and held is None:',
+        "tests": [
+            "tests.test_malformed_inventory.WhatIsTakenOfAnItem."
+            "test_nothing_under_a_key_that_may_be_absent",
+        ],
+    },
+    {
+        "what": 'synthesize.READS — an input or an output given by its name '
+                'cannot be read',
+        "why": '`{"name": ...}` among a section\'s inputs is how a capability '
+               'is given, and it says what the input is. Set aside, it puts '
+               'every orphan of the document in doubt over an item that can be '
+               'read',
+        "module": "synthesize",
+        "old": '         ("consumes", not_named), ("produces", not_named))',
+        "new": '         ("consumes", lambda item: "" if isinstance(item, str) else "is not text"),\n'
+               '         ("produces", lambda item: "" if isinstance(item, str) else "is not text"))',
+        "tests": [
+            "tests.test_malformed_inventory.AnItemThatCannotBeRead."
+            "test_an_input_or_an_output_given_by_its_name_is_read_by_it",
+        ],
+    },
+    {
+        "what": 'synthesize.taken — an input or an output given by its name is '
+                'taken as the mapping it came in',
+        "why": 'it was read by its name where --authority-as-dataflow folds '
+               'data flow into ownership, and nowhere else. Without the flag '
+               'it was no consumer, and what it names was an orphan, asserted',
+        "module": "synthesize",
+        "old": '    if key in ("consumes", "produces"):\n'
+               '        return writable(item["name"])',
+        "new": '    if False:\n'
+               '        return writable(item["name"])',
+        "tests": [
+            "tests.test_malformed_inventory.AnItemThatCannotBeRead."
+            "test_an_input_or_an_output_given_by_its_name_is_read_by_it",
+        ],
+    },
+    {
+        "what": 'synthesize.not_named — a name given as text alone cannot be '
+                'read',
+        "why": 'an input or an output is text by the schema, and the '
+               "fallback's validator lets a capability through as text. Set "
+               'aside, a capability leaves a claim that points to its section '
+               'a question, where the section holds what the claim says',
+        "module": "synthesize",
+        "old": '    if isinstance(item, str):\n'
+               '        return ""\n'
+               '    if not isinstance(item, dict):',
+        "new": '    if False:\n'
+               '        return ""\n'
+               '    if not isinstance(item, dict):',
         "tests": [
             "tests.test_malformed_inventory.WhatIsTakenOfAnItem."
             "test_a_capability_that_is_its_name_and_nothing_else",
@@ -3495,14 +3613,13 @@ MUTATIONS = [
     },
     {
         "what": 'synthesize.taken — every key of an item is taken',
-        "why": '`"owner": 5` on an evidence claim is not what a claim is asked '
-               'for, so nothing checks it. Taken with the claim, it reaches '
-               'the line that prints who a finding names, which is written for '
-               'text, and raises',
+        "why": '`owner` on an evidence claim is not what a claim is asked for, '
+               'so nothing checks it. Taken with the claim, text under it is '
+               'printed as who the finding names, where the place the claim '
+               'points to belongs',
         "module": "synthesize",
-        "old": '    kept = {name: item[name] for name in TAKEN[key] if name in '
-               'item}',
-        "new": '    kept = dict(item)',
+        "old": '    for name in TAKEN[key]:',
+        "new": '    for name in item:',
         "tests": [
             "tests.test_malformed_inventory.WhatIsTakenOfAnItem."
             "test_a_key_its_list_is_not_asked_for_is_not_carried",
@@ -3513,9 +3630,9 @@ MUTATIONS = [
     {
         "what": 'synthesize.taken — a quote that is not text is taken',
         "why": 'nothing is decided on a quote, so one that is a list of two is '
-               'no reason to set the item aside. Taken, it is cut to length '
-               'where a pair is put to a model and written to the candidate '
-               'file as Python prints a list; one that is null raises there',
+               'no reason to set the item aside. It is not text to be shown '
+               'either, and taken as if it were it raises where it is made '
+               'ready to be written',
         "module": "synthesize",
         "old": '    if isinstance(item.get("quote"), str):',
         "new": '    if "quote" in item:',
@@ -3527,15 +3644,32 @@ MUTATIONS = [
     {
         "what": 'synthesize — an input that was set aside does not put an '
                 'orphan in doubt',
-        "why": '`{"name": "calibrated gauge readings"}` among a section\'s '
-               'inputs is not text, so it was no consumer, and the output it '
-               'names was an orphan, asserted',
+        "why": '`{"label": "calibrated gauge readings"}` among a section\'s '
+               'inputs does not say what the input is where this program reads '
+               'it. It was no consumer, and the output it may be was an '
+               'orphan, asserted',
         "module": "synthesize",
         "old": '                    open_question(holding("consumes"),',
         "new": '                    open_question(holding(),',
         "tests": [
             "tests.test_malformed_inventory.WhatAnItemSetAsideCouldHaveAnswered."
             "test_an_input_could_be_what_consumes_an_output",
+        ],
+    },
+    {
+        "what": 'synthesize — an output that was set aside puts an orphan in '
+                'doubt',
+        "why": "what a section produces cannot be what consumes another's "
+               'output. The first version of this check refused the whole '
+               'section over one item, and every absence in the document '
+               'became a question',
+        "module": "synthesize",
+        "old": '                    open_question(holding("consumes"),',
+        "new": '                    open_question(holding("consumes", '
+               '"produces"),',
+        "tests": [
+            "tests.test_malformed_inventory.WhatAnItemSetAsideCouldHaveAnswered."
+            "test_each_list_answers_for_its_own_absence_and_no_other",
         ],
     },
     {
@@ -3554,6 +3688,38 @@ MUTATIONS = [
         ],
     },
     {
+        "what": 'synthesize — under --authority-as-dataflow, an input or an '
+                'output that was set aside does not put an owner in doubt',
+        "why": 'that flag takes ownership from what a section produces and '
+               'consumes as well, so an item of either that was not read could '
+               'be the owner',
+        "module": "synthesize",
+        "old": '            ("produces", "consumes") if '
+               'args.authority_as_dataflow else ()))',
+        "new": '            ()))',
+        "tests": [
+            "tests.test_malformed_inventory.WhatAnItemSetAsideCouldHaveAnswered."
+            "test_under_authority_as_dataflow_an_input_or_an_output_could_own",
+        ],
+    },
+    {
+        "what": 'synthesize — without that flag, an input or an output that was '
+                'set aside puts an owner in doubt',
+        "why": 'an input is not an owner where ownership is read from '
+               'authority alone, and a finding it cannot answer is not a '
+               'question because of it',
+        "module": "synthesize",
+        "old": '            ("produces", "consumes") if '
+               'args.authority_as_dataflow else ()))',
+        "new": '            ("produces", "consumes")))',
+        "tests": [
+            "tests.test_malformed_inventory.WhatAnItemSetAsideCouldHaveAnswered."
+            "test_under_authority_as_dataflow_an_input_or_an_output_could_own",
+            "tests.test_malformed_inventory.WhatAnItemSetAsideCouldHaveAnswered."
+            "test_each_list_answers_for_its_own_absence_and_no_other",
+        ],
+    },
+    {
         "what": 'synthesize — a capability that was set aside does not put what '
                 'a claim points to in doubt',
         "why": 'a capability named with a number is not one a claim can be '
@@ -3566,6 +3732,82 @@ MUTATIONS = [
         "tests": [
             "tests.test_malformed_inventory.WhatAnItemSetAsideCouldHaveAnswered."
             "test_a_capability_could_be_what_a_claim_points_to",
+        ],
+    },
+    {
+        "what": 'synthesize — any item that was set aside in the place a claim '
+                'points to puts the claim in doubt',
+        "why": 'what a section consumes is not what it holds. A claim that the '
+               'section holds something is answered by its capabilities, and '
+               'by no other list',
+        "module": "synthesize",
+        "old": '                                            '
+               'holding("capabilities"))',
+        "new": '                                            holding(*(key for '
+               'key, _ in READS)))',
+        "tests": [
+            "tests.test_malformed_inventory.WhatAnItemSetAsideCouldHaveAnswered."
+            "test_nor_an_item_of_another_list_in_the_section_it_does_point_to",
+        ],
+    },
+    {
+        "what": 'synthesize.self_claims — a capability that was set aside '
+                'anywhere puts every claim in doubt',
+        "why": 'a claim is about the place it points to. A capability that was '
+               'not read in another section cannot be what that place holds',
+        "module": "synthesize",
+        "old": '                [section for section in hits\n'
+               '                 if any(section is each for each in blurred)],',
+        "new": '                list(blurred),',
+        "tests": [
+            "tests.test_malformed_inventory.WhatAnItemSetAsideCouldHaveAnswered."
+            "test_but_not_one_in_a_section_the_claim_does_not_point_to",
+        ],
+    },
+    {
+        "what": 'synthesize.self_claims — a capability that was set aside is '
+                'the reason given before a section that was not read',
+        "why": 'both stand between the claim and saying it is untrue, and one '
+               'is given. The section is the larger doubt: it could hold the '
+               'place itself',
+        "module": "synthesize",
+        "old": '                unread, "a section that was not read could hold it, as part "\n'
+               '                        "of the place the pointer names") or open_question(\n'
+               '                [section for section in hits\n'
+               '                 if any(section is each for each in blurred)],\n'
+               '                "the place it points to holds a capability that was not "\n'
+               '                "read") or doubt))',
+        "new": '                [section for section in hits\n'
+               '                 if any(section is each for each in blurred)],\n'
+               '                "the place it points to holds a capability that was not "\n'
+               '                "read") or open_question(\n'
+               '                unread, "a section that was not read could hold it, as part "\n'
+               '                        "of the place the pointer names") or doubt))',
+        "tests": [
+            "tests.test_malformed_inventory.WhatAnItemSetAsideCouldHaveAnswered."
+            "test_a_section_that_was_not_read_is_the_reason_given_first",
+        ],
+    },
+    {
+        "what": 'synthesize.self_claims — a doubt about the pointer is the '
+                'reason given before a capability that was set aside',
+        "why": 'the capability is what the place could hold, and the line '
+               "names the section to read again. The pointer's own doubt is "
+               'the one given where the place was read whole',
+        "module": "synthesize",
+        "old": '                        "of the place the pointer names") or open_question(\n'
+               '                [section for section in hits\n'
+               '                 if any(section is each for each in blurred)],\n'
+               '                "the place it points to holds a capability that was not "\n'
+               '                "read") or doubt))',
+        "new": '                        "of the place the pointer names") or doubt or open_question(\n'
+               '                [section for section in hits\n'
+               '                 if any(section is each for each in blurred)],\n'
+               '                "the place it points to holds a capability that was not "\n'
+               '                "read")))',
+        "tests": [
+            "tests.test_malformed_inventory.WhatAnItemSetAsideCouldHaveAnswered."
+            "test_and_the_capability_before_a_doubt_about_the_pointer_itself",
         ],
     },
     {
@@ -3584,17 +3826,64 @@ MUTATIONS = [
         ],
     },
     {
+        "what": 'synthesize — the reasons a finding is not asserted are listed '
+                'without the item that was set aside',
+        "why": 'the line under the count of candidates says why a finding is '
+               'marked unverifiable: a section not read, a line in no section, '
+               'a place not looked up. A finding in doubt over an item was '
+               'marked for a reason that list does not give',
+        "module": "synthesize",
+        "old": '        if aside:\n'
+               '            print("   An item of a section\'s lists that could not be read is "',
+        "new": '        if False:\n'
+               '            print("   An item of a section\'s lists that could not be read is "',
+        "tests": [
+            "tests.test_malformed_inventory.WhatAnItemSetAsideCouldHaveAnswered."
+            "test_the_reasons_listed_under_the_count_take_an_item_in",
+        ],
+    },
+    {
+        "what": 'synthesize — a score does not say how many items it was made '
+                'without',
+        "why": 'a score over an inventory with items set aside is a score of '
+               'what was read. The line that says what the inventory left '
+               'unread was not printed for it',
+        "module": "synthesize",
+        "old": '        if unread or partial or short or no_section or aside:',
+        "new": '        if unread or partial or short or no_section:',
+        "tests": [
+            "tests.test_malformed_inventory.WhatAnItemSetAsideCouldHaveAnswered."
+            "test_and_a_score_says_how_many_items_it_was_made_without",
+        ],
+    },
+    {
         "what": 'synthesize.consult — a name of the document that is not text '
                 'is looked up',
         "why": '`"doc": ["d"]` was looked up in the manifest and printed as '
                'Python prints a list. Nested a hundred thousand deep, which '
                'Python 3.14 parses, it raised where it was printed',
         "module": "synthesize",
-        "old": '    if not isinstance(slug, str) or one_line(slug) != slug:\n',
+        "old": '    if not isinstance(slug, str) or not slug.isprintable():\n',
         "new": '    if False:\n',
         "tests": [
             "tests.test_malformed_inventory.WhichDocumentItWasBuiltFrom."
             "test_a_name_that_is_not_text_names_no_document",
+        ],
+    },
+    {
+        "what": 'synthesize.consult — a name of the document with a line break '
+                'in it is looked up',
+        "why": 'it names no document, and the line that says so printed it: '
+               'what came after the break was a line of the report that this '
+               'program did not write',
+        "module": "synthesize",
+        "old": '    if not isinstance(slug, str) or not slug.isprintable():\n',
+        "new": '    if not isinstance(slug, str):\n',
+        "tests": [
+            "tests.test_malformed_inventory.WhichDocumentItWasBuiltFrom."
+            "test_nor_does_one_with_a_character_that_cannot_be_printed",
+            "tests.test_malformed_inventory.TextThatNothingCanEncode."
+            "test_in_the_name_of_the_document",
         ],
     },
     {
@@ -3638,6 +3927,44 @@ MUTATIONS = [
         "tests": [
             "tests.test_malformed_inventory.WhatIsTakenOfAnItem."
             "test_a_line_break_in_a_claim_does_not_begin_a_line_of_the_report",
+        ],
+    },
+    {
+        "what": 'synthesize.one_line — a control character that is not a line '
+                'break is printed as it came',
+        "why": 'an escape sequence in what a claim points to goes to the '
+               'terminal with the finding, and can take back the line the '
+               'terminal has shown above it',
+        "module": "synthesize",
+        "old": '    return "".join(" " if unicodedata.category(ch) in ("Cc", "Zl", "Zp")\n'
+               '                   else ch for ch in text)',
+        "new": '    return " ".join(text.splitlines())',
+        "tests": [
+            "tests.test_malformed_inventory.HowAFindingIsPrinted."
+            "test_a_control_character_is_a_space_where_a_line_is_printed",
+        ],
+    },
+    {
+        "what": 'synthesize.writable — half of a surrogate pair is left as it '
+                'came',
+        "why": 'it is text of the right kind in every place of an inventory, '
+               'and JSON spells it "\\ud83d". Left as it came it raises where a '
+               'finding is printed, where the candidate file is written, and '
+               'where a text is hashed for the embedding cache or a prompt for '
+               'a model call',
+        "module": "synthesize",
+        "old": '    return text.encode("utf-8", '
+               '"backslashreplace").decode("utf-8")',
+        "new": '    return text',
+        "tests": [
+            "tests.test_malformed_inventory.TextThatNothingCanEncode."
+            "test_in_a_claim_and_in_what_it_points_to",
+            "tests.test_malformed_inventory.TextThatNothingCanEncode."
+            "test_in_the_heading_of_a_section_that_was_not_read",
+            "tests.test_malformed_inventory.TextThatNothingCanEncode."
+            "test_in_what_is_embedded_and_in_what_is_put_to_a_model",
+            "tests.test_malformed_inventory.TextThatNothingCanEncode."
+            "test_and_in_the_file_of_candidates",
         ],
     },
 ]

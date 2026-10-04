@@ -580,13 +580,13 @@ inventory.** The extraction stage is not the hard part.
 > of three sections in one place at a time. It puts each of 14 odd values in
 > each of 147 places and takes each key out, which makes 2,109 inventories
 > that differ from the sound one. By the test's own statement of the shape,
-> 1,281 of them are still sound (a text replaced by another text, a key no
-> list is asked for) and 828 are not: 27 are no inventory at all, 578 have an
-> entry that is not a section, and 223 have an item that cannot be read. The
+> 1,255 of them are still sound (a text replaced by another text, a key no
+> list is asked for) and 854 are not: 27 are no inventory at all, 605 have an
+> entry that is not a section, and 222 have an item that cannot be read. The
 > code as it was raised on 239 of the 2,109, and a run that raises loses every
 > finding of every class. A section given as a number and a heading of -1 are
 > two of those; five were sound inventories whose `runs` was not a number. It
-> reported on 536 of the 828 with no word of anything unread, and those
+> reported on 562 of the 854 with no word of anything unread, and those
 > include the worse cases. `"capabilities": null` was read as a section that
 > provides nothing, and the claim that it holds something was reported as
 > untrue. `"consumes": {}` was read as a section that consumes nothing, and
@@ -609,6 +609,14 @@ inventory.** The extraction stage is not the hard part.
 > `sections` that is not a list, and a list of sections with nothing in it,
 > which had printed "0 of 0 sections read" and exited 0. A byte-order mark in
 > front of the file is not part of it.
+>
+> A run in which no entry is a section that was read is no result either.
+> With every section failed at extraction, the report named them, listed no
+> candidate and exited 0. It still names each entry and says why it was not
+> read, and there it stops: `NOTHING WAS READ` on stderr, exit status 1, no
+> candidates, no score, no candidate file. `dossier inventory` runs
+> `inventory.py` and then `synthesize.py`, and returned the first one's
+> status whatever the second did. It returns the second's.
 >
 > **An entry.** What an entry says of itself, `inventory.py` writes with no
 > model in between: `catalogue()` builds the heading, the locator, the counts
@@ -633,16 +641,21 @@ inventory.** The extraction stage is not the hard part.
 >   holds nothing.
 > - An entry that is null or `{}` is a section the inventory holds nothing
 >   for. One with an `error` was not read, whatever the error says and
->   whatever else is in it.
+>   whatever else is in it. Nor was one marked `skipped`, error or no error:
+>   `inventory.py` marks an entry so only beside an error, and one marked so
+>   with its lists in it and no error was read as a section.
 >
 > **An item.** What a list holds is a model's reply, and `inventory.py`'s
-> validators ask little of it: that a capability have a name and an authority
-> entry say what, who, how and which way, and of the fallback's reply less.
-> An evidence claim given as a bare sentence, a number among the things a
-> section consumes, an owner that is a list of two: each is as `inventory.py`
-> writes it. The test file has 34 such shapes, each made by
-> `inventory.catalogue()` from a reply its validator accepts. Three courses
-> were weighed for an item that cannot be read.
+> validators ask little of it. The one for the whole schema asks that a
+> capability have a name and that an authority entry say what, who, how and
+> which way, and not that any of those be text. The fallback's asks one
+> thing, of an authority entry that is a mapping: which way. An evidence
+> claim given as a bare sentence, a number among the things a section
+> consumes, an owner that is a list of two: each is as `inventory.py` writes
+> it. The test file has 34 such shapes, and four more with nothing where
+> something is asked, each made by `inventory.catalogue()` from a reply its
+> validator accepts. Three courses were weighed for an item that cannot be
+> read.
 >
 > - *Read it as nothing.* That is what the code did where it did not raise,
 >   and it is the false assertion this note opens with.
@@ -656,58 +669,89 @@ inventory.** The extraction stage is not the hard part.
 >   because an unread section can answer any absence. An independent review
 >   of that version found both.
 > - *Set the item aside.* `read_items()` does this. The section is read. The
->   item is not used. It is counted, and named on the inventory line under
->   ITEMS NOT READ with what is wrong with it. An absence that it could have
->   answered is a question, and no other is: a capability, for a claim that
->   points into its section (D3); an authority entry, for what another
->   section defers (D6); an input, for what another section produces (D8);
->   and under `--authority-as-dataflow` an input or an output for D6 as
->   well. A claim that was set aside is counted among the claims D3 did not
->   check. A deferral or an output that was set aside is a finding that was
->   not made, and puts nothing in doubt.
+>   item is not used. It is counted, and each section that holds one is named
+>   under ITEMS NOT READ with what is wrong with the first of its items and
+>   how many more it has. An absence that it could have answered is a
+>   question, and no other is: a capability, for a claim that points into
+>   its section (D3); an authority entry, for what another section defers
+>   (D6); an input, for what another section produces (D8); and under
+>   `--authority-as-dataflow` an input or an output for D6 as well. A claim
+>   that was set aside is counted among the claims D3 did not check. A
+>   deferral or an output that was set aside is a finding that was not made,
+>   and puts nothing in doubt. So is the conflict an authority entry would
+>   have been one side of (D5).
 >
-> What each item is. A capability is a mapping with a `name` in text, or the
-> name alone, which the fallback's validator lets through. An evidence claim
-> is a mapping with a `claim` in text; its `points_to` is text, a list of
-> texts, or absent. An authority entry is a mapping with `capability` and
-> `owner` in text, `action` in text where given, and `polarity` "owns" or
-> "excludes" where given. A deferral is a mapping with `capability` in text,
-> and `to` in text where given. An input or an output is text; one given as
-> `{"name": ...}` is set aside and not read for its name, which would be a
-> guess. Three things are not reasons to set an item aside.
+> What each item is. A capability, an input or an output is its name in
+> text, alone or under `name`. The schema gives an input as text and a
+> capability under `name`, and the fallback's validator lets a capability
+> through as text. An input given under `name` was read by it where
+> `--authority-as-dataflow` folds data flow into ownership and nowhere else:
+> without that flag it was no consumer, and what it names was an orphan,
+> asserted. One given under any other key is set aside, `value` among them:
+> the code as it was read `value`, which is how it held an input itself and
+> nothing the schema gives. An evidence claim is a mapping with a `claim` in
+> text; its `points_to` is text, a list of texts, which is run together as
+> one pointer as it was before, or nothing. An authority entry is a mapping
+> with `capability` and `owner` in text, `action` in text or nothing, and
+> `polarity` "owns" or "excludes" where given. A deferral is a mapping with
+> `capability` in text, and `to` in text or nothing. Text that is needed has
+> something in it: a capability named `""` with what the section holds in
+> its quote, which the fallback's validator lets through, was read as a
+> capability that matches nothing, and the claim that the section holds it
+> was asserted as untrue. Under a key that may be absent, null, an empty
+> list, an empty mapping and blank text are each nothing: a deferral to `{}`
+> still says what is deferred. Three things are not reasons to set an item
+> aside.
 >
 > - *A `quote` that is not text.* A quote is shown to a reader or to a model
 >   and nothing is decided on it, so it is not shown and the item is read.
-> - *A null in a list.* It is an empty place and not an item: it holds
->   nothing that could be anything. Counted as an input that was not read,
+> - *A null in a list, or text with nothing in it.* Each is an empty place
+>   and not an item: it holds nothing that could be anything, and `[null]`
+>   and `[""]` say what `[]` says. Counted as an input that was not read,
 >   one null made a question of every orphan, 26 of them on the fixture with
 >   `--no-embed` as it was then read, each with "a section holds an input
->   that was not read" beside it where no input was.
-> - *A key the list is not asked for.* `"owner": 5` on a claim is not
->   checked, and it is not read either: of a mapping, the keys its list is
->   asked for are taken and no others.
+>   that was not read" beside it where no input was. With `--adjudicate`, a
+>   blank among a section's deferrals was put to the model as one of a pair,
+>   and the finding named a capability "deferred to Hydrology Model, and to"
+>   nothing. A mapping is an item whatever it holds, and `{"name": ""}` is
+>   set aside.
+> - *A key the list is not asked for.* `owner` on a claim or a deferral is
+>   not checked, and it is not read either: of a mapping, the keys its list
+>   is asked for are taken and no others. Text under it was printed as who
+>   the finding names, and with `--adjudicate` it stood for the party a
+>   deferral is passed to.
 >
 > The rest, briefly.
 >
 > - *`runs` that is not a whole number of one or more* (text, `true`, 0) is
->   taken as not given, and one line says that the list of sections read in
->   fewer passes could not be made. It decides that list and no finding.
-> - *`doc` that is not one line of text* names no document, and the document
+>   taken as not given, and the report says that the list of sections read
+>   in fewer passes could not be made. It decides that list and no finding.
+> - *`doc` that is not text, or has a character in it that cannot be
+>   printed* (a line break, an escape) names no document, and the document
 >   is not consulted: D3 then asserts nothing, by the rule further down. A
 >   hash that is not text matches nothing, with the same result. One that is
 >   null, nought or empty is no hash, and the other hash is asked.
 > - *A run with sections NOT READ or items set aside still exits 0*, as it
->   does when a section failed at extraction. The report says what was not
->   read and marks what rests on it.
-> - *Text that no stream can write is written as an escape.* Half of a
->   surrogate pair is text of the right kind in every place: JSON spells it
->   `\ud83d`. In a heading or a claim it raised where the report was printed
->   or where the candidate file was written. This is decided for the streams
->   and the file, not entry by entry: the same character can come from the
->   manifest.
-> - *A line break in a claim does not begin a line of the report.* A heading
->   with one in it is an entry `inventory.py` did not write. In a section
->   that failed, what followed the break was printed as a line of the report.
+>   does when a section failed at extraction, so long as one section was
+>   read. The report says what was not read and marks what rests on it.
+> - *Text that nothing can encode is written as the escape it came in as.*
+>   Half of a surrogate pair is text of the right kind in every place: JSON
+>   spells it `\ud83d`. In a heading or a claim it raised where the report
+>   was printed and where the candidate file was written. It raised as well
+>   where a text is hashed for the embedding cache, which is every run not
+>   given `--no-embed`, and where a pair is hashed for a model call. So it
+>   is rewritten where the text is read from the inventory, before anything
+>   is done with it. A first version decided this for the two streams and
+>   the candidate file, which left the other two.
+> - *A control character is printed as a space*, in every line of the report
+>   that prints text from the inventory. A line break in a claim began a
+>   line of the report, and an escape sequence in what a claim points to
+>   went to the terminal, where it can take back the line above it. A
+>   heading or a locator with a line break in it is an entry `inventory.py`
+>   did not write, and its section is NOT READ. In a section that failed,
+>   what followed the break in its heading was printed as a line of the
+>   report. A heading with a tab in it is one `inventory.py` can write, and
+>   its section is read.
 > - *Where an entry says it is* is asked, by the check that the text has not
 >   moved, only where the entry says so in text, read or not.
 > - *A run of digits too long to be a line number is not one*, where a score
@@ -724,19 +768,46 @@ inventory.** The extraction stage is not the hard part.
 > NOT READ. A pointer given as a mapping, a claim that is a list, and a
 > capability named with a number are set aside.
 >
+> Two reviews were made of this, each by a reviewer who had not written it.
+> The first is the one above. The second, of the version merged with the
+> lines in no section, could not get an absence asserted over a section NOT
+> READ, an item set aside or a line in no section. What it found was read
+> that should not have been, or lost that should have been kept, is decided
+> above: half a surrogate pair on the embedding and model paths, text with
+> nothing in it, an entry marked `skipped`, an input given by its name, a
+> deferral to `{}`, a run that read no section, and control characters. It
+> found too that the lines under the count of candidates, which say why a
+> finding is `unverifiable`, left out the item set aside. They say it now
+> where there is one.
+>
 > Not done. `inventory.py`'s validators still let through every item this
-> sets aside, where a stricter validator would have asked the model again.
-> The inventory is held to its own shape here and not to the document: an
+> sets aside but one, an authority entry whose polarity is neither of the
+> two, where a stricter validator would have asked the model again. A text
+> given as a list is read only where it is a pointer. An owner that is a list
+> of two, an action that is a list of two verbs and a capability named with
+> a list are set aside, and what each would have said is not used: on three
+> sound sections, a claim whose place holds a capability named with a list
+> of two texts, which matched it before, is a question; and under
+> `--object-identity`, which does not read the action, the conflict that an
+> authority entry with such an action is one side of is no longer found
+> (without that flag it raised). The inventory is held to its own shape here
+> and not to the document. What a locator says is held to nothing: one that
+> names another document is read for its line numbers all the same. An
 > entry taken out of the file is seen only as a gap between its neighbours'
 > line numbers (the note on lines in no section, further down). One taken
 > off the end is not seen, nor one taken out of an inventory whose
 > `unread_lines` says that no line was left out, and the absences it could
 > answer are asserted. A count of `passes` above the `runs` the file gives
 > is not remarked on. Only a value of the wrong kind is cut to fit a line: a
-> heading of 5,000 characters is printed whole. A pointer of 80,000
-> characters takes this half a minute, the time growing with the square of
-> the length (the longest of the 354 at hand has 131). `components.yaml` and
-> the ground truth are read on trust.
+> heading of 5,000 characters is printed whole. A character that is not a
+> control character and changes how a line is shown, such as one that turns
+> the direction of the text after it, is printed as it came. Two costs are
+> older than this change and are not bounded by it. A pointer of 80,000
+> characters takes this 37 seconds, the time growing with the square of the
+> length (the longest of the 354 at hand has 131). The search for a cycle of
+> deferrals takes 0.3, 2.2 and 9.5 seconds among 8, 9 and 10 components
+> that each defer one capability to every other. `components.yaml` and the
+> ground truth are read on trust.
 
 > **Which sections the document has was asked of the inventory, until
 > 2026-10-04.** D3 checks "recorded in Section 3.1" two ways: is there such a

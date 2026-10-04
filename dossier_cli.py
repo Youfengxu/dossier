@@ -248,7 +248,10 @@ def cmd_inventory(args):
     code = run("inventory.py", "--project", args.project, "--doc", args.doc,
                "--out", out, *model_args(args.vllm, concurrency=48))
     if code == 0:
-        run("synthesize.py", "--project", args.project, "--inventory", out)
+        # What synthesize.py exits with is this command's own status: it
+        # refuses an inventory it cannot read, and that was thrown away here.
+        code = run("synthesize.py", "--project", args.project,
+                   "--inventory", out)
     return code
 
 

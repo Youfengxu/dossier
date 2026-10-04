@@ -70,8 +70,8 @@ product, not a presentation afterthought.
 
 | tier | artefact | count | industry term |
 |---|---|---|---|
-| 1 | `tests/` | 822 | unit tests |
-| 2 | `run-tests.py --mutate` | 222/222 | **mutation testing** |
+| 1 | `tests/` | 837 | unit tests |
+| 2 | `run-tests.py --mutate` | 241/241 | **mutation testing** |
 | 3 | `conformance.py` | 6/6 | **contract testing**, proved by mutation |
 | 3 | `smoke.py` | 27/27 | integration / E2E |
 | 0 | `doctor.py` | — | preflight / environment check |
@@ -80,10 +80,10 @@ Tiers 1 and 2 were re-derived from a run on 2026-10-05: 578 tests and 112
 mutations before the work on the lines of a document that are in no section
 (`DESIGN` §3.21), which added 75 tests and 30 mutations, the work on the
 sections that did not answer (`DESIGN` §0.1), which added 78 and 49, and the
-work on the shape of the inventory (`DESIGN` §3.21), which added 91 and 31: 97
-tests and 32 mutations of its own, less six tests and one mutation that pinned
-shapes an earlier version had turned into text. `smoke.py` was re-run the same
-day and is unchanged at 27/27.
+work on the shape of the inventory (`DESIGN` §3.21), which added 106 and 50:
+112 tests and 51 mutations of its own, less six tests and one mutation that
+pinned shapes an earlier version had turned into text. `smoke.py` was re-run
+the same day and is unchanged at 27/27.
 
 ### 2.4 Validation evidence — is the method right?
 
@@ -137,7 +137,7 @@ vocabulary.
 
 | 25059-style characteristic | where dossier already evidences it | strength |
 |---|---|---|
-| Functional correctness | 822 unit tests, 222 mutations, 6 contract checks | **strong** |
+| Functional correctness | 837 unit tests, 241 mutations, 6 contract checks | **strong** |
 | Robustness | fixtures carry deliberate decoys; adversarial checker tests | moderate |
 | Transparency / explicability | every finding carries `slug:line` + verbatim quote | **strong** — this is the thesis |
 | Accuracy (task-level) | eval suite on 5 labelled corpora | **weak — no human baseline (G1)** |

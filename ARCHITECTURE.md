@@ -319,9 +319,10 @@ a line only where it is a line of the place the pointer names.
 What the inventory holds is held to a shape as well. An entry that is not
 of the shape `inventory.py` writes is a section that was not read, and says
 why. An item of one of a section's lists is a model's reply, and one that
-cannot be read is set aside and named, with the same consequence for the one
-absence it could answer. A file that is not an inventory at all is refused,
-with exit status 1 and no report.
+cannot be read is set aside and named, with the same consequence for the
+absences it could answer and for no other. A file that is not an inventory
+at all is refused, with exit status 1 and no report, and a run in which no
+section was read says so and exits 1 with no list of candidates.
 
 One absence is not the inventory's to assert at all. Whether a section a
 pointer names is in the document is a question about the document, and the
