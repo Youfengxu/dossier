@@ -491,6 +491,167 @@ inventory.** The extraction stage is not the hard part.
 > inventory quoted in this section is not in the repository, and whether it had
 > any cannot be checked.
 
+> **The shape of the inventory was a second premise nothing checked, until
+> 2026-10-05.** `synthesize.py` took what it was handed on trust, at every
+> level: that the file is an inventory, that each entry of it is a section,
+> and that each item of a section's lists is what the list is asked for. The
+> last test of `tests/test_malformed_inventory.py` changes a sound inventory
+> of three sections in one place at a time. It puts each of 14 odd values in
+> each of 145 places and takes each key out, which makes 2,081 inventories
+> that differ from the sound one. By the test's own statement of the shape,
+> 1,253 of them are still sound (a text replaced by another text, a key no
+> list is asked for) and 828 are not: 27 are no inventory at all, 578 have an
+> entry that is not a section, and 223 have an item that cannot be read. The
+> code as it was raised on 239 of the 2,081, and a run that raises loses every
+> finding of every class. A section given as a number and a heading of -1 are
+> two of those; five were sound inventories whose `runs` was not a number. It
+> reported on 536 of the 828 with no word of anything unread, and those
+> include the worse cases. `"capabilities": null` was read as a section that
+> provides nothing, and the claim that it holds something was reported as
+> untrue. `"consumes": {}` was read as a section that consumes nothing, and
+> what another section produces for it was an orphan, asserted. So it was
+> where the section's one input was `{"name": ...}`. (`python -m
+> tests.test_malformed_inventory --against <a synthesize.py>` prints these
+> figures for that file.)
+>
+> The shape is now checked where the file is read, at three levels, because
+> the three are written by different hands. The author delegated the decisions
+> below on condition that each be written down.
+>
+> **The file.** `load_inventory()` refuses a file that is not an inventory:
+> one line on stderr, exit status 1, no report, no score, no candidate file.
+> A report with no findings and status 0 is what a document with no defects
+> gives, and nothing was read. Refused are a file that cannot be opened, text
+> that is not JSON, JSON that this Python will not read (nested deeper than
+> its parser goes, or holding a number of more digits than `int()` takes from
+> 3.11 on), JSON that is not a mapping, a mapping with no `sections`,
+> `sections` that is not a list, and a list of sections with nothing in it,
+> which had printed "0 of 0 sections read" and exited 0. A byte-order mark in
+> front of the file is not part of it.
+>
+> **An entry.** What an entry says of itself, `inventory.py` writes with no
+> model in between: `catalogue()` builds the heading, the locator, the counts
+> and the eight lists itself, whatever the reply was. So `unreadable()` holds
+> an entry to exactly that, and one that fails is a section that was NOT READ,
+> named and counted on the inventory line with the first thing found wrong.
+> Every absence it could answer is then a question, by the rule above, and
+> what else the entry holds is not used.
+>
+> - It is a mapping, and its `heading` and `locator` are text of one line.
+> - Its six lists that `synthesize.py` reads are there and are lists. A list
+>   that is missing is not an empty one: nothing says the section was asked
+>   for it.
+> - `identifiers` and `deferred` are lists where it has them. Nothing is read
+>   off them, but an entry from before `full_passes` shows that a full pass
+>   read it by holding something in one, and `"identifiers": 7` was something.
+> - `degraded` is true or false. `passes` and `full_passes` come together or
+>   not at all, and agree as `inventory.py` counts them: one pass or more
+>   answered, each with the whole schema, except the first where the entry is
+>   marked degraded. `"full_passes": 99` beside `"passes": 1` was a section
+>   read in full, and `"passes": 0` beside six empty lists was a section that
+>   holds nothing.
+> - An entry that is null or `{}` is a section the inventory holds nothing
+>   for. One with an `error` was not read, whatever the error says and
+>   whatever else is in it.
+>
+> **An item.** What a list holds is a model's reply, and `inventory.py`'s
+> validators ask little of it: that a capability have a name and an authority
+> entry say what, who, how and which way, and of the fallback's reply less.
+> An evidence claim given as a bare sentence, a number among the things a
+> section consumes, an owner that is a list of two: each is as `inventory.py`
+> writes it. The test file has 34 such shapes, each made by
+> `inventory.catalogue()` from a reply its validator accepts. Three courses
+> were weighed for an item that cannot be read.
+>
+> - *Read it as nothing.* That is what the code did where it did not raise,
+>   and it is the false assertion this note opens with.
+> - *Refuse its section.* The first version of this check did, and called the
+>   entry "not as inventory.py writes it", which was untrue of 33 of the 34
+>   shapes. It also cost a run everything. On the committed fixture inventory
+>   (74 sections; 35 candidates with `--no-embed`, all asserted), one
+>   authority entry's quote given as a list of two left 73 of 74 sections
+>   read and all 35 candidates `unverifiable`, because an unread section can
+>   answer any absence. An independent review of that version found both.
+> - *Set the item aside.* `read_items()` does this. The section is read. The
+>   item is not used. It is counted, and named on the inventory line under
+>   ITEMS NOT READ with what is wrong with it. An absence that it could have
+>   answered is a question, and no other is: a capability, for a claim that
+>   points into its section (D3); an authority entry, for what another
+>   section defers (D6); an input, for what another section produces (D8);
+>   and under `--authority-as-dataflow` an input or an output for D6 as
+>   well. A claim that was set aside is counted among the claims D3 did not
+>   check. A deferral or an output that was set aside is a finding that was
+>   not made, and puts nothing in doubt.
+>
+> What each item is. A capability is a mapping with a `name` in text, or the
+> name alone, which the fallback's validator lets through. An evidence claim
+> is a mapping with a `claim` in text; its `points_to` is text, a list of
+> texts, or absent. An authority entry is a mapping with `capability` and
+> `owner` in text, `action` in text where given, and `polarity` "owns" or
+> "excludes" where given. A deferral is a mapping with `capability` in text,
+> and `to` in text where given. An input or an output is text; one given as
+> `{"name": ...}` is set aside and not read for its name, which would be a
+> guess. Three things are not reasons to set an item aside.
+>
+> - *A `quote` that is not text.* A quote is shown to a reader or to a model
+>   and nothing is decided on it, so it is not shown and the item is read.
+> - *A null in a list.* It is an empty place and not an item: it holds
+>   nothing that could be anything. Counted as an input that was not read,
+>   one null made a question of each of the 26 orphans the fixture has with
+>   `--no-embed`.
+> - *A key the list is not asked for.* `"owner": 5` on a claim is not
+>   checked, and it is not read either: of a mapping, the keys its list is
+>   asked for are taken and no others.
+>
+> The rest, briefly.
+>
+> - *`runs` that is not a whole number of one or more* (text, `true`, 0) is
+>   taken as not given, and one line says that the list of sections read in
+>   fewer passes could not be made. It decides that list and no finding.
+> - *`doc` that is not one line of text* names no document, and the document
+>   is not consulted: D3 then asserts nothing, by the rule further down. A
+>   hash that is not text matches nothing, with the same result. One that is
+>   null, nought or empty is no hash, and the other hash is asked.
+> - *A run with sections NOT READ or items set aside still exits 0*, as it
+>   does when a section failed at extraction. The report says what was not
+>   read and marks what rests on it.
+> - *Text that no stream can write is written as an escape.* Half of a
+>   surrogate pair is text of the right kind in every place: JSON spells it
+>   `\ud83d`. In a heading or a claim it raised where the report was printed
+>   or where the candidate file was written. This is decided for the streams
+>   and the file, not entry by entry: the same character can come from the
+>   manifest.
+> - *A line break in a claim does not begin a line of the report.* A heading
+>   with one in it is an entry `inventory.py` did not write. In a section
+>   that failed, what followed the break was printed as a line of the report.
+> - *Where an entry says it is* is asked, by the check that the text has not
+>   moved, only where the entry says so in text, read or not.
+> - *A run of digits too long to be a line number is not one*, where a score
+>   asks whether a finding's locator falls in a planted defect's span.
+>
+> None of the five inventories at hand has an entry that is not read or an
+> item that is set aside (464 entries, 2,220 items in the six lists; one is
+> `inv-ablation.json`, the other four are in the author's checkout and not
+> in the repository), and no number re-derived from the fixture moves.
+>
+> Six shapes that an earlier version made not to raise, by turning each into
+> text or into an empty list, are no longer read that way. A heading or a
+> locator of null, and capabilities that are not a list, leave their section
+> NOT READ. A pointer given as a mapping, a claim that is a list, and a
+> capability named with a number are set aside.
+>
+> Not done. `inventory.py`'s validators still let through every item this
+> sets aside, where a stricter validator would have asked the model again.
+> An inventory with no entry for a section of the document says "2 of 2
+> sections read" beside a document of three headings, and its absences are
+> asserted: the inventory is held to its own shape here, not to the
+> document. A count of `passes` above the `runs` the file gives is not
+> remarked on. Only a value of the wrong kind is cut to fit a line: a
+> heading of 5,000 characters is printed whole. A pointer of 80,000
+> characters takes this half a minute, the time growing with the square of
+> the length (the longest of the 354 at hand has 131). `components.yaml` and
+> the ground truth are read on trust.
+
 > **Which sections the document has was asked of the inventory, until
 > 2026-10-04.** D3 checks "recorded in Section 3.1" two ways: is there such a
 > place, and does it hold what the sentence says. For the first it matched the

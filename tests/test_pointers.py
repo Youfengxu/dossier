@@ -1558,28 +1558,14 @@ class WhatTheScoreRestsOn(Frozen):
         self.assertNotIn("rest on", report)
 
 
-class WhatAnEntryMayHold(Frozen):
-    """No validator promises the shape of any of these. Each has raised, in
-    the code as committed or in a version of this change."""
+class WhereAChunkSaysItIs(Frozen):
+    """A locator is text, and nothing promises what the text says. What an
+    entry may hold besides, and what happens to one that holds something
+    else, is tests/test_malformed_inventory.py."""
 
     def sections(self, pointer="Section 3.1"):
         return sections_of(DOCUMENT, (CLAIM, pointer),
                            holds={**HOLDS, 20: "gauge inventory"})
-
-    def test_a_pointer_given_as_a_mapping(self):
-        sections = self.sections()
-        sections[0]["evidence_claims"][0]["points_to"] = {"place": "Section 9"}
-        self.assertIn("Section 9", self.in_doubt(self.run_on(sections)))
-
-    def test_a_locator_that_is_null(self):
-        sections = self.sections()
-        sections[0]["locator"] = None
-        self.assertIn("-> Section 3.1", self.one(self.run_on(sections)))
-
-    def test_a_heading_that_is_null(self):
-        sections = self.sections()
-        sections[0]["heading"] = None
-        self.assertIn("-> Section 3.1", self.one(self.run_on(sections)))
 
     def test_a_locator_with_a_line_number_no_document_has(self):
         """int() refuses a number of five thousand digits."""
@@ -1596,24 +1582,6 @@ class WhatAnEntryMayHold(Frozen):
         report = self.run_on(sections, text_sha256=self.freeze(DOCUMENT))
         self.assertNotIn("NOT CONSULTED", report)
         self.assertIn("-> Section 3.1", self.one(report))
-
-    def test_capabilities_that_are_not_a_list(self):
-        for capabilities in (None, 5):
-            sections = self.sections()
-            sections[2]["capabilities"] = capabilities
-            self.again()
-            self.assertIn("-> Section 3.1", self.one(self.run_on(sections)))
-
-    def test_a_capability_not_named_by_a_string(self):
-        sections = self.sections()
-        sections[2]["capabilities"] = [{"name": 5, "quote": "q"}]
-        self.assertIn("-> Section 3.1", self.one(self.run_on(sections)))
-
-    def test_a_claim_that_is_not_a_string(self):
-        sections = self.sections()
-        sections[0]["evidence_claims"][0]["claim"] = ["Calibration", "drift"]
-        self.run_on(sections)
-        self.assertEqual(self.status, 0)
 
 
 class WhatAPointerNames(unittest.TestCase):

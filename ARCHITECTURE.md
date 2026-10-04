@@ -296,7 +296,12 @@ inventory was built by reading 100% of the document rather than a sample.
 That is a premise, and `synthesize.py` checks it: a section whose extraction
 failed, or that was read by the fallback schema alone, is counted and named on
 the inventory line, and a finding it could answer is listed as `unverifiable`
-rather than asserted.
+rather than asserted. So is an entry that is not of the shape `inventory.py`
+writes: it is a section that was not read, and says why. An item of one of a
+section's lists is a model's reply, and one that cannot be read is set aside
+and named, with the same consequence for the one absence it could answer. A
+file that is not an inventory at all is refused, with exit status 1 and no
+report.
 
 One absence is not the inventory's to assert at all. Whether a section a
 pointer names is in the document is a question about the document, and the

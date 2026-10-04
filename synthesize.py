@@ -32,6 +32,16 @@ were not, and every finding that asserts an absence one of those could answer is
 marked `unverifiable` and says which. It is still listed: a reviewer is owed the
 question, not a verdict the tool could not reach.
 
+WHAT AN INVENTORY IS was taken on trust as well. A section given as a number
+raised, and `"capabilities": null` was read as a section that provides nothing.
+The shape is checked where the file is read, at three levels. A file that is
+not an inventory is refused: one line, exit status 1, no report. An entry that
+is not a section as inventory.py writes one is a section that was not read,
+with the reason. An item of one of a section's lists is a model's reply, which
+no validator holds to a shape: one that cannot be read is set aside, counted
+and named, and a finding that asserts an absence it could answer is a question
+(DESIGN 3.21 says what was weighed).
+
 WHICH SECTIONS THE DOCUMENT HAS is not the inventory's to say either. It keeps
 the first heading of each chunk, and a chunk also holds every heading that came
 too soon to start one of its own, so D3 called a sub-section, a stub, and a
@@ -388,7 +398,10 @@ def reached(defect, kind, label, members):
     span = defect.get("lines")
     if span and isinstance(span, list) and len(span) == 2:
         for member in members:
-            for number in re.findall(r"\d+", str(member.get("_locator", ""))):
+            # A run of digits too long to be a line number is not one, and
+            # one of five thousand is more than int() will read.
+            for number in re.findall(r"(?<!\d)\d{1,9}(?!\d)",
+                                     str(member.get("_locator", ""))):
                 if span[0] <= int(number) <= span[1]:
                     return True
 
@@ -416,8 +429,260 @@ def reached(defect, kind, label, members):
     return False
 
 
+def worded(value):
+    """A value of the wrong kind, as a reason names it: the way JSON is
+    written, and short enough for one line."""
+    if isinstance(value, (list, dict)):
+        return "a list" if isinstance(value, list) else "a mapping"
+    text = json.dumps(value)
+    return text if len(text) <= 32 else text[:29] + "..."
+
+
+def one_line(text):
+    """Text from the inventory, as one line of the report can hold it. A line
+    break in a claim would end the line it is printed on and begin one that
+    this program did not write."""
+    return " ".join(text.splitlines())
+
+
+def load_inventory(path):
+    """(the inventory, "") or (None, why the file is not one).
+
+    A file that cannot be read as an inventory is refused, not reported on.
+    With no sections there is nothing to ask, and a run that printed no
+    findings and exited 0 would read as a document with no defects. That is
+    as true of a list of sections with nothing in it. A byte-order mark in
+    front of the file, which an editor may put there, is not part of it.
+    """
+    try:
+        with open(path, encoding="utf-8-sig") as handle:
+            data = json.load(handle)
+    except OSError as error:
+        return None, f"could not be read: {error.strerror or error}"
+    except RecursionError:
+        # JSON all the same. How deep a value may go before the parser gives
+        # up differs from one Python to the next.
+        return None, "is nested more deeply than this Python can read"
+    except (json.JSONDecodeError, UnicodeDecodeError) as error:
+        # On one line, whatever the parser's message is.
+        return None, f"is not JSON: {' '.join(str(error).split())}"
+    except ValueError as error:
+        # JSON too: a number of five thousand digits, which int() refuses
+        # from Python 3.11 on.
+        return None, (f"holds what this Python will not read: "
+                      f"{' '.join(str(error).split())}")
+    if not isinstance(data, dict):
+        return None, (f"is not an inventory: it holds {worded(data)}, not a "
+                      f"mapping")
+    if "sections" not in data:
+        return None, "is not an inventory: it has no 'sections'"
+    if not isinstance(data["sections"], list):
+        return None, (f"is not an inventory: its 'sections' is "
+                      f"{worded(data['sections'])}, not a list")
+    if not data["sections"]:
+        return None, ("is an inventory of no sections: nothing of the "
+                      "document was read")
+    return data, ""
+
+
+def passes_asked(data):
+    """How many passes the inventory says it asked for, or None when it does
+    not say so with a whole number of one or more. An inventory from before
+    --runs says nothing."""
+    runs = data.get("runs")
+    return runs if isinstance(runs, int) and not isinstance(runs, bool) \
+        and runs > 0 else None
+
+
+def not_texts(item, needed, optional=()):
+    """Why an item is not a mapping with text under each key of `needed`, and
+    text or nothing under each of `optional`. "" when it is."""
+    if not isinstance(item, dict):
+        return f"is {worded(item)}, not a mapping"
+    for key in needed:
+        if key not in item:
+            return f"has no '{key}'"
+    for key in needed + optional:
+        held = item.get(key)
+        if not isinstance(held, str) and not (held is None and key in optional):
+            return f"has {worded(held)} for its '{key}', not text"
+    return ""
+
+
+def not_capability(item):
+    # The fallback's validator accepts a capability as a bare string, where
+    # the full schema requires {"name": ...}.
+    return "" if isinstance(item, str) else not_texts(item, ("name",))
+
+
+def not_claim(item):
+    """A claim is text. What it points to is text, or nothing, or a list of
+    texts, which is run together as one pointer."""
+    place = item.get("points_to") if isinstance(item, dict) else None
+    if isinstance(place, list) and all(isinstance(each, str) for each in place):
+        return not_texts(item, ("claim",))
+    return not_texts(item, ("claim",), ("points_to",))
+
+
+def not_authority(item):
+    why = not_texts(item, ("capability", "owner"), ("action",))
+    if not why and item.get("polarity") not in (None, "owns", "excludes"):
+        return (f"has {worded(item['polarity'])} for its 'polarity', not "
+                f"\"owns\" or \"excludes\"")
+    return why
+
+
+def not_deferral(item):
+    return not_texts(item, ("capability",), ("to",))
+
+
+def not_text(item):
+    return "" if isinstance(item, str) else f"is {worded(item)}, not text"
+
+
+# The six lists this program reads, and why an item of each would not be one.
+READS = (("capabilities", not_capability), ("evidence_claims", not_claim),
+         ("authority", not_authority), ("defers_to", not_deferral),
+         ("consumes", not_text), ("produces", not_text))
+
+# What is taken of an item that is a mapping: the keys its check looked at,
+# which are the ones the rest of this program reads. A model's reply may hold
+# more, and what was not checked is not read. Every key used to be taken:
+# `"owner": 5` on a claim reached the line that prints who a finding names,
+# and raised there.
+TAKEN = {"capabilities": ("name",),
+         "evidence_claims": ("claim", "points_to"),
+         "authority": ("capability", "owner", "action", "polarity"),
+         "defers_to": ("capability", "to")}
+
+
+def taken(key, item):
+    """An item that passed its check, as the rest of this program is given
+    it."""
+    if not isinstance(item, dict):
+        return item
+    kept = {name: item[name] for name in TAKEN[key] if name in item}
+    # A pointer given as a list of places names them all: the extraction
+    # schema does not say that it must be one text.
+    if isinstance(kept.get("points_to"), list):
+        kept["points_to"] = " and ".join(kept["points_to"])
+    # A quote is shown, to a reader or to a model, and nothing is decided on
+    # it. One that is not text is not shown, and that is no reason to set
+    # aside what the item says.
+    if isinstance(item.get("quote"), str):
+        kept["quote"] = item["quote"]
+    return kept
+
+
+def unreadable(entry):
+    """Why an entry is not a section as inventory.py writes one, or "".
+
+    What is checked here, inventory.py writes with no model in between:
+    where the section is, how it was read, and that each of its lists is a
+    list. It used to be taken on trust. A section given as a number and a
+    heading of -1 each raised, which loses every finding of every class;
+    `"capabilities": null` was read as a section that provides nothing,
+    which is an absence nobody established.
+
+    An entry that fails any of this is a section that was NOT READ, and the
+    report says why. What else it holds is not used: inventory.py did not
+    write it so, and its other fields are no better founded than the one
+    that gave it away. (DESIGN 3.21 says what was weighed against this.)
+
+    What a list HOLDS is a model's reply, and is another matter:
+    read_items().
+    """
+    if not isinstance(entry, dict):
+        return f"it is {worded(entry)}, not a mapping"
+    for key in ("heading", "locator"):
+        if not isinstance(entry.get(key), str):
+            return (f"its '{key}' is {worded(entry[key])}, not text"
+                    if key in entry else f"it has no '{key}'")
+        if one_line(entry[key]) != entry[key]:
+            return f"its '{key}' has a line break in it"
+    counts = [key for key in ("passes", "full_passes") if key in entry]
+    for key in counts:
+        if isinstance(entry[key], bool) or not isinstance(entry[key], int):
+            return f"its '{key}' is {worded(entry[key])}, not a whole number"
+    if not isinstance(entry.get("degraded", False), bool):
+        return (f"its 'degraded' is {worded(entry['degraded'])}, not true or "
+                f"false")
+    if len(counts) == 1:
+        return (f"it has '{counts[0]}' and no "
+                f"'{'full_passes' if counts[0] == 'passes' else 'passes'}'")
+    if counts:
+        # As inventory.py counts them. One pass or more answered, or the
+        # entry would be an error. Each used the whole schema, except the
+        # first where the entry is marked degraded. `"full_passes": 99`
+        # beside `"passes": 1` was a section read in full.
+        passes, full = entry["passes"], entry["full_passes"]
+        fallback = bool(entry.get("degraded"))
+        if passes < 1:
+            return (f"its 'passes' is {passes}, and a section no pass "
+                    f"answered is written as an error")
+        if full != passes - fallback:
+            return (f"its 'passes' ({passes}), 'full_passes' ({full}) and "
+                    f"'degraded' ({worded(fallback)}) do not agree")
+    for key, _ in READS:
+        if not isinstance(entry.get(key), list):
+            return (f"its '{key}' is {worded(entry[key])}, not a list"
+                    if key in entry else f"it has no '{key}'")
+    # The other two lists inventory.py writes are asked one thing, by
+    # fully_read(): whether they hold anything. A number holds something.
+    for key in ("identifiers", "deferred"):
+        if key in entry and not isinstance(entry[key], list):
+            return f"its '{key}' is {worded(entry[key])}, not a list"
+    return ""
+
+
+def read_items(entry):
+    """(the section as the rest of this program is given it, the items of its
+    lists that could not be read).
+
+    What a list holds is a model's reply. inventory.py's validators ask that
+    a capability have a name and that an authority entry say what, who, how
+    and which way. Of the rest they ask nothing, so an evidence claim given
+    as a bare sentence, or a number among the things a section consumes, is
+    as inventory.py writes it.
+
+    An item that cannot be read does not make its section unread. It is SET
+    ASIDE: not used, counted, and named in the report, and wherever an
+    absence is asserted that it could answer, the finding is a question
+    (main() says which lists answer which). To read it as nothing would be
+    to assert that absence; to refuse its section would be to throw away
+    everything else the section says, and to call every absence in the
+    document a question, over one item.
+
+    A null in a list is an empty place and not an item: it holds nothing
+    that could be anything, and `[null]` says what `[]` says.
+    """
+    section = {key: entry[key] for key in
+               ("heading", "locator", "passes", "full_passes", "degraded")
+               if key in entry}
+    aside = []
+    for key, wrong in READS:
+        section[key] = []
+        for position, item in enumerate(entry[key], 1):
+            if item is None:
+                continue
+            why = wrong(item)
+            if why:
+                aside.append({"section": section, "list": key,
+                              "why": f"entry {position} of its '{key}' {why}"})
+            else:
+                section[key].append(taken(key, item))
+    # The other two lists are asked whether they hold anything, by
+    # fully_read(), and a null is an empty place there too.
+    for key in ("identifiers", "deferred"):
+        # aggregation-ok: no answers are counted here, with nulls or without
+        section[key] = [item for item in entry.get(key, ())
+                        if item is not None]
+    return section, aside
+
+
 def read_inventory(data):
-    """(sections read, sections not read, sections read in part, short).
+    """(sections read, sections not read, sections read in part, short,
+    items set aside).
 
     Every entry of the inventory is a section of the document. One whose
     extraction failed carries "error" and nothing that was extracted. Those
@@ -427,31 +692,52 @@ def read_inventory(data):
       unread   {"position", "of", "heading", "locator", "why"}. An inventory
                written before a failure kept its heading has "" for both, and
                its position is all that can be said about it. `why` is
-               "extraction failed", or what inventory.py wrote when --limit
-               stopped it before the section.
+               "extraction failed", what inventory.py wrote when --limit
+               stopped it before the section, or what unreadable() says of an
+               entry that is not as inventory.py writes one.
       partial  read by the fallback schema and by no full pass. What it says of
                capabilities, authority and deferrals is a reading. Its
                produces, consumes and evidence claims are empty because nothing
                asked for them.
       short    read in fewer passes than the inventory asked for.
+      aside    {"section", "list", "why"}: an item of one of a read section's
+               lists that could not be read. read_items() says what becomes
+               of it.
     """
-    entries, runs = data["sections"], data.get("runs")
-    sections, unread, partial, short = [], [], [], []
+    entries, runs = data["sections"], passes_asked(data)
+    sections, unread, partial, short, aside = [], [], [], [], []
     for position, entry in enumerate(entries, 1):
-        if not entry or "error" in entry:
-            entry = entry or {}
+        if isinstance(entry, dict) and "error" in entry:
+            # Not read, whatever the error says and whatever else is there.
+            # `"error": ""` beside `"skipped": true` gave an empty reason, and
+            # an empty reason was taken for none.
+            why = "extraction failed"
+            if entry.get("skipped"):
+                said = entry["error"]
+                why = one_line(said) if isinstance(said, str) and said.strip() \
+                    else "skipped, and the inventory does not say why"
+        elif entry is None or entry == {}:
+            why = "the inventory holds nothing for it"
+        else:
+            why = unreadable(entry)
+            why = why and f"not as inventory.py writes it: {why}"
+        if why:
+            # Named by what the entry does say of itself, where that is text.
+            heading, locator = (
+                one_line(entry[key]) if isinstance(entry, dict)
+                and isinstance(entry.get(key), str) else ""
+                for key in ("heading", "locator"))
             unread.append({"position": position, "of": len(entries),
-                           "heading": entry.get("heading") or "",
-                           "locator": entry.get("locator") or "",
-                           "why": (str(entry.get("error")) if entry.get("skipped")
-                                   else "extraction failed")})
+                           "heading": heading, "locator": locator, "why": why})
             continue
-        sections.append(entry)
-        if entry.get("degraded") and not fully_read(entry):
-            partial.append(entry)
-        if runs and entry.get("passes", runs) < runs:
-            short.append(entry)
-    return sections, unread, partial, short
+        section, set_aside = read_items(entry)
+        sections.append(section)
+        aside += set_aside
+        if section.get("degraded") and not fully_read(section):
+            partial.append(section)
+        if runs and section.get("passes", runs) < runs:
+            short.append(section)
+    return sections, unread, partial, short, aside
 
 
 # The five fields the fallback schema does not ask for.
@@ -498,6 +784,11 @@ def open_question(sections, what):
     if len(sections) > 3:
         names += f"; and {len(sections) - 3} more"
     return f"{what}: {names}"
+
+
+def together(*doubts):
+    """The doubts there are about one finding, as one."""
+    return "; ".join(filter(None, doubts))
 
 
 # -- D3: where a pointer points ----------------------------------------------
@@ -1006,7 +1297,9 @@ def located(key, heads):
 
 def lines_of(entry):
     """(first line, last line) of a chunk, from its locator "slug:a-b"."""
-    found = re.search(r":(\d{1,9})-(\d{1,9})$", str(entry.get("locator", "")))
+    locator = entry.get("locator")
+    found = re.search(r":(\d{1,9})-(\d{1,9})$", locator) \
+        if isinstance(locator, str) else None
     return (int(found.group(1)), int(found.group(2))) if found else None
 
 
@@ -1024,9 +1317,12 @@ def moved(entries, lines):
     """
     before, blind, tied = None, False, 0
     for entry in entries:
+        # Every entry the file has, read or not. One that does not say where
+        # it is in text says nothing. A heading given as a list is not the
+        # line its locator names, and that is no sign that the text has moved.
         heading = entry.get("heading") if isinstance(entry, dict) else None
         span = lines_of(entry) if isinstance(entry, dict) else None
-        if heading is None or not span:
+        if not isinstance(heading, str) or not span:
             blind = True
             continue
         if not 1 <= span[0] <= span[1] <= len(lines):
@@ -1071,6 +1367,9 @@ def consult(project, data):
     slug = data.get("doc")
     if not slug:
         return None, "the inventory does not name the document it was built from"
+    if not isinstance(slug, str) or one_line(slug) != slug:
+        return None, (f"the inventory gives {worded(slug)} as the document it "
+                      f"was built from, which is not a name")
     try:
         doc, lines = llm.load_doc(project, slug)
     except Exception as error:      # noqa: BLE001: whatever a manifest can do
@@ -1225,11 +1524,14 @@ NOT_A_SECTION = "a pointer to a table, figure, page or paragraph"
 NO_NUMBER = "a pointer to a place without a number or a letter"
 TOO_LITTLE = "a claim that says too little to check"
 REPEAT = "a repeat of an earlier claim"
+# Not one of the reasons above: it is given before any of them is tried, to
+# an entry of a section's evidence claims that could not be read as one.
+SET_ASIDE = "an entry that could not be read as a claim"
 NOT_CHECKED = (NO_POINTER, NO_PLACE, OWN_SECTION, NOT_A_SECTION, NO_NUMBER,
-               TOO_LITTLE, REPEAT)
+               TOO_LITTLE, REPEAT, SET_ASIDE)
 
 
-def self_claims(claims, sections, unread, document):
+def self_claims(claims, sections, unread, document, blurred=()):
     """D3: an evidence claim pointing somewhere that holds no such thing.
     -> ([finding, ...], {why a claim was not checked: how many}, how many
     claims were looked for in the place they point to).
@@ -1243,6 +1545,10 @@ def self_claims(claims, sections, unread, document):
     only when it is there and marks its headings; `doubts` below is
     everything else that stands between a claim the place does not hold and
     saying so.
+
+    `blurred` is the sections that hold a capability this program could not
+    read. That a place does not hold what a claim says is not asserted of
+    one of those.
     """
     findings, skipped, seen, looked = [], defaultdict(int), set(), 0
     homes = {str(section.get("locator")): section for section in sections}
@@ -1256,13 +1562,10 @@ def self_claims(claims, sections, unread, document):
         names = own("section", document["heads"])
         known = {}      # each place, asked of the document once
     for claim in claims:
-        # The extraction schema does not say the pointer must be one string,
-        # and "Section 3 and Appendix B" has come back as a list of two.
-        target = claim.get("points_to") or ""
-        if isinstance(target, (list, tuple)):
-            target = " and ".join(str(place) for place in target)
-        target = str(target).strip()
-        said = str(claim.get("claim") or "")
+        # Both are text: read_items() saw to that, and ran a pointer given
+        # as a list of places together as one.
+        target = (claim.get("points_to") or "").strip()
+        said = claim["claim"]
         # One pointer can name several places — "Section 14 and Appendix F".
         # The claim is only untrue if NONE of them holds the content.
         keys, other, more = places(target)
@@ -1428,17 +1731,20 @@ def self_claims(claims, sections, unread, document):
         wanted = norm(said)
         present = set()
         for section in hits:
-            held = section.get("capabilities")
-            for capability in held if isinstance(held, list) else []:
+            for capability in section["capabilities"]:
                 # The fallback's validator accepts a capability as a bare
                 # string, where the full schema requires {"name": ...}.
-                present |= norm(str(capability.get("name") or "")
-                                if isinstance(capability, dict) else str(capability))
+                present |= norm(capability["name"]
+                                if isinstance(capability, dict) else capability)
         if wanted and not similar(wanted, present, 0.34):
             findings.append(("D3", f"{said[:50]} -> {target}",
                              [claim], open_question(
                 unread, "a section that was not read could hold it, as part "
-                        "of the place the pointer names") or doubt))
+                        "of the place the pointer names") or open_question(
+                [section for section in hits
+                 if any(section is each for each in blurred)],
+                "the place it points to holds a capability that was not "
+                "read") or doubt))
     return findings, skipped, looked
 
 
@@ -1497,10 +1803,36 @@ def main():
     parser.add_argument("--embed-model", default="Qwen3-Embedding-8B-Q4_K_M")
     args = parser.parse_args()
 
+    # Half of a surrogate pair is text JSON can spell ("\ud83d") and no stream
+    # can write. One in a heading or a claim raised where the report was
+    # printed, and every finding went with it. It is written as the escape it
+    # came in as, here and in the candidate file.
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(errors="backslashreplace")
+
     project = os.path.abspath(os.path.expanduser(args.project))
-    with open(os.path.join(project, args.inventory), encoding="utf-8") as handle:
-        data = json.load(handle)
-    sections, unread, partial, short = read_inventory(data)
+    data, refused = load_inventory(os.path.join(project, args.inventory))
+    if refused:
+        # Not a report with nothing in it. Nothing was looked at, and exit
+        # status 0 over an empty list of findings would say the opposite.
+        print(f"NOT RUN: {args.inventory} {refused}.", file=sys.stderr)
+        return 1
+    sections, unread, partial, short, aside = read_inventory(data)
+
+    def holding(*lists):
+        """The sections that hold an item of one of these lists that was
+        set aside.
+
+        Three of the lists are asked for an absence, and an item that was
+        not read could be the answer: a capability, for what a claim says a
+        place holds (D3); an authority entry, for who owns what another
+        section defers (D6); an input, for what consumes an output (D8). A
+        claim set aside is one that D3 did not check. A deferral or an
+        output set aside is a finding that was not made, and asserts
+        nothing."""
+        return list({id(each["section"]): each["section"] for each in aside
+                     if each["list"] in lists}.values())
     # Needed by D6, and by --authority-as-dataflow to attribute a produces entry
     # to somebody, so it is resolved once here rather than at either use.
     owners_by_section = section_owner_map(sections)
@@ -1616,12 +1948,33 @@ def main():
               f"no produces,\n{pad}consumes or evidence claims: {len(partial)} "
               f"section(s)")
         listed(partial, lambda s: "")
+    runs = passes_asked(data)
     if short:
         # Counted and named, and no finding is put in doubt by it: every
         # extraction is a sample (DESIGN 3.27), and this one is a smaller one.
-        print(f"{pad}READ IN FEWER than the {data['runs']} passes the "
+        print(f"{pad}READ IN FEWER than the {runs} passes the "
               f"inventory asked for: {len(short)} section(s)")
-        listed(short, lambda s: f"  [{s.get('passes')} of {data['runs']}]")
+        listed(short, lambda s: f"  [{s.get('passes')} of {runs}]")
+    if runs is None and data.get("runs") is not None:
+        # "runs": "three" raised where a section's passes were compared with
+        # it. It decides nothing but the list above, so the run goes on, and
+        # says that the list could not be made.
+        print(f"{pad}The inventory gives {worded(data['runs'])} as the passes "
+              f"it asked for, which is not a whole\n{pad}number of one or "
+              f"more: which sections were read in fewer cannot be told.")
+    if aside:
+        holders = holding(*(key for key, _ in READS))
+        print(f"{pad}ITEMS NOT READ: {len(aside)}, in {len(holders)} "
+              f"section(s). Each is an entry of a list that is not\n{pad}what "
+              f"the list is asked for. It is not used, and a finding that "
+              f"asserts an\n{pad}absence it could answer is marked "
+              f"{UNVERIFIABLE} below.")
+
+        def first(section):
+            whys = [each["why"] for each in aside if each["section"] is section]
+            return f"  [{whys[0]}" + (f"; and {len(whys) - 1} more]"
+                                     if whys[1:] else "]")
+        listed(holders, first)
     if unread or partial:
         print(f"{pad}A finding that asserts an absence one of the sections not "
               f"read, or read in\n{pad}part, could answer is marked "
@@ -1655,15 +2008,21 @@ def main():
               f"records, the first\n{pad}of each chunk, and asserts nothing "
               f"found that way: each D3 finding is listed\n{pad}as "
               f"{UNVERIFIABLE}.")
-    untrue, unchecked, looked = self_claims(claims, sections, unread, document)
+    untrue, unchecked, looked = self_claims(claims, sections, unread, document,
+                                            holding("capabilities"))
+    # An evidence claim that was set aside is one of the document's, and D3
+    # did not check it. It used to drop out of the count below without a word.
+    unchecked[SET_ASIDE] += sum(each["list"] == "evidence_claims"
+                                for each in aside)
+    stated = len(claims) + unchecked[SET_ASIDE]
     left_out = sum(unchecked.values())
-    print(f"claims:    D3 checked {looked} of {len(claims)} evidence claims "
+    print(f"claims:    D3 checked {looked} of {stated} evidence claims "
           f"against the place each points to")
-    if len(claims) - left_out - looked:
+    if stated - left_out - looked:
         # Not "checked": there was nothing to check them against. Each is a
         # D3 finding, a missing section or a place that could not be found.
         print(f"{pad}no place to check against: "
-              f"{len(claims) - left_out - looked}, each a D3 finding")
+              f"{stated - left_out - looked}, each a D3 finding")
     if left_out:
         print(f"{pad}not checked: {left_out}")
         for why in NOT_CHECKED:
@@ -1772,8 +2131,16 @@ def main():
         # ownership is also taken from produces and consumes, which the
         # fallback never asks for, and a section read in part can hold it too.
         owners_unseen = unread + (partial if args.authority_as_dataflow else [])
-        findings.append(("D6", group["label"], group["members"], open_question(
-            owners_unseen, "a section that was not read could own it")))
+        # So can an authority entry that was set aside, and under the flag an
+        # input or an output that was.
+        aside_owners = holding("authority", *(
+            ("produces", "consumes") if args.authority_as_dataflow else ()))
+        findings.append(("D6", group["label"], group["members"], together(
+            open_question(owners_unseen,
+                          "a section that was not read could own it"),
+            open_question(aside_owners,
+                          "a section holds an item that was not read, which "
+                          "could be its owner"))))
 
     # -- D8: produced and never consumed -------------------------------------
     #
@@ -1783,10 +2150,16 @@ def main():
     for group in group_by_concept(produces, "value", embedder):
         if not any(similar(group["tokens"], c, 0.6) for c in consumed if c):
             findings.append(("D8", group["label"], group["members"][:2],
-                             open_question(unread + partial,
-                                           "a section that was not read, or "
-                                           "was read without its consumes, "
-                                           "could consume it")))
+                             together(
+                                 open_question(
+                                     unread + partial,
+                                     "a section that was not read, or was "
+                                     "read without its consumes, could "
+                                     "consume it"),
+                                 open_question(
+                                     holding("consumes"),
+                                     "a section holds an input that was not "
+                                     "read, which could be this"))))
 
     # -- D3: evidence claim pointing somewhere that holds no such thing ------
     findings += untrue
@@ -1845,20 +2218,19 @@ def main():
         if shown[kind] >= args.show:
             continue
         shown[kind] += 1
-        print(f"[{kind}] {label[:76]}")
+        print(f"[{kind}] {one_line(label)[:76]}")
         for entry in members[:3]:
             who = entry.get("owner") or entry.get("to") or entry.get("points_to") or ""
-            # str(): none of the three is a string by any validator's promise.
-            # A locator of null, a pointer given as {"place": ...}, raised here.
-            print(f"      {str(entry.get('_locator') or ''):22} "
-                  f"{str(entry.get('_heading') or '')[:30]:32} {str(who)[:26]}")
+            print(f"      {entry['_locator']:22} {entry['_heading'][:30]:32} "
+                  f"{one_line(who)[:26]}")
         if doubt:
             print(f"      {UNVERIFIABLE}: {doubt}")
 
     if args.out:
         import csv as _csv
         out_path = os.path.join(project, args.out)
-        with open(out_path, "w", newline="", encoding="utf-8") as handle:
+        with open(out_path, "w", newline="", encoding="utf-8",
+                  errors="backslashreplace") as handle:
             writer = _csv.writer(handle)
             writer.writerow(["obligation", "source_ref", "modality",
                              "requirement", "verdict", "quote", "locator",
@@ -1931,13 +2303,14 @@ def main():
             print(f"  {unscorable} defect(s) not auto-scorable — no anchor, no "
                   f"line span; read them by hand")
         resting = sum(1 for i in claimed if findings[i][3])
-        if unread or partial or short:
+        if unread or partial or short or aside:
             # The score is of the inventory, not of the document.
             print(f"  scored over an inventory that left {len(unread)} "
                   f"section(s) unread, {len(partial)} read in part and "
-                  f"{len(short)} read in\n  fewer passes than asked: a miss "
-                  f"may be a defect it never saw, and {resting} of the hits "
-                  f"rest on\n  a finding marked {UNVERIFIABLE}")
+                  f"{len(short)} read in\n  fewer passes than asked"
+                  + (f", with {len(aside)} item(s) not read" if aside else "")
+                  + f": a miss may be a defect it never saw, and {resting} of "
+                  f"the hits rest on\n  a finding marked {UNVERIFIABLE}")
         elif resting:
             # D3 has reasons of its own to list a finding and not assert it:
             # a document that marks no headings, or was not consulted. With
