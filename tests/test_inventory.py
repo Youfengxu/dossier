@@ -140,9 +140,18 @@ class WhatIsWritten(unittest.TestCase):
         while it moves every line."""
         doc = {"slug": "d", "source_sha256": "5" * 64, "text_sha256": "7" * 64}
         self.assertEqual(
-            inventory.record("d", doc, 3, [SECTION]),
+            inventory.record("d", doc, 3, [SECTION], []),
             {"doc": "d", "source_sha256": "5" * 64, "text_sha256": "7" * 64,
-             "runs": 3, "sections": [SECTION]})
+             "runs": 3, "unread_lines": [], "sections": [SECTION]})
+
+    def test_and_which_of_its_lines_are_in_no_section(self):
+        """Written even when there are none: an inventory that does not say
+        cannot be told from one that left out nothing."""
+        doc = {"slug": "d", "source_sha256": "5" * 64, "text_sha256": "7" * 64}
+        self.assertEqual(
+            inventory.record("d", doc, 3, [SECTION], [284, 285]).get(
+                "unread_lines"),
+            [284, 285])
 
 
 class WhatTheRunReports(unittest.TestCase):

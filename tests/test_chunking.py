@@ -230,11 +230,16 @@ class InventorySections(unittest.TestCase):
         self.assertEqual(sections[0]["heading"], "2. Introduction")
         self.assertEqual((sections[0]["start"], sections[0]["end"]), (1, 6))
 
-    def test_a_section_with_almost_no_text_is_not_emitted(self):
-        # Sixty characters of content is the floor. A section of one short line
-        # is a model call that cannot produce anything, and this pipeline makes
-        # one call per section.
-        self.assertEqual(inventory.split_sections(["## 1. A", "Short."]), [])
+    def test_a_section_with_almost_no_text_is_still_a_section(self):
+        # Sixty characters of content was the floor, and this test pinned it:
+        # a section of one short line "is a model call that cannot produce
+        # anything". It was dropped heading and all, with nothing to say so,
+        # under a run that printed "reading 100% of the document". Forty-four
+        # characters is "Component maturity is assessed in Section 9.", the
+        # anchor of a planted defect. tests/test_unread_lines.py has the rest.
+        self.assertEqual(
+            inventory.split_sections(["## 1. A", "Short."]),
+            [{"heading": "1. A", "start": 1, "end": 2, "text": "Short."}])
 
     def test_the_character_cap_splits_a_long_section(self):
         sections = inventory.split_sections(["## 1. Terms"] + ["x" * 400] * 6)

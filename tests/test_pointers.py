@@ -190,12 +190,22 @@ def word(before=None, *added):
     return extracted(tuple(paragraphs))
 
 
-def sections_of(document, *claims, holds=HOLDS, **split):
+def sections_of(document, *claims, holds=HOLDS, older=False, **split):
     """The inventory's sections for `document`: the chunks inventory.py splits
     it into, each holding what `holds` gives for a line of it. The claims are
-    made by the first chunk."""
+    made by the first chunk.
+
+    `older` is the inventory as it was cut before 2026-10-04, when a chunk of
+    sixty characters or fewer was dropped, heading and all. Inventories cut
+    that way are still read, and what D3 says of the lines they left out is
+    tested on them."""
+    parts = inventory.split_sections(document, **split)
+    if older:
+        parts = [part for part in parts
+                 if sum(len(line.strip())
+                        for line in part["text"].split("\n")) > 60]
     sections = []
-    for part in inventory.split_sections(document, **split):
+    for part in parts:
         sections.append({
             "heading": part["heading"],
             "locator": f"d:{part['start']}-{part['end']}",
@@ -223,8 +233,19 @@ class TheChunksAreTheSplittersOwn(unittest.TestCase):
     def test_what_inventory_py_makes_of_the_document(self):
         """3.1 has no chunk: its heading came two lines after "3." and was
         taken as body text. A numbered step heads a chunk of its own. The five
-        lines before section 1 are too short to be kept at all."""
+        lines before section 1 are a chunk under the title: they were too
+        short to be kept at all until 2026-10-04."""
         self.assertEqual(where(sections_of(DOCUMENT)), [
+            ("Flood twin design", "d:1-5"),
+            ("1. Sensor Fabric", "d:6-10"),
+            ("2. Hydrology Model", "d:11-15"),
+            ("3. Calibration Register", "d:16-22"),
+            ("4. Algorithms", "d:23-27"),
+            ("1. The fabric ingests readings, in tick order", "d:28-32"),
+            ("Appendix A — Requirement mapping", "d:33-35")])
+
+    def test_as_it_was_cut_before_a_short_chunk_was_kept(self):
+        self.assertEqual(where(sections_of(DOCUMENT, older=True)), [
             ("1. Sensor Fabric", "d:6-10"),
             ("2. Hydrology Model", "d:11-15"),
             ("3. Calibration Register", "d:16-22"),
@@ -234,10 +255,12 @@ class TheChunksAreTheSplittersOwn(unittest.TestCase):
 
     def test_and_of_the_same_document_as_a_docx(self):
         """extract.py writes a paragraph a line and no line between them, so a
-        heading comes sooner after the last one. Section 2 heads no chunk, the
-        tab in "3.1<TAB>Drift limits" is gone, and two of the numbered steps
-        are in no chunk at all: each was taken for a heading and replaced by
-        the next."""
+        heading comes sooner after the last one. Section 2 heads no chunk and
+        the tab in "3.1<TAB>Drift limits" is gone. The second numbered step
+        heads a chunk, and the third and Appendix A, which follow it at once,
+        are text of that chunk. Until 2026-10-04 each of those lines replaced
+        the one before as the heading: two steps were in no chunk at all, and
+        Appendix A headed one."""
         text = word()
         self.assertEqual(text[:3], ["", "########## design.docx ##########",
                                     "Flood twin design"])
@@ -247,7 +270,7 @@ class TheChunksAreTheSplittersOwn(unittest.TestCase):
             ("1. Sensor Fabric", "d:6-13"),
             ("3. Calibration Register", "d:14-18"),
             ("4. Algorithms", "d:19-24"),
-            ("Appendix A — Requirement mapping", "d:27-29")])
+            ("2. The model forecasts.", "d:25-29")])
 
 
 class Frozen(unittest.TestCase):
@@ -357,6 +380,35 @@ class ASectionThatExists(Frozen):
             DOCUMENT, (CLAIM, "Section 3.1"),
             holds={**HOLDS, 20: "gauge inventory"})))
         self.assertIn("-> Section 3.1", finding)
+        self.assertNotIn("no such section", finding)
+
+    # A sub-heading on the line straight after its parent's. Until 2026-10-04
+    # it replaced the parent and headed the chunk; it is now the first line of
+    # the parent's chunk. Matched against the headings of chunks, as D3 once
+    # did, a pointer to it would have read "no such section in the document":
+    # a review of the splitter found that against the D3 of the day.
+    UNDER = DOCUMENT[:32] + [
+        "## 5. Runtime Orchestrator", "### 5.1 Responsibility",
+        "The orchestrator schedules each tick and commits its state.",
+        "It freezes the order of a tick before any reading is ingested.",
+        ""] + DOCUMENT[32:]
+
+    def under(self, claim, holds):
+        sections = sections_of(self.UNDER, (claim, "Section 5.1"), holds=holds)
+        self.assertIn(("5. Runtime Orchestrator", "d:33-37"), where(sections))
+        self.assertNotIn("5.1 Responsibility",
+                         [heading for heading, _ in where(sections)])
+        return self.run_on(sections, document=self.UNDER)
+
+    def test_a_sub_heading_straight_under_its_parent_is_found_in_its_chunk(self):
+        report = self.under("Tick scheduling is described",
+                            {35: "tick scheduling"})
+        self.assertEqual(self.d3(report), [])
+        self.assertIn("1 of 1 evidence claims", report)
+
+    def test_and_what_it_does_not_hold_is_reported_against_it(self):
+        finding = self.asserted(self.under(CLAIM, {35: "tick scheduling"}))
+        self.assertIn("-> Section 5.1", finding)
         self.assertNotIn("no such section", finding)
 
     def test_a_heading_that_spells_out_the_word_section(self):
@@ -558,7 +610,7 @@ class ASectionThatExists(Frozen):
                    29: "late readings wait for the next tick"})
         self.assertEqual(
             [[c["name"] for c in section["capabilities"]]
-             for section in sections[3:5]],
+             for section in sections[4:6]],
             [["step sequencing"], ["late readings wait for the next tick"]])
         self.assertEqual(self.d3(self.run_on(sections)), [])
 
@@ -578,9 +630,13 @@ class ASectionThatExists(Frozen):
 
     def test_the_passage_a_claim_is_in_is_one_of_the_places_it_names(self):
         """"This section and Appendix A": Appendix A does not hold it, and the
-        section the claim was made in does."""
-        sections = sections_of(DOCUMENT, ("Gauge readings are ingested",
-                                          "this section and Appendix A"))
+        section the claim was made in does. Section 1 is the second chunk: the
+        first is the lines under the title."""
+        sections = sections_of(DOCUMENT)
+        self.assertEqual(where(sections)[1], ("1. Sensor Fabric", "d:6-10"))
+        sections[1]["evidence_claims"] = [
+            {"claim": "Gauge readings are ingested",
+             "points_to": "this section and Appendix A", "quote": "q"}]
         self.assertEqual(self.d3(self.run_on(sections)), [])
 
 
@@ -592,13 +648,13 @@ class ASectionThatExists(Frozen):
             "Each is kept for ten years.", ""] + DOCUMENT[17:]
         sections = sections_of(document, holds={24: "calibration drift limits",
                                                 18: "registers by reach"})
-        self.assertEqual(where(sections)[2:4], [
+        self.assertEqual(where(sections)[3:5], [
             ("3. Calibration Register", "d:16-22"),
             ("3.1 Drift limits", "d:23-31")])
-        sections[2]["evidence_claims"] = [
+        sections[3]["evidence_claims"] = [
             {"claim": CLAIM, "points_to": "this section and Appendix A",
              "quote": "q"}]
-        sections[3]["evidence_claims"] = [
+        sections[4]["evidence_claims"] = [
             {"claim": "Registers are listed by reach",
              "points_to": "this section and Appendix A", "quote": "q"}]
         finding = self.in_doubt(self.run_on(sections, document=document))
@@ -811,17 +867,29 @@ class APlaceThatCannotBeLookedUp(Frozen):
             sections_of(document, (CLAIM, "Appendix C")), document=document))
         self.assertIn("the heading on line 39 has C in it", finding)
 
-    def test_a_section_too_short_for_the_splitter_to_keep(self):
-        """A stub: a heading and "To be written." The splitter drops a chunk
-        of sixty characters or fewer, heading and all, so the inventory never
-        saw it. It is in the document all the same."""
+    def test_a_section_an_older_inventory_has_no_chunk_for(self):
+        """A stub: a heading and "To be written." Until 2026-10-04 the
+        splitter dropped a chunk of sixty characters or fewer, heading and
+        all, so an inventory cut before then never saw it. It is in the
+        document all the same."""
         document = DOCUMENT[:22] + ["### 3.2 Drift history", "",
                                     "To be written.", "", ""] + DOCUMENT[22:]
-        sections = sections_of(document, (CLAIM, "Section 3.2"))
+        sections = sections_of(document, (CLAIM, "Section 3.2"), older=True)
         self.assertNotIn("3.2 Drift history",
                          [heading for heading, _ in where(sections)])
         finding = self.in_doubt(self.run_on(sections, document=document))
         self.assertIn("lines 23-27", finding)
+
+    def test_and_cut_now_it_is_a_chunk_the_claim_is_checked_against(self):
+        """The stub is read, it holds no such thing, and that is a finding
+        about what Section 3.2 holds: the reason to keep a short chunk."""
+        document = DOCUMENT[:22] + ["### 3.2 Drift history", "",
+                                    "To be written.", "", ""] + DOCUMENT[22:]
+        sections = sections_of(document, (CLAIM, "Section 3.2"))
+        self.assertIn(("3.2 Drift history", "d:23-27"), where(sections))
+        finding = self.asserted(self.run_on(sections, document=document))
+        self.assertIn("-> Section 3.2", finding)
+        self.assertNotIn("no such section", finding)
 
     UNNUMBERED = ["# Flood twin design", "", "## Sensor Fabric",
                   "The fabric ingests gauge readings, and checks each one.",
@@ -896,16 +964,26 @@ class APlaceInDoubtBesideOneThatWasFound(Frozen):
         self.assertIn("-> Section 2 and Annex B", finding)
 
     def test_part_of_the_place_is_in_no_chunk(self):
-        """Section 3 runs over the stub 3.2, which the splitter dropped. What
-        the rest of Section 3 does not hold, those lines may."""
-        sections = sections_of(self.STUB, ("Every audit is logged", "Section 3"))
+        """Section 3 runs over the stub 3.2, which an inventory cut before
+        2026-10-04 has no chunk for. What the rest of Section 3 does not
+        hold, those lines may."""
+        sections = sections_of(self.STUB, ("Every audit is logged", "Section 3"),
+                               older=True)
         finding = self.in_doubt(self.run_on(sections, document=self.STUB))
         self.assertIn("-> Section 3", finding)
         self.assertIn("line 25 of it is in no section", finding)
 
     def test_and_a_claim_the_rest_of_it_does_hold_is_no_finding(self):
-        sections = sections_of(self.STUB, (CLAIM, "Section 3"))
+        sections = sections_of(self.STUB, (CLAIM, "Section 3"), older=True)
         self.assertEqual(self.d3(self.run_on(sections, document=self.STUB)), [])
+
+    def test_with_the_stub_read_the_claim_is_one_the_section_does_not_hold(self):
+        """The same document cut now: the stub is a chunk, every line of
+        Section 3 was read, and the finding is one to stand behind."""
+        sections = sections_of(self.STUB, ("Every audit is logged", "Section 3"))
+        self.assertIn(("3.2 Drift history", "d:23-27"), where(sections))
+        finding = self.asserted(self.run_on(sections, document=self.STUB))
+        self.assertIn("-> Section 3", finding)
 
     def test_the_section_is_found_by_its_sub_sections_and_has_a_line_of_its_own(self):
         """A heading set in bold above sub-sections that are marked. What is
@@ -1187,7 +1265,9 @@ class HowManyClaimsWereChecked(Frozen):
         """True where Section 1 says it and untrue where Section 2 does. As
         a repeat of the first, the second was never looked at."""
         sections = sections_of(DOCUMENT)
-        for section in sections[:2]:
+        self.assertEqual([heading for heading, _ in where(sections)[1:3]],
+                         ["1. Sensor Fabric", "2. Hydrology Model"])
+        for section in sections[1:3]:
             section["evidence_claims"] = [
                 {"claim": "Gauge readings are ingested",
                  "points_to": "this section and Appendix A", "quote": "q"}]
@@ -1280,8 +1360,72 @@ class WhichDocument(Frozen):
         """freeze.py --refreeze leaves the hash of the source as it was and
         moves every line. An inventory from before the text's hash was kept
         has only the source's, so each chunk's heading is looked for at the
-        line its locator gives. Here the text gained a line at the top."""
+        line its locator gives. Here the text gained a line at the top, and
+        the first chunk, under the title, is the first to show it."""
         report = self.run_on(sections_of(DOCUMENT, (CLAIM, "Section 9")),
+                             document=[""] + DOCUMENT)
+        self.assertIn("NOT CONSULTED", report)
+        self.assertIn("line 1 is not the heading the inventory has there",
+                      report)
+        self.in_doubt(report)
+
+    def test_a_heading_with_nothing_in_it_is_not_found_on_a_blank_line(self):
+        """A bare "#" heads a chunk whose heading is "". A blank line is ""
+        as well once its hashes are taken off, so a line added just above
+        that chunk put a blank line where its heading had been and nothing
+        differed. Only a line of hashes is that heading."""
+        lines = ["# Flood twin design", "", "The twin is in three parts.",
+                 "Each is described below.", "Each has an owner.", "",
+                 "#", "Gap", "Owner", "G1", "Provider not selected", "IA lead"]
+        sections = [{"heading": part["heading"],
+                     "locator": f"d:{part['start']}-{part['end']}"}
+                    for part in inventory.split_sections(lines)]
+        self.assertEqual(where(sections), [("Flood twin design", "d:1-6"),
+                                           ("", "d:7-12")])
+        self.assertEqual(synthesize.moved(sections, lines), "")
+        shifted = lines[:6] + [""] + lines[6:]
+        self.assertIn("line 7 is not the heading the inventory has there",
+                      synthesize.moved(sections, shifted))
+
+    def test_nor_after_an_entry_that_says_nothing(self):
+        """An entry with no heading puts the chunk after it in doubt, and a
+        chunk in doubt is not refused for its first line. It is not tied by
+        a blank one either: with no other chunk to tie the text, nothing
+        does, and that is said."""
+        lines = ["", "Gap", "Owner", "G1", "Provider not selected", "IA lead"]
+        sections = [{"error": "extraction failed"},
+                    {"heading": "", "locator": "d:1-6"}]
+        self.assertIn("no chunk of the inventory starts on a heading",
+                      synthesize.moved(sections, lines))
+
+    def test_a_line_added_between_two_sections_of_one_heading_is_not_seen(self):
+        """A limit, pinned so that it is not taken for something checked.
+        Two tables in a row each open on a bare "#". The second chunk has
+        the heading of the one before it, which is also how a later piece of
+        one section looks, so it is not looked at: a line added between the
+        two moves the second and moved() returns "". Nothing in an entry
+        tells the two cases apart."""
+        table = ["#", "Gap", "Owner", "G1", "Provider not selected",
+                 "IA lead", "G2", "Datum not agreed with the port authority",
+                 "Hydrology lead"]
+        lines = ["# Flood twin design", "The twin is in three parts.",
+                 "Each is described below.", "Each has an owner.",
+                 "Open items follow.", "They are reviewed monthly."] \
+            + table + table
+        sections = [{"heading": part["heading"],
+                     "locator": f"d:{part['start']}-{part['end']}"}
+                    for part in inventory.split_sections(lines)]
+        self.assertEqual(where(sections), [("Flood twin design", "d:1-6"),
+                                           ("", "d:7-15"), ("", "d:16-24")])
+        between = lines[:15] + ["One more gap was closed."] + lines[15:]
+        self.assertEqual(synthesize.moved(sections, between), "")
+        above = lines[:6] + ["One more gap was closed."] + lines[6:]
+        self.assertIn("line 7 is not the heading the inventory has there",
+                      synthesize.moved(sections, above))
+
+    def test_and_in_an_inventory_cut_before_the_title_had_a_chunk(self):
+        report = self.run_on(sections_of(DOCUMENT, (CLAIM, "Section 9"),
+                                         older=True),
                              document=[""] + DOCUMENT)
         self.assertIn("NOT CONSULTED", report)
         self.assertIn("line 6 is not the heading the inventory has there",
@@ -1351,7 +1495,7 @@ class WhichDocument(Frozen):
         self.freeze(DOCUMENT)
         doc, lines = llm.load_doc(self.project, "d")
         written = inventory.record(
-            "d", doc, 3, sections_of(lines, (CLAIM, "Section 9")))
+            "d", doc, 3, sections_of(lines, (CLAIM, "Section 9")), [])
         report = self.run_on(written["sections"], source_sha256="0" * 64,
                              text_sha256=written.get("text_sha256"))
         self.assertNotIn("NOT CONSULTED", report)
@@ -1433,7 +1577,7 @@ class WithoutTheDocument(Frozen):
                                     "Each is kept for ten years."] + DOCUMENT[17:]
         sections = sections_of(document, (CLAIM, "Section 3"), holds={
             17: "gauge registers", 22: "calibration drift limits"})
-        self.assertEqual(where(sections)[2:4], [
+        self.assertEqual(where(sections)[3:5], [
             ("3. Calibration Register", "d:16-20"),
             ("3.1 Drift limits", "d:21-29")])
         self.assertEqual(self.d3(self.run_on(sections, document=None)), [])

@@ -81,7 +81,7 @@ flowchart TD
     COV --> CLUST["cluster-findings.py<br/>rank by convergence<br/>EMBEDDINGS"]
     CLUST --> CAND[("candidates-&lt;doc&gt;.csv")]
 
-    FROZEN --> INV["inventory.py<br/>read 100% of the document<br/>MODEL, heavily"]
+    FROZEN --> INV["inventory.py<br/>read 100% of the document, and check it<br/>MODEL, heavily"]
     INV --> INVJ[("inventory.json")]
     INVJ --> SYN["6 · synthesize.py<br/>query the inventory in code<br/>EMBEDDINGS"]
     COMP --> SYN
@@ -264,6 +264,19 @@ the entire text for four things: a definitional copula, a definition-list line,
 a glossary section, or a heading of its own. Nothing the model says survives
 without corroboration, and the model never gets to say "this is undefined".
 
+What it could not say until 2026-10-04 was how much of the document had been
+asked about. A section whose call failed nominated nothing, which is also what
+a section with nothing to nominate does, and `--limit` shortened the list of
+sections without saying so. It now counts the sections that answered, names
+the others beside its result, and writes the same into its file, which
+`bundle.py` carries onto the reviewer's page and into the sheet beside it
+(`DESIGN` §0.1). A term is still never wrongly listed. One that only an unread
+section would have raised is missed, and the output says so. `claim.py` reads
+the same sections and had the same gap, with the same remedy, and
+`score-claims.py` says beside a score what the index it scores does not rest
+on: sections not answered, sections a pass failed on, and pairs nobody
+judged.
+
 The tuning history is instructive about how easy the check is to get wrong. An
 early `DEFINITION` pattern accepted a hyphen after the term and cleared most
 nominations, because hyphens join compound words on every page. An early
@@ -296,12 +309,19 @@ inventory was built by reading 100% of the document rather than a sample.
 That is a premise, and `synthesize.py` checks it: a section whose extraction
 failed, or that was read by the fallback schema alone, is counted and named on
 the inventory line, and a finding it could answer is listed as `unverifiable`
-rather than asserted. So is an entry that is not of the shape `inventory.py`
-writes: it is a section that was not read, and says why. An item of one of a
-section's lists is a model's reply, and one that cannot be read is set aside
-and named, with the same consequence for the one absence it could answer. A
-file that is not an inventory at all is refused, with exit status 1 and no
-report.
+rather than asserted. `inventory.py` checks the other half, that every line
+which holds text is in a section: it compares each section's text with the
+lines its locator names, and writes the lines in none into the inventory as
+`unread_lines`. `synthesize.py` prints those too, and lists an ownership gap or
+an orphan over them as `unverifiable`. A pointer (D3) is put in doubt by such
+a line only where it is a line of the place the pointer names.
+
+What the inventory holds is held to a shape as well. An entry that is not
+of the shape `inventory.py` writes is a section that was not read, and says
+why. An item of one of a section's lists is a model's reply, and one that
+cannot be read is set aside and named, with the same consequence for the one
+absence it could answer. A file that is not an inventory at all is refused,
+with exit status 1 and no report.
 
 One absence is not the inventory's to assert at all. Whether a section a
 pointer names is in the document is a question about the document, and the

@@ -28,6 +28,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import closure  # noqa: E402
+import inventory  # noqa: E402
 
 # Ground-truth classes a claim index can reach: D3 (a document asserting
 # something untrue about itself), D5 (two components claiming one capability),
@@ -62,6 +63,75 @@ def matches(finding, entry):
     # neither an anchor nor a line span is simply not auto-scorable, and saying
     # so is more useful than guessing.
     return False
+
+
+# Said of an index written before claim.py recorded its sections, and of one
+# written before it kept the pairs it could not judge.
+UNSAID = ("the index does not say how many sections its claims were taken "
+          "from:\n  a MISSED below may be a defect in a section it never read")
+UNJUDGED_UNSAID = ("the index does not say whether every candidate pair was "
+                   "judged:\n  a MISSED below may be a pair nobody judged")
+NOT_JUDGED = ("a candidate pair that matches it was never judged: this is "
+              "not a verdict on it")
+
+
+def a_claim(value):
+    return isinstance(value, dict) and isinstance(value.get("quote"), str) \
+        and type(value.get("start")) is int
+
+
+def unjudged(data):
+    """The candidate pairs the index says nobody judged, or None when it does
+    not say: an index written before claim.py kept them (2026-10-04), or one
+    whose record of them cannot be read."""
+    pairs = data.get("unjudged") if isinstance(data, dict) else None
+    if not isinstance(pairs, list) or not all(
+            isinstance(pair, dict) and a_claim(pair.get("a"))
+            and a_claim(pair.get("b")) for pair in pairs):
+        return None
+    return pairs
+
+
+def unread(data):
+    """What a score over this index does not rest on, as the lines to print
+    beside it, and [] when it rests on the whole of it.
+
+    A defect is scored MISSED when no reported finding matches it. That is a
+    miss of the tool's only where the tool looked: not where the defect's
+    claim sits in a section the index was never answered on, or in one a
+    pass failed on, and not where the pair that matches it was a candidate
+    and its judging call failed. The index records all three. The score is
+    left as it is, of what the index reports, and each is said beside it.
+
+    An index written before 2026-10-04 does not say how many sections its
+    claims came from, or which pairs went unjudged. That is said too: not
+    known is not all.
+    """
+    said = []
+    read = data.get("sections") if isinstance(data, dict) else None
+    if not inventory.is_answers(read):
+        said.append(UNSAID)
+    elif not read["answered"]:
+        said.append(f"NOTHING WAS READ: the index was answered on 0 of "
+                    f"{read['of']} sections:\n  a MISSED below is a defect "
+                    f"nobody looked for")
+    elif read["not_read"]:
+        said.append(f"the index was answered on {read['answered']} of "
+                    f"{read['of']} sections:\n  a MISSED below may be a "
+                    f"defect in one of the others")
+    if inventory.is_answers(read) and read["short"]:
+        said.append(f"{len(read['short'])} section(s) of the index answered "
+                    f"in fewer than the {read['runs']} passes asked for:\n  "
+                    f"a MISSED below may be a claim one more pass would have "
+                    f"returned")
+    pairs = unjudged(data)
+    if pairs is None:
+        said.append(UNJUDGED_UNSAID)
+    elif pairs:
+        said.append(f"{len(pairs)} candidate pair(s) could not be judged, "
+                    f"the call failed:\n  a MISSED below may be one of them, "
+                    f"and says so where a pair matches it")
+    return said
 
 
 def main():
@@ -125,6 +195,9 @@ def main():
     correct = len(found) + len(other_class)
     recall = len(found) / scorable if scorable else 0.0
     precision = correct / len(findings) if findings else 0.0
+    for line in unread(data):
+        # The score is of the index, not of the document.
+        print(f"  {line}")
     print(f"  recall     {len(found)}/{scorable}   {recall:6.1%}")
     print(f"  precision  {correct}/{len(findings)}   {precision:6.1%}"
           if findings else "  precision  n/a (nothing reported)")
@@ -138,8 +211,11 @@ def main():
     for entry in unscorable:
         print(f"\nUNSCORED {entry['id']}  {entry['title'][:56]}"
               f"\n         no anchor or line span in the ground truth")
+    not_judged = unjudged(data) or []
     for entry in missed:
         print(f"\nMISSED   {entry['id']}  {entry['title'][:60]}")
+        if any(matches(pair, entry) for pair in not_judged):
+            print(f"         {NOT_JUDGED}")
     for finding in other_class:
         print(f"\nOTHER    {finding['subject'][:40]}  "
               f"{finding['a']['start']} + {finding['b']['start']}"

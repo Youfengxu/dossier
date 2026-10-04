@@ -31,6 +31,7 @@ import zipfile
 import locate
 
 sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
+import inventory  # noqa: E402
 import matrix as matrix_reader
 import vocabulary  # noqa: E402
 
@@ -165,8 +166,65 @@ def write_xlsx(path, sheet_name, headers, rows):
 QUOTE_ROWS = 12          # a table longer than this is summarised, not pasted
 
 
+def undefined_terms(data):
+    """(the terms undefined.py wrote, what it wrote of the sections behind
+    them, or None).
+
+    The file is an object since 2026-10-04: the terms, and how many of the
+    document's sections were asked about and answered. Before that it was the
+    bare list of terms. Such a file is still read, and says nothing of its
+    sections, which is not the same as saying that every one was read.
+
+    Anything else is not a terms file, and is refused. Read as a file with no
+    term in it, an object with no "terms" gave a bundle that listed none and
+    said nothing of why.
+    """
+    if isinstance(data, list):
+        terms, read = data, None
+    elif isinstance(data, dict):
+        terms, read = data.get("terms"), data.get("sections")
+    else:
+        terms, read = None, None
+    if not isinstance(terms, list) or \
+            not all(isinstance(term, dict) for term in terms):
+        raise ValueError('not a terms file: it is neither a list of terms '
+                         'nor an object with one under "terms"')
+    return terms, read if inventory.is_answers(read) else None
+
+
+# Said of a terms file written before undefined.py recorded its sections. It
+# is not called partial: nothing in it says that a section went unread.
+UNSAID = ("NOT KNOWN TO BE THE WHOLE DOCUMENT: the undefined terms come from "
+          "a file that does not say how many sections of the document were "
+          "asked about")
+
+
+def terms_note(read):
+    """What the bundle says when the terms did not come from every section,
+    or "" when they did. A reviewer reads the bundle, not the run that made
+    it, and a list of undefined terms reads as the document's.
+
+    Three things are told apart, each under its own words: a file that does
+    not say, a run no section answered, and a run some did not.
+    """
+    if read is None:
+        return UNSAID
+    if not read["answered"]:
+        return (f"NOTHING WAS READ: undefined terms were looked for in 0 of "
+                f"the document's {read['of']} sections. That none is listed "
+                f"says nothing about the document")
+    if read["not_read"]:
+        return (f"NOT THE WHOLE DOCUMENT: undefined terms were looked for in "
+                f"{read['answered']} of the document's {read['of']} sections; "
+                f"a term that only one of the others would have raised is "
+                f"not listed")
+    return ""
+
+
 def collect(args, project):
-    findings = []
+    """(the findings, what the bundle has to say about how they were come
+    by)."""
+    findings, notes = [], []
 
     path = os.path.join(project, args.coverage) if args.coverage else None
     if path and os.path.exists(path):
@@ -186,7 +244,13 @@ def collect(args, project):
 
     path = os.path.join(project, args.undefined) if args.undefined else None
     if path and os.path.exists(path):
-        terms = json.load(open(path, encoding="utf-8"))
+        with open(path, encoding="utf-8") as handle:
+            try:
+                terms, read = undefined_terms(json.load(handle))
+            except ValueError as error:
+                sys.exit(f"{args.undefined}: {error}")
+        if terms_note(read):
+            notes.append(terms_note(read))
         # Frequency-ordered and capped. The detector's own scoring is not
         # trustworthy enough to paginate a reviewer through 1,187 rows; the
         # tail is noise and saying so is better than shipping it as findings.
@@ -224,10 +288,39 @@ def collect(args, project):
             })
 
     findings.sort(key=lambda f: f["sort"])
-    return findings
+    return findings, notes
 
 
-def markdown(findings, counts, title, doc):
+def note_rows(notes):
+    """The notes as rows of the sheet, to stand under its header and above
+    every finding.
+
+    They reached the page and the terminal and not the sheet, which is built
+    from the findings alone: two outputs of one pass, one of which said the
+    terms were looked for in 3 of 4 sections and one of which listed them as
+    the document's.
+    """
+    return [["", "about this bundle", "", note, "", "", "", ""]
+            for note in notes]
+
+
+def nothing_to_bundle(args, project, notes):
+    """What a bundle with no finding in it stops with.
+
+    "no inputs found" was said of every such run, and sent its reader to
+    check the flags. A terms file from a run no section answered is an input
+    that was found, with no term in it and a record saying why: that record
+    is the message.
+    """
+    named = [name for name in (args.coverage, args.undefined, args.candidates)
+             if name and os.path.exists(os.path.join(project, name))]
+    if not named:
+        return "no inputs found — check --coverage/--undefined/--candidates"
+    return "\n".join([f"nothing to bundle: no finding in {', '.join(named)}"]
+                     + [f"  {note}" for note in notes])
+
+
+def markdown(findings, counts, title, doc, notes=()):
     """The reviewer-facing report, lifted out of main() so it can be TESTED.
 
     It was inline, which made the only way to check its output a subprocess —
@@ -245,6 +338,8 @@ def markdown(findings, counts, title, doc):
     out.append("")
     for key in sorted(counts):
         out.append(f"- {counts[key]} — {key}")
+    for note in notes:
+        out.append(f"- {note}")
     out.append("")
 
     current = None
@@ -296,9 +391,9 @@ def main():
     args = parser.parse_args()
 
     project = os.path.abspath(os.path.expanduser(args.project))
-    findings = collect(args, project)
+    findings, notes = collect(args, project)
     if not findings:
-        sys.exit("no inputs found — check --coverage/--undefined/--candidates")
+        sys.exit(nothing_to_bundle(args, project, notes))
 
     # The SAME evidence the markdown shows. It was the raw string here and the
     # capped one there, so two artefacts of one run disagreed about what was
@@ -307,7 +402,7 @@ def main():
              locate.quoted(f["evidence"], limit=QUOTE_ROWS)[0], f["why"], ""]
             for f in findings]
     xlsx_path = os.path.abspath(os.path.expanduser(args.out_xlsx))
-    write_xlsx(xlsx_path, args.doc[:31], HEADERS, rows)
+    write_xlsx(xlsx_path, args.doc[:31], HEADERS, note_rows(notes) + rows)
 
     title = args.title or f"{args.doc} — pipeline findings"
     counts = {}
@@ -316,7 +411,7 @@ def main():
             else f"RFO coverage: {f['status']}"
         counts[key] = counts.get(key, 0) + 1
 
-    out = markdown(findings, counts, title, args.doc).splitlines()
+    out = markdown(findings, counts, title, args.doc, notes).splitlines()
 
     md_path = os.path.abspath(os.path.expanduser(args.out_md))
     os.makedirs(os.path.dirname(md_path) or ".", exist_ok=True)
@@ -327,6 +422,8 @@ def main():
     print(f"wrote {md_path}")
     print(f"  {len(findings)} findings: "
           + ", ".join(f"{v} {k}" for k, v in sorted(counts.items())))
+    for note in notes:
+        print(f"  {note}")
     return 0
 
 

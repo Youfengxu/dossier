@@ -29,6 +29,16 @@ failure mode this toolkit keeps producing. So grouping is deterministic and
 reported: --show-groups prints what merged with what, and a subject that should
 have merged and did not is visible rather than silent.
 
+WHAT IT WAS NOT ANSWERED ON. A section whose call fails gives no claim, and a
+contradiction with a claim made there cannot be found. That came back as an
+empty list, which is what a section that asserts nothing comes back as, and
+--limit cut the list of sections without saying so: "4/4 sections" and "0
+finding(s)", over a document one section of which nobody had answered for. The
+run now counts the sections that answered, names the others under its
+findings, and writes the same into --out, where --reuse and score-claims.py
+read it back. An index that does not say is not taken for the whole document.
+The exit status is 0 either way: it is said, not signalled.
+
 WHAT IT DOES NOT DO. It finds contradictions between STATED claims. A document
 that omits a decision entirely is not contradicting itself, and this will say
 nothing about it — that is the coverage pipeline's job. It also cannot reach
@@ -49,6 +59,12 @@ import closure  # noqa: E402
 import inventory  # noqa: E402
 
 PROMPT_VERSION = "claim-3"
+
+# What a section that did not answer means for the findings, and what "0
+# finding(s)" is when none answered.
+NOT_READ = ("A contradiction with a claim made there cannot be among the "
+            "findings")
+NOTHING_READ = '"0 finding(s)" says nothing about the document'
 
 EXTRACT_SYSTEM = """You catalogue the claims one section of a technical document makes.
 
@@ -216,13 +232,22 @@ def load_aliases(project):
 def extract(client, sections, concurrency, runs=1, verbose=True):
     """Union of `runs` passes.
 
-    Extraction samples what a section says rather than enumerating it: on the
-    fixture, steps 1, 4 and 5 of a five-step sequence came back and step 3 —
-    the one that contradicted an authority rule forty lines earlier — did not.
-    A claim missed here cannot be recovered downstream, so recall at this stage
-    is worth paying for twice.
+    Extraction samples what a section says rather than enumerating it (DESIGN
+    3.27). A claim missed here cannot be recovered downstream, so recall at
+    this stage is worth paying for twice.
+
+    The example that stood here was not one: "on the fixture, steps 1, 4 and 5
+    of a five-step sequence came back and step 3 — the one that contradicted
+    an authority rule — did not". Until 2026-10-04 inventory.split_sections put
+    steps 2 and 3 in no section, so the three that came back are the three
+    that were shown, and no number of passes returns a line no pass is given.
+    A failure to show is not a model's miss.
+
+    -> (the distinct claims, how many passes answered each section). A
+    section whose call failed used to come back as [], the same as a section
+    that asserts nothing, and "4/4 sections" was printed over it.
     """
-    claims = []
+    claims, passes = [], [0] * len(sections)
     def one(index_section):
         index, section = index_section
         user = (f"Section: {section['heading']}\n"
@@ -233,7 +258,7 @@ def extract(client, sections, concurrency, runs=1, verbose=True):
                                validate=validate_extract,
                                label=f"claim:{section['start']}")
         except LLMError:
-            return []
+            return None             # not []: see the docstring
         out = []
         for item in reply["claims"]:
             out.append({
@@ -250,13 +275,19 @@ def extract(client, sections, concurrency, runs=1, verbose=True):
 
     for run in range(runs):
         client.prompt_version = f"{PROMPT_VERSION}-r{run}" if run else PROMPT_VERSION
+        silent = 0
         with ThreadPoolExecutor(max_workers=max(1, concurrency)) as pool:
             for index, batch in enumerate(
                     pool.map(one, enumerate(sections)), 1):
-                claims.extend(batch)
+                if batch is None:
+                    silent += 1
+                else:
+                    passes[index - 1] += 1
+                    claims.extend(batch)
                 if verbose and (index % 25 == 0 or index == len(sections)):
                     print(f"  run {run + 1}/{runs}: {index}/{len(sections)} "
-                          f"sections, {len(claims)} claims")
+                          f"sections asked, {index - silent} answered, "
+                          f"{len(claims)} claims")
     client.prompt_version = PROMPT_VERSION
     seen, unique = set(), []
     for claim in claims:
@@ -268,7 +299,7 @@ def extract(client, sections, concurrency, runs=1, verbose=True):
     if runs > 1 and verbose:
         print(f"  union of {runs} runs: {len(unique)} distinct claims "
               f"from {len(claims)}")
-    return unique
+    return unique, passes
 
 
 def verify_quotes(claims, lines):
@@ -453,6 +484,12 @@ def main():
     parser.add_argument("--include-tension", action="store_true",
                         help="report tension verdicts as well as contradictions")
     args = parser.parse_args()
+    if args.runs < 1:
+        # A run of no pass asks about no section. It printed "0 finding(s)"
+        # with no call made, and then, once sections were counted, named
+        # every one as "extraction failed" when none had been tried.
+        parser.error("--runs must be at least 1: a run of no pass reads "
+                     "nothing")
 
     project = os.path.abspath(os.path.expanduser(args.project))
     _doc, lines = load_doc(project, args.doc)
@@ -474,14 +511,23 @@ def main():
     embedder = Embedder(project, **embed_kwargs)
 
     if args.reuse:
-        claims = json.load(open(os.path.join(project, args.reuse)))["claims"]
+        with open(os.path.join(project, args.reuse), encoding="utf-8") as handle:
+            saved = json.load(handle)
+        claims = saved["claims"]
+        # The index says how many sections its claims came from, if it was
+        # written since 2026-10-04. One that does not say is not taken to
+        # have been answered on all of them.
+        read = saved.get("sections") \
+            if inventory.is_answers(saved.get("sections")) else None
         print(f"reusing {len(claims)} claims from {args.reuse}")
     else:
-        sections = inventory.split_sections(lines, max_chars=args.max_chars)
-        if args.limit:
-            sections = sections[:args.limit]
-        print(f"{args.doc}: {len(sections)} sections")
-        claims = extract(client, sections, args.concurrency, args.runs)
+        # --limit cut this list and said nothing, and the line below read "2
+        # sections" of a document that has four.
+        everything = inventory.split_sections(lines, max_chars=args.max_chars)
+        sections, beyond = inventory.limited(everything, args.doc, args.limit)
+        print(inventory.asking(args.doc, sections, everything, beyond))
+        claims, passes = extract(client, sections, args.concurrency, args.runs)
+        read = inventory.answers(sections, beyond, passes, args.runs, args.doc)
         claims, dropped, fragments = verify_quotes(claims, lines)
         print(f"  {len(claims)} claims survive verification "
               f"({dropped} unquotable, {fragments} too short to assert)")
@@ -578,6 +624,15 @@ def main():
         print(f"{len(unjudged)} of {len(candidates)} candidate pairs could NOT "
               f"be judged: the call failed. They are in no finding above or "
               f"below, and that is not a verdict.")
+    # The same for a section nobody answered for. Its claims were never in
+    # the index, so no pair was made from them and nothing above counts them.
+    if read is None:
+        print(f"{args.reuse} does not say how many sections its claims were "
+              f"taken from. A contradiction\nwith a claim in a section it "
+              f"never read cannot be among the findings.")
+    else:
+        for line in inventory.unanswered(read, NOT_READ, NOTHING_READ):
+            print(line)
     print("=" * 74)
     for finding in unique:
         a, b = finding["a"], finding["b"]
@@ -597,7 +652,7 @@ def main():
         path = os.path.join(project, args.out)
         temporary = f"{path}.{os.getpid()}.tmp"
         with open(temporary, "w", encoding="utf-8") as handle:
-            json.dump({"doc": args.doc, "claims": claims,
+            json.dump({"doc": args.doc, "sections": read, "claims": claims,
                        "findings": findings,
                        "unjudged": [{"subject": subject, "a": a, "b": b}
                                     for subject, a, b in unjudged]},

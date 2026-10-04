@@ -850,6 +850,545 @@ MUTATIONS = [
             "test_the_sections_it_stopped_before_are_recorded_as_not_read",
         ],
     },
+    # Lines of the document that are in no section. The splitter left two kinds
+    # out under a run that printed "reading 100% of the document". Each entry
+    # below is one decision of 2026-10-04: the two kinds are kept, the run
+    # checks what its splitter left out and records it, and synthesize.py
+    # asserts no absence over lines no call was shown.
+    {
+        "what": "inventory.split_sections — a heading straight after a heading "
+                "replaces it again",
+        "why": "the replaced line is then in no section. A numbered list is a "
+               "run of heading-like lines, so each step replaced the one "
+               "before: lines 284 and 285 of the fixture, the second a "
+               "corroborating anchor of the planted defect GT-D5-001",
+        "module": "inventory",
+        "old": '        elif is_heading and not current and not opened:',
+        "new": '        elif is_heading and not current:',
+        "tests": [
+            "tests.test_unread_lines.AHeadingStraightAfterAHeading."
+            "test_each_step_of_a_numbered_list_is_shown_to_a_call",
+            "tests.test_unread_lines.AHeadingStraightAfterAHeading."
+            "test_the_first_of_the_run_heads_the_section_and_the_rest_are_text",
+            "tests.test_unread_lines.AHeadingStraightAfterAHeading."
+            "test_a_heading_followed_at_once_by_its_sub_heading_keeps_both",
+            "tests.test_unread_lines.AHeadingStraightAfterAHeading."
+            "test_the_two_steps_the_fixture_lost_are_read",
+            "tests.test_unread_lines.AHeadingStraightAfterAHeading."
+            "test_no_line_of_the_fixture_that_holds_text_is_in_no_section",
+            "tests.test_unread_lines.WhatALocatorSays."
+            "test_the_committed_inventory_differs_from_a_fresh_cut_in_one_section",
+            "tests.test_unread_lines.OnDocumentsNobodyChose."
+            "test_every_line_with_text_is_in_one_section_and_no_locator_lies",
+        ],
+    },
+    {
+        "what": "inventory.split_sections — the sixty-character floor put back",
+        "why": "a stub, a short front matter and a short last section were "
+               "dropped heading and all, to save a call that \"cannot produce "
+               "anything\". Forty-four characters is \"Component maturity is "
+               "assessed in Section 9.\", which is what D3 checks",
+        "module": "inventory",
+        "old": '        if opened or any(x.strip() for x in current):',
+        "new": '        if current and sum(len(x.strip()) for x in current) > 60:',
+        "tests": [
+            "tests.test_unread_lines.ASectionOfAFewWords."
+            "test_a_stub_is_a_section_of_its_own",
+            "tests.test_unread_lines.ASectionOfAFewWords."
+            "test_a_short_front_matter_is_kept",
+            "tests.test_unread_lines.ASectionOfAFewWords."
+            "test_a_short_last_section_is_kept",
+            "tests.test_unread_lines.ASectionOfAFewWords."
+            "test_a_heading_with_nothing_under_it_is_kept",
+            "tests.test_chunking.InventorySections."
+            "test_a_section_with_almost_no_text_is_still_a_section",
+            # The run's own check, on a document with a stub in it: with the
+            # floor back it no longer says it reads the whole document.
+            "tests.test_unread_lines.ARun."
+            "test_it_reads_the_whole_document_and_the_inventory_says_so",
+            "tests.test_unread_lines.OnDocumentsNobodyChose."
+            "test_every_line_with_text_is_in_one_section_and_no_locator_lies",
+        ],
+    },
+    {
+        "what": "inventory.split_sections — a heading with nothing under it "
+                "is dropped",
+        "why": "a heading is text, and a section that holds nothing is not "
+               "the same as no section: a pointer to it would be called a "
+               "pointer to nowhere",
+        "module": "inventory",
+        "old": '        if opened or any(x.strip() for x in current):',
+        "new": '        if any(x.strip() for x in current):',
+        "tests": [
+            "tests.test_unread_lines.ASectionOfAFewWords."
+            "test_a_heading_with_nothing_under_it_is_kept",
+            "tests.test_unread_lines.OnDocumentsNobodyChose."
+            "test_every_line_with_text_is_in_one_section_and_no_locator_lies",
+        ],
+    },
+    {
+        "what": "inventory.split_sections — the piece after a size cut starts "
+                "one line early",
+        "why": "its locator then names a line its text does not hold, and "
+               "that line is in two sections. Everything downstream takes a "
+               "locator for what a call was shown: unread_lines() is the one "
+               "place that checks, and the documents in the fixture are never "
+               "cut for size, so only generated ones reach this",
+        "module": "inventory",
+        "old": '                current, start, opened = [], number + 1, False',
+        "new": '                current, start, opened = [], number, False',
+        "tests": [
+            "tests.test_unread_lines.OnDocumentsNobodyChose."
+            "test_every_line_with_text_is_in_one_section_and_no_locator_lies",
+        ],
+    },
+    {
+        "what": "inventory.unread_lines — a section is taken at its locator's "
+                "word",
+        "why": "the claim is that a call was shown the line, and a locator is "
+               "the splitter's own account of that. A check that reads only "
+               "the line numbers confirms what the splitter believes",
+        "module": "inventory",
+        "old": '        if whole or headed:',
+        "new": '        if True:',
+        "tests": [
+            "tests.test_unread_lines.WhatTheRunChecks."
+            "test_a_section_whose_text_is_not_its_lines_shows_none_of_them",
+            "tests.test_unread_lines.WhatTheRunChecks."
+            "test_nor_does_one_whose_heading_is_not_the_line_it_starts_on",
+        ],
+    },
+    {
+        "what": "inventory.unread_lines — it never finds a line",
+        "why": "a check that cannot fail: the run says 100% whatever the "
+               "splitter did, which is where this started",
+        "module": "inventory",
+        "old": '            if line.strip() and number not in shown]',
+        "new": '            if False]',
+        "tests": [
+            "tests.test_unread_lines.WhatTheRunChecks."
+            "test_a_line_in_no_section_is_reported",
+            "tests.test_unread_lines.WhatTheRunChecks."
+            "test_it_finds_the_two_lines_the_committed_inventory_left_out",
+            "tests.test_unread_lines.ARun."
+            "test_a_splitter_that_leaves_lines_out_is_not_taken_at_its_word",
+            "tests.test_unread_lines.ARun."
+            "test_and_the_inventory_records_which_lines",
+        ],
+    },
+    {
+        "what": "inventory.unread_lines — a blank line in no section counts "
+                "as text not read",
+        "why": "blank lines under no heading are what the splitter still "
+               "leaves out, and nothing is lost with them. A run that says "
+               "NOT the whole document over them says it of most documents, "
+               "and stops being read",
+        "module": "inventory",
+        "old": '            if line.strip() and number not in shown]',
+        "new": '            if number not in shown]',
+        "tests": [
+            "tests.test_unread_lines.WhatTheRunChecks."
+            "test_a_blank_line_in_no_section_is_not",
+        ],
+    },
+    {
+        "what": "inventory.reading — 100% is said over lines in no section",
+        "why": "the line was a constant. It is the sentence synthesize.py's "
+               "licence to assert an absence rests on",
+        "module": "inventory",
+        "old": '    if not beyond and not left_out:',
+        "new": '    if not beyond:',
+        "tests": [
+            "tests.test_unread_lines.WhatTheRunSays.test_and_not_when_one_is",
+            "tests.test_unread_lines.ARun."
+            "test_a_splitter_that_leaves_lines_out_is_not_taken_at_its_word",
+        ],
+    },
+    {
+        "what": "inventory.py — the run does not check what its splitter "
+                "left out",
+        "why": "the splitter is tested on the documents the tests hold. The "
+               "run checks it on the document in hand, and that is the one "
+               "the inventory is about",
+        "module": "inventory",
+        "old": '    left_out = unread_lines(lines, everything)',
+        "new": '    left_out = []',
+        "tests": [
+            "tests.test_unread_lines.ARun."
+            "test_a_splitter_that_leaves_lines_out_is_not_taken_at_its_word",
+            "tests.test_unread_lines.ARun."
+            "test_and_the_inventory_records_which_lines",
+            "tests.test_unread_lines.ARun."
+            "test_and_the_last_line_of_the_run_counts_them",
+        ],
+    },
+    {
+        "what": "inventory.py — the inventory does not say which lines it "
+                "left out",
+        "why": "the announcement scrolls away and the inventory is what "
+               "synthesize.py reads. One that does not say cannot be told "
+               "from one that left out none",
+        "module": "inventory",
+        "old": '            "runs": runs, "unread_lines": left_out, "sections": results}',
+        "new": '            "runs": runs, "sections": results}',
+        "tests": [
+            "tests.test_unread_lines.ARun."
+            "test_it_reads_the_whole_document_and_the_inventory_says_so",
+            "tests.test_unread_lines.ARun."
+            "test_and_the_inventory_records_which_lines",
+            "tests.test_inventory.WhatIsWritten."
+            "test_the_inventory_says_which_text_its_line_numbers_are_in",
+            "tests.test_inventory.WhatIsWritten."
+            "test_and_which_of_its_lines_are_in_no_section",
+        ],
+    },
+    {
+        "what": "synthesize.moved — a heading with nothing in it is found "
+                "on a blank line",
+        "why": "a bare \"#\" is a heading whose text is empty, and so is a "
+               "blank line once its hashes are taken off. Since a short "
+               "chunk is kept, such a line heads one more often, and a line "
+               "added above it moved every later line without being noticed. "
+               "The generated documents of tests/test_pointers_generated.py "
+               "found it the first time they were cut the new way",
+        "module": "synthesize",
+        "old": '            if first.lstrip("#").strip() == heading and (heading or first):',
+        "new": '            if first.lstrip("#").strip() == heading:',
+        "tests": [
+            "tests.test_pointers_generated.TheTextTheInventoryWasSplitFrom."
+            "test_and_a_line_added_above_a_chunk_that_starts_on_a_heading_is_noticed",
+            "tests.test_pointers.WhichDocument."
+            "test_a_heading_with_nothing_in_it_is_not_found_on_a_blank_line",
+        ],
+    },
+    {
+        "what": "synthesize.lines_left_out — the inventory's own list is "
+                "ignored",
+        "why": "the gaps between sections cannot tell a blank line from one "
+               "that holds text. An inventory that checked and found none "
+               "would be doubted over its blank lines, and one that found "
+               "some would be reported as a guess",
+        "module": "synthesize",
+        "old": '    if line_numbers(record):',
+        "new": '    if False:',
+        "tests": [
+            "tests.test_unread_lines.TheInventoryLine."
+            "test_an_inventory_that_left_no_line_out_says_so",
+            "tests.test_unread_lines.TheInventoryLine."
+            "test_lines_the_inventory_left_out_are_counted_and_named",
+            "tests.test_unread_lines.AnAbsenceALineInNoSectionCouldAnswer."
+            "test_with_no_line_left_out_the_gap_and_the_orphan_are_findings",
+            "tests.test_unread_lines.WhatAnInventorySaysOfItsLines."
+            "test_the_inventorys_own_list_is_taken_first",
+            "tests.test_unread_lines.WhatAnInventorySaysOfItsLines."
+            "test_and_an_empty_list_is_an_answer",
+        ],
+    },
+    {
+        "what": "synthesize.lines_left_out — an older inventory's gaps are "
+                "not looked for",
+        "why": "inv-ablation.json, which DESIGN §3.24-§3.30 quote from, was "
+               "written before the lines left out were recorded. Its two "
+               "show only as a gap between its sections' line numbers",
+        "module": "synthesize",
+        "old": '        if first > reached + 1:',
+        "new": '        if False:',
+        "tests": [
+            "tests.test_unread_lines.TheInventoryLine."
+            "test_an_older_inventory_shows_them_as_a_gap_between_its_sections",
+            "tests.test_unread_lines.AnAbsenceALineInNoSectionCouldAnswer."
+            "test_an_older_inventorys_gap_does_the_same",
+            "tests.test_unread_lines.WhatAnInventorySaysOfItsLines."
+            "test_without_one_the_gaps_between_the_sections_are_all_there_is",
+            "tests.test_unread_lines.WhatAnInventorySaysOfItsLines."
+            "test_lines_before_the_first_section_are_a_gap",
+            "tests.test_unread_lines.WhatAnInventorySaysOfItsLines."
+            "test_the_committed_inventory_has_two",
+        ],
+    },
+    # What an independent review of the entries above found, each reproduced
+    # before it was fixed. Four mutations it tried were caught by no test.
+    {
+        "what": "synthesize.line_numbers — a list of anything is the "
+                "inventory's own account",
+        "why": "entries that were not line numbers were dropped one by one "
+               "and what was left was the record: [21.0, 22.0] read as \"no "
+               "line left out\", and the absences were asserted over lines "
+               "21 and 22",
+        "module": "synthesize",
+        "old": '    return all(type(n) is int and n > 0 for n in value)',
+        "new": '    return True',
+        "tests": [
+            "tests.test_unread_lines.TheInventoryLine."
+            "test_a_list_that_is_not_line_numbers_is_not_taken_as_the_record",
+            "tests.test_unread_lines.WhatAnInventorySaysOfItsLines."
+            "test_a_list_holding_numbers_that_are_not_line_numbers_is_no_record",
+        ],
+    },
+    {
+        "what": "synthesize.lines_left_out — a locator that runs backwards "
+                "holds lines",
+        "why": "\"d:40-23\" was read as reaching line 23, and the gap after "
+               "it was then counted twice: \"36 line(s) ... lines 21-39, "
+               "24-40\", of twenty",
+        "module": "synthesize",
+        "old": '        if found and int(found.group(1)) <= int(found.group(2)):',
+        "new": '        if found:',
+        "tests": [
+            "tests.test_unread_lines.WhatAnInventorySaysOfItsLines."
+            "test_a_locator_that_runs_backwards_names_no_lines",
+        ],
+    },
+    {
+        "what": "synthesize.lines_left_out — a section inside another ends "
+                "the outer one",
+        "why": "the lines between the end of the inner section and the end "
+               "of the outer are then a gap, reported as lines no call was "
+               "shown, and every absence is marked over them",
+        "module": "synthesize",
+        "old": '        reached = max(reached, last)',
+        "new": '        reached = last',
+        "tests": [
+            "tests.test_unread_lines.WhatAnInventorySaysOfItsLines."
+            "test_nor_is_a_section_inside_another",
+        ],
+    },
+    {
+        "what": "synthesize.lines_left_out — no locator to read is no gap "
+                "found",
+        "why": "\"going by its sections' line numbers there is none\", "
+               "printed over an inventory none of whose sections gave a line "
+               "number. Nothing was looked at, and it read as a look that "
+               "found nothing",
+        "module": "synthesize",
+        "old": '    return gaps, BY_LOCATOR if spans else NOT_KNOWN',
+        "new": '    return gaps, BY_LOCATOR',
+        "tests": [
+            "tests.test_unread_lines.WhatAnInventorySaysOfItsLines."
+            "test_with_no_locator_that_can_be_read_nothing_is_known",
+            "tests.test_unread_lines.TheInventoryLine."
+            "test_an_inventory_whose_sections_name_no_lines_says_so",
+        ],
+    },
+    {
+        "what": "synthesize — a cycle of deferrals is put in doubt by lines "
+                "no call was shown",
+        "why": "a cycle is three deferrals found, and what was not read "
+               "cannot unfind them. Marked with the rest, the one D6 the "
+               "inventory establishes would read as a question",
+        "module": "synthesize",
+        "old": '                             labelled, ""))',
+        "new": ('                             labelled, '
+                'line_question(no_section, "could own it")))'),
+        "tests": [
+            "tests.test_unread_lines.AnAbsenceALineInNoSectionCouldAnswer."
+            "test_so_is_a_cycle_of_deferrals_and_the_header_does_not_say_otherwise",
+        ],
+    },
+    {
+        "what": "inventory.unread_lines — a section that starts before the "
+                "first line is taken at its word",
+        "why": "a start of 0 is a slice from the end of the list. It read as "
+               "the last line, the text matched, and every line of the "
+               "range counted as shown: the check, fooled by the thing it "
+               "checks",
+        "module": "inventory",
+        "old": '        if not 1 <= start <= end <= len(lines):',
+        "new": '        if False:',
+        "tests": [
+            "tests.test_unread_lines.WhatTheRunChecks."
+            "test_nor_one_whose_lines_the_text_does_not_have",
+        ],
+    },
+    {
+        "what": "inventory.unread_lines — a section's first line is taken "
+                "for its heading",
+        "why": "a section whose text is every line after its first shows "
+               "that first line only if it IS the heading. The test that "
+               "was meant to hold this passed with the comparison deleted",
+        "module": "inventory",
+        "old": ('        headed = "\\n".join(span[1:]) == section["text"] and \\\n'
+                '            span[0].strip().lstrip("#").strip() == section["heading"]'),
+        "new": '        headed = "\\n".join(span[1:]) == section["text"]',
+        "tests": [
+            "tests.test_unread_lines.WhatTheRunChecks."
+            "test_nor_does_one_whose_heading_is_not_the_line_it_starts_on",
+        ],
+    },
+    {
+        "what": "inventory.py — the lines of a section --limit stopped "
+                "before are counted as lines in no section",
+        "why": "they are in a section, and the section is recorded as not "
+               "read. Counted again as lines the splitter lost, a run told "
+               "to stop early blames the splitter for it. No test ran "
+               "main() with --limit",
+        "module": "inventory",
+        "old": ('    left_out = unread_lines(lines, everything)\n'
+                '    sections, beyond = limited(everything, args.doc, args.limit)'),
+        "new": ('    sections, beyond = limited(everything, args.doc, args.limit)\n'
+                '    left_out = unread_lines(lines, sections)'),
+        "tests": [
+            "tests.test_unread_lines.ARun."
+            "test_a_section_limit_stopped_before_is_not_lines_in_no_section",
+        ],
+    },
+    {
+        "what": "inventory.py — a run with nothing to read divides by the "
+                "time it took",
+        "why": "older than the rest of this block: an empty document wrote "
+               "its inventory and then died of ZeroDivisionError in the "
+               "line that reports the rate, in more than half of 200 runs",
+        "module": "inventory",
+        "old": '    rate = len(sections) / elapsed if elapsed else 0.0',
+        "new": '    rate = len(sections) / elapsed',
+        "tests": [
+            "tests.test_unread_lines.ARun."
+            "test_a_document_with_nothing_in_it_is_read_as_that",
+        ],
+    },
+    {
+        "what": "inventory.reading — a document with no text is read 100%",
+        "why": "nothing was read. \"100% of the document\" over no sections "
+               "is true the way an empty tally is unanimous",
+        "module": "inventory",
+        "old": '    if not everything and not left_out:',
+        "new": '    if False:',
+        "tests": [
+            "tests.test_unread_lines.WhatTheRunSays."
+            "test_a_document_with_no_text_is_not_read_one_hundred_percent",
+            "tests.test_unread_lines.ARun."
+            "test_a_document_with_nothing_in_it_is_read_as_that",
+        ],
+    },
+    {
+        "what": "synthesize — every inventory is taken to have left no line "
+                "out",
+        "why": "\"74 of 74 sections read\" says nothing about a line that is "
+               "in none of the 74, and said nothing for as long as there "
+               "were two",
+        "module": "synthesize",
+        "old": '    no_section, line_record = lines_left_out(data)',
+        "new": '    no_section, line_record = [], RECORDED',
+        "tests": [
+            "tests.test_unread_lines.TheInventoryLine."
+            "test_lines_the_inventory_left_out_are_counted_and_named",
+            "tests.test_unread_lines.TheInventoryLine."
+            "test_an_older_inventory_with_no_gap_is_not_said_to_be_whole",
+            "tests.test_unread_lines.AnAbsenceALineInNoSectionCouldAnswer."
+            "test_an_orphan_a_line_in_no_section_could_consume",
+            "tests.test_unread_lines.AnAbsenceALineInNoSectionCouldAnswer."
+            "test_an_ownership_gap_a_line_in_no_section_could_close",
+            "tests.test_unread_lines.AnAbsenceALineInNoSectionCouldAnswer."
+            "test_a_score_says_what_the_inventory_did_not_read",
+        ],
+    },
+    {
+        "what": "synthesize — the lines left out are counted by their runs",
+        "why": "\"1 line(s)\" over lines 284-285: a count of something other "
+               "than what it names",
+        "module": "synthesize",
+        "old": '    return sum(last - first + 1 for first, last in left_out)',
+        "new": '    return len(left_out)',
+        "tests": [
+            "tests.test_unread_lines.TheInventoryLine."
+            "test_lines_the_inventory_left_out_are_counted_and_named",
+            "tests.test_unread_lines.TheInventoryLine."
+            "test_an_older_inventory_shows_them_as_a_gap_between_its_sections",
+            "tests.test_unread_lines.TheInventoryLine."
+            "test_a_long_list_is_cut_and_its_count_is_not",
+            "tests.test_unread_lines.AnAbsenceALineInNoSectionCouldAnswer."
+            "test_a_score_says_what_the_inventory_did_not_read",
+        ],
+    },
+    {
+        "what": "synthesize — a score counts the pairs it adjudicated as "
+                "lines in no section",
+        "why": "main() is one long namespace and already keeps a `count`: "
+               "the pairs adjudicate_pairs tried. The first version of the "
+               "score line kept its own under that name, and with "
+               "--adjudicate printed \"has 1 line(s) in no section\" under a "
+               "header that said 3",
+        "module": "synthesize",
+        "old": '                  f"{how_many(no_section)} line(s) in no section: a miss may "',
+        "new": '                  f"{count} line(s) in no section: a miss may "',
+        "tests": [
+            "tests.test_unread_lines.AnAbsenceALineInNoSectionCouldAnswer."
+            "test_and_says_the_same_after_pairs_were_adjudicated",
+        ],
+    },
+    {
+        "what": "synthesize — an orphan is asserted over lines no call was "
+                "shown",
+        "why": "\"never consumed\" needs every line's consumes. One of the "
+               "two lines the committed inventory left out is \"SF ingests "
+               "telemetry and applies quality flags.\"",
+        "module": "synthesize",
+        "old": 'line_question(no_section, "could consume it")',
+        "new": '""',
+        "tests": [
+            "tests.test_unread_lines.AnAbsenceALineInNoSectionCouldAnswer."
+            "test_an_orphan_a_line_in_no_section_could_consume",
+            "tests.test_unread_lines.AnAbsenceALineInNoSectionCouldAnswer."
+            "test_an_older_inventorys_gap_does_the_same",
+            "tests.test_unread_lines.AnAbsenceALineInNoSectionCouldAnswer."
+            "test_a_section_not_read_and_a_line_in_none_are_both_named",
+            "tests.test_unread_lines.AnAbsenceALineInNoSectionCouldAnswer."
+            "test_the_summary_counts_them",
+            "tests.test_unread_lines.AnAbsenceALineInNoSectionCouldAnswer."
+            "test_the_candidate_file_carries_the_verdict_and_the_lines",
+        ],
+    },
+    {
+        "what": "synthesize — an ownership gap is asserted over lines no "
+                "call was shown",
+        "why": "\"owned nowhere\" is a statement about every line of the "
+               "document, and the owner can be named on one that is in no "
+               "section",
+        "module": "synthesize",
+        "old": 'line_question(no_section, "could own it")',
+        "new": '""',
+        "tests": [
+            "tests.test_unread_lines.AnAbsenceALineInNoSectionCouldAnswer."
+            "test_an_ownership_gap_a_line_in_no_section_could_close",
+            "tests.test_unread_lines.AnAbsenceALineInNoSectionCouldAnswer."
+            "test_an_older_inventorys_gap_does_the_same",
+            "tests.test_unread_lines.AnAbsenceALineInNoSectionCouldAnswer."
+            "test_the_summary_counts_them",
+            "tests.test_unread_lines.AnAbsenceALineInNoSectionCouldAnswer."
+            "test_the_candidate_file_carries_the_verdict_and_the_lines",
+        ],
+    },
+    {
+        "what": "synthesize.line_question — an absence is in doubt with no "
+                "line left out",
+        "why": "the same as for sections: marking that cries wolf is marking "
+               "nobody reads. With every line in a section the absence is "
+               "the inventory's to assert",
+        "module": "synthesize",
+        "old": '    if not left_out:\n        return ""',
+        "new": '    if False:\n        return ""',
+        "tests": [
+            "tests.test_unread_lines.AnAbsenceALineInNoSectionCouldAnswer."
+            "test_with_no_line_left_out_the_gap_and_the_orphan_are_findings",
+            "tests.test_unread_lines.AnAbsenceALineInNoSectionCouldAnswer."
+            "test_an_older_inventory_with_no_gap_keeps_its_findings",
+        ],
+    },
+    {
+        "what": "synthesize — a score says nothing of the lines the "
+                "inventory left out",
+        "why": "the score is of the inventory, not of the document. \"miss "
+               "GT-D5-001\" was printed over an inventory that had never "
+               "been shown one of that defect's corroborating anchors, with "
+               "nothing beside it to say so",
+        "module": "synthesize",
+        "old": '        if unread or partial or short or no_section or aside:',
+        "new": '        if unread or partial or short or aside:',
+        "tests": [
+            "tests.test_unread_lines.AnAbsenceALineInNoSectionCouldAnswer."
+            "test_a_score_says_what_the_inventory_did_not_read",
+        ],
+    },
     {
         "what": "claim.judged — a pair nobody judged is dropped",
         "why": "\"judged 200/200, 0 contradictions\" is what a run printed "
@@ -901,7 +1440,7 @@ MUTATIONS = [
             "tests.test_pointers.ASectionThatExists."
             "test_a_section_is_all_of_its_lines_not_its_first_chunk",
             "tests.test_pointers.APlaceThatCannotBeLookedUp."
-            "test_a_section_too_short_for_the_splitter_to_keep",
+            "test_a_section_an_older_inventory_has_no_chunk_for",
             "tests.test_pointers.ASectionThatDoesNot."
             "test_a_section_nobody_wrote_is_called_missing",
         ],
@@ -1610,15 +2149,16 @@ MUTATIONS = [
     {
         "what": "synthesize.self_claims — a section the inventory never saw "
                 "is called missing",
-        "why": "the splitter drops a chunk of sixty characters or fewer, "
-               "heading and all, so a stub section is in the document and in "
-               "no chunk. It was \"no such section in the document\"",
+        "why": "until 2026-10-04 the splitter dropped a chunk of sixty "
+               "characters or fewer, heading and all, so in an inventory cut "
+               "before then a stub section is in the document and in no "
+               "chunk. It was \"no such section in the document\"",
         "module": "synthesize",
         "old": '        if not hits and spans:',
         "new": '        if False:',
         "tests": [
             "tests.test_pointers.APlaceThatCannotBeLookedUp."
-            "test_a_section_too_short_for_the_splitter_to_keep",
+            "test_a_section_an_older_inventory_has_no_chunk_for",
         ],
     },
     {
@@ -1644,9 +2184,10 @@ MUTATIONS = [
     {
         "what": "synthesize.self_claims — lines of the place that no chunk "
                 "covers are not a doubt",
-        "why": "the splitter leaves lines in no chunk: a stub it dropped, a "
-               "numbered step replaced by the next. What the rest of the "
-               "section does not hold, those lines may, and nothing read them",
+        "why": "an inventory cut before 2026-10-04 has lines in no chunk: "
+               "a stub the splitter dropped, a numbered step replaced by the "
+               "next. What the rest of the section does not hold, those "
+               "lines may, and nothing read them",
         "module": "synthesize",
         "old": '            if hits and unseen:',
         "new": '            if False:',
@@ -1804,6 +2345,784 @@ MUTATIONS = [
             "test_the_inventory_says_which_text_its_line_numbers_are_in",
             "tests.test_pointers.WhichDocument."
             "test_an_inventory_that_records_the_hash_of_the_text_is_held_to_it",
+        ],
+    },
+    # Sections that did not answer. claim.py and undefined.py ask a model
+    # about a document one section at a time and keep no entry for each, so a
+    # call that failed came back as [], which is what a section with nothing
+    # in it comes back as, and --limit cut the list without a word. Decided
+    # with the author on 2026-10-04: counted and named beside the result,
+    # carried in --out, and the exit status stays 0.
+    {
+        "what": "undefined.py — a section whose call failed has no terms",
+        "why": "the defect as it shipped: `except LLMError: return []`. "
+               "\"4/4 sections\" was printed with one of the four unanswered, "
+               "and a term only that section would have raised was not in "
+               "the list, with nothing to say why",
+        "module": "undefined",
+        "old": ('            return None\n'
+                '        return [(item["term"].strip(), item["quote"].strip(), section)'),
+        "new": ('            return []\n'
+                '        return [(item["term"].strip(), item["quote"].strip(), section)'),
+        "tests": [
+            "tests.test_unanswered_sections.UndefinedTerms."
+            "test_a_section_whose_call_failed_is_counted_and_named",
+            "tests.test_unanswered_sections.UndefinedTerms."
+            "test_the_file_says_how_many_sections_its_terms_came_from",
+            "tests.test_unanswered_sections.UndefinedTerms."
+            "test_a_run_no_section_answered_is_not_a_document_with_no_such_term",
+        ],
+    },
+    {
+        "what": "undefined.py — --limit cuts the list and says nothing",
+        "why": "\"d: 2 sections\", of a document that has four. inventory.py "
+               "had the same and records the sections it stopped before; "
+               "this tool reads the same sections and did not",
+        "module": "undefined",
+        "old": '    sections, beyond = inventory.limited(everything, args.doc, args.limit)',
+        "new": '    sections, beyond = everything[:args.limit or None], []',
+        "tests": [
+            "tests.test_unanswered_sections.UndefinedTerms."
+            "test_a_run_told_to_stop_early_says_so_and_names_what_it_left",
+        ],
+    },
+    {
+        "what": "undefined.py — nothing is said beside the result",
+        "why": "the count belongs with the number it qualifies. \"1 "
+               "undefined\" reads as the document's, and the sections the "
+               "terms did not come from were in a dict on the last line",
+        "module": "undefined",
+        "old": ('    for line in inventory.unanswered(read, NOT_READ, NOTHING_READ):\n'
+                '        print(f"  {line}")'),
+        "new": ('    for line in ():\n'
+                '        print(f"  {line}")'),
+        "tests": [
+            "tests.test_unanswered_sections.UndefinedTerms."
+            "test_a_section_whose_call_failed_is_counted_and_named",
+            "tests.test_unanswered_sections.UndefinedTerms."
+            "test_a_run_told_to_stop_early_says_so_and_names_what_it_left",
+            "tests.test_unanswered_sections.UndefinedTerms."
+            "test_a_run_no_section_answered_is_not_a_document_with_no_such_term",
+        ],
+    },
+    {
+        "what": "undefined.py — the file does not say which sections its "
+                "terms came from",
+        "why": "the output scrolls away and the file is what bundle.py puts "
+               "in front of a reviewer. A list of terms that does not say "
+               "is read as the document's",
+        "module": "undefined",
+        "old": '            json.dump({"doc": args.doc, "sections": read, "terms": findings},',
+        "new": '            json.dump({"doc": args.doc, "terms": findings},',
+        "tests": [
+            "tests.test_unanswered_sections.UndefinedTerms."
+            "test_the_file_says_how_many_sections_its_terms_came_from",
+            "tests.test_unanswered_sections.WhatReadsTheFiles."
+            "test_a_bundle_made_from_a_partial_run_says_so_on_the_page",
+        ],
+    },
+    {
+        "what": "undefined.py — a score says nothing of the sections it is "
+                "not a score of",
+        "why": "\"miss\" against a register term is a term the tool did not "
+               "raise, or one whose only section it never asked about. The "
+               "score is of what was asked",
+        "module": "undefined",
+        "old": ('        if read["not_read"]:\n'
+                '            # The score is of what was asked about, not of the document.'),
+        "new": ('        if False:\n'
+                '            # The score is of what was asked about, not of the document.'),
+        "tests": [
+            "tests.test_unanswered_sections.UndefinedTerms."
+            "test_a_score_says_how_many_sections_it_is_a_score_of",
+        ],
+    },
+    {
+        "what": "claim.extract — a section whose call failed asserts nothing",
+        "why": "the defect as it shipped: `except LLMError: return []`. Two "
+               "components each own the calibration baseline; with one of "
+               "the two sections unanswered there is no pair to judge, and "
+               "\"0 finding(s)\" was the whole report",
+        "module": "claim",
+        "old": '            return None             # not []: see the docstring',
+        "new": '            return []',
+        "tests": [
+            "tests.test_unanswered_sections.ClaimIndex."
+            "test_a_section_whose_call_failed_is_counted_under_the_findings",
+            "tests.test_unanswered_sections.ClaimIndex."
+            "test_the_index_says_how_many_sections_its_claims_came_from",
+            "tests.test_unanswered_sections.ClaimIndex."
+            "test_a_section_one_pass_answered_is_read_and_listed_apart",
+            "tests.test_unanswered_sections.ClaimIndex."
+            "test_a_run_no_section_answered_has_not_found_a_consistent_document",
+            "tests.test_unanswered_sections.ClaimIndex."
+            "test_extract_returns_how_many_passes_answered_each_section",
+        ],
+    },
+    {
+        "what": "claim.py — --limit cuts the list and says nothing",
+        "why": "the same line as undefined.py's, in the other tool that "
+               "reads inventory.py's sections",
+        "module": "claim",
+        "old": '        sections, beyond = inventory.limited(everything, args.doc, args.limit)',
+        "new": '        sections, beyond = everything[:args.limit or None], []',
+        "tests": [
+            "tests.test_unanswered_sections.ClaimIndex."
+            "test_a_run_told_to_stop_early_says_so_and_names_what_it_left",
+        ],
+    },
+    {
+        "what": "claim.py — nothing is said under the findings",
+        "why": "claim.py already says, under \"N finding(s)\", how many "
+               "pairs it could not judge. A section nobody answered for is "
+               "further back: its claims were never in the index, so no "
+               "pair was made from them and that count is silent too",
+        "module": "claim",
+        "old": ('        for line in inventory.unanswered(read, NOT_READ, NOTHING_READ):\n'
+                '            print(line)'),
+        "new": ('        for line in ():\n'
+                '            print(line)'),
+        "tests": [
+            "tests.test_unanswered_sections.ClaimIndex."
+            "test_a_section_whose_call_failed_is_counted_under_the_findings",
+            "tests.test_unanswered_sections.ClaimIndex."
+            "test_a_run_told_to_stop_early_says_so_and_names_what_it_left",
+            "tests.test_unanswered_sections.ClaimIndex."
+            "test_a_section_one_pass_answered_is_read_and_listed_apart",
+            "tests.test_unanswered_sections.ClaimIndex."
+            "test_a_run_no_section_answered_has_not_found_a_consistent_document",
+            "tests.test_unanswered_sections.ClaimIndex."
+            "test_an_index_reused_brings_its_record_with_it",
+        ],
+    },
+    {
+        "what": "claim.py — the index does not say which sections its "
+                "claims came from",
+        "why": "--reuse and score-claims.py start from the index. One that "
+               "does not say is scored, and reused, as the whole document",
+        "module": "claim",
+        "old": '            json.dump({"doc": args.doc, "sections": read, "claims": claims,',
+        "new": '            json.dump({"doc": args.doc, "claims": claims,',
+        "tests": [
+            "tests.test_unanswered_sections.ClaimIndex."
+            "test_the_index_says_how_many_sections_its_claims_came_from",
+            "tests.test_unanswered_sections.ClaimIndex."
+            "test_an_index_reused_brings_its_record_with_it",
+            "tests.test_unanswered_sections.WhatReadsTheFiles."
+            "test_a_score_of_an_index_says_how_many_sections_the_index_is_of",
+        ],
+    },
+    {
+        "what": "claim.py — an index that does not say is taken to be of "
+                "every section",
+        "why": "every index written before 2026-10-04. Its claims may be all "
+               "of the document's or half of them, and nothing in it tells "
+               "the two apart: not known is not the same as all",
+        "module": "claim",
+        "old": ('        read = saved.get("sections") \\\n'
+                '            if inventory.is_answers(saved.get("sections")) else None'),
+        "new": '        read = inventory.answers([], [], [], args.runs, args.doc)',
+        "tests": [
+            "tests.test_unanswered_sections.ClaimIndex."
+            "test_one_that_does_not_say_is_not_taken_to_be_of_every_section",
+            "tests.test_unanswered_sections.ClaimIndex."
+            "test_an_index_reused_brings_its_record_with_it",
+        ],
+    },
+    {
+        "what": "inventory.answers — a section no pass answered counts as "
+                "answered",
+        "why": "the count a run prints beside its result. \"4 of 4\" over a "
+               "section nobody answered for is the line this replaced",
+        "module": "inventory",
+        "old": '            "answered": sum(1 for count in passes if count),',
+        "new": '            "answered": len(passes),',
+        "tests": [
+            "tests.test_unanswered_sections.TheRecord."
+            "test_a_section_no_pass_answered_is_not_read_and_is_named",
+            "tests.test_unanswered_sections.UndefinedTerms."
+            "test_the_file_says_how_many_sections_its_terms_came_from",
+            "tests.test_unanswered_sections.ClaimIndex."
+            "test_a_run_no_section_answered_has_not_found_a_consistent_document",
+        ],
+    },
+    {
+        "what": "inventory.answers — the sections --limit stopped before are "
+                "left out of the record",
+        "why": "they are sections of the document and nobody asked about "
+               "them. Left out, a run told to stop at two reports two "
+               "sections answered and none unread",
+        "module": "inventory",
+        "old": ('    not_read += [{"heading": entry["heading"], "locator": entry["locator"],\n'
+                '                  "why": entry["error"]} for entry in beyond]'),
+        "new": '    not_read += []',
+        "tests": [
+            "tests.test_unanswered_sections.TheRecord."
+            "test_so_is_one_the_run_was_told_to_stop_before",
+            "tests.test_unanswered_sections.UndefinedTerms."
+            "test_a_run_told_to_stop_early_says_so_and_names_what_it_left",
+            "tests.test_unanswered_sections.ClaimIndex."
+            "test_a_run_told_to_stop_early_says_so_and_names_what_it_left",
+        ],
+    },
+    {
+        "what": "inventory.unanswered — a run no section answered is "
+                "reported like one that missed a few",
+        "why": "the no-result case. \"4 of 4 sections were NOT read\" above "
+               "\"0 finding(s)\" still lets the zero stand as a result; said "
+               "apart, it does not",
+        "module": "inventory",
+        "old": ('    elif not read["answered"]:\n'
+                '        lines += [f"NOTHING WAS READ: 0 of'),
+        "new": ('    elif False:\n'
+                '        lines += [f"NOTHING WAS READ: 0 of'),
+        "tests": [
+            "tests.test_unanswered_sections.WhatIsSaidBesideTheResult."
+            "test_a_run_no_section_answered_is_said_apart",
+            "tests.test_unanswered_sections.UndefinedTerms."
+            "test_a_run_no_section_answered_is_not_a_document_with_no_such_term",
+            "tests.test_unanswered_sections.ClaimIndex."
+            "test_a_run_no_section_answered_has_not_found_a_consistent_document",
+        ],
+    },
+    {
+        "what": "inventory.asking — a run under --limit announces itself as "
+                "the whole document",
+        "why": "\"d: 2 sections\" was true of the list and read as true of "
+               "the document",
+        "module": "inventory",
+        "old": ('    if beyond:\n'
+                '        return (f"{doc}: asking about the first {len(sections)} of "'),
+        "new": ('    if False:\n'
+                '        return (f"{doc}: asking about the first {len(sections)} of "'),
+        "tests": [
+            "tests.test_unanswered_sections.WhatIsSaidBesideTheResult."
+            "test_before_it_starts_a_run_says_how_many_sections_it_will_ask",
+            "tests.test_unanswered_sections.UndefinedTerms."
+            "test_a_run_told_to_stop_early_says_so_and_names_what_it_left",
+            "tests.test_unanswered_sections.ClaimIndex."
+            "test_a_run_told_to_stop_early_says_so_and_names_what_it_left",
+        ],
+    },
+    {
+        "what": "inventory.is_answers — a record whose counts do not add up "
+                "is taken at its word",
+        "why": "4 sections, 2 answered, and a list of the unread that "
+               "somebody emptied. The readers of these files print what the "
+               "record says, so the record is checked before it is believed",
+        "module": "inventory",
+        "old": '        value["answered"] + len(value["not_read"]) == value["of"]',
+        "new": '        True',
+        "tests": [
+            "tests.test_unanswered_sections.TheRecord.test_nor_is_one_whose_counts_do_not_add_up",
+        ],
+    },
+    {
+        "what": "bundle.undefined_terms — an older list of terms is not read",
+        "why": "every terms file written before 2026-10-04 is a bare list. "
+               "Changing what undefined.py writes must not empty the "
+               "bundles made from those",
+        "module": "bundle",
+        "old": '    if isinstance(data, list):\n        terms, read = data, None',
+        "new": '    if isinstance(data, list):\n        terms, read = [], None',
+        "tests": [
+            "tests.test_unanswered_sections.WhatReadsTheFiles."
+            "test_and_a_file_from_before_it_was_an_object",
+        ],
+    },
+    {
+        "what": "bundle.terms_note — a terms file that does not say is "
+                "taken for the whole document",
+        "why": "the bundle is the page a reviewer reads. An older list of "
+               "terms says nothing of the sections behind it, and silence "
+               "on the page would say they were all read",
+        "module": "bundle",
+        "old": '        return UNSAID',
+        "new": '        return ""',
+        "tests": [
+            "tests.test_unanswered_sections.WhatReadsTheFiles."
+            "test_and_a_file_from_before_it_was_an_object",
+            "tests.test_unanswered_sections.WhatReadsTheFiles."
+            "test_one_made_from_an_older_list_keeps_its_terms_and_says_so",
+        ],
+    },
+    {
+        "what": "bundle.terms_note — a partial run is bundled without a word",
+        "why": "the record is in the file so that this page can say it",
+        "module": "bundle",
+        "old": ('    if read["not_read"]:\n'
+                '        return (f"NOT THE WHOLE DOCUMENT: undefined terms were looked for in "'),
+        "new": ('    if False:\n'
+                '        return (f"NOT THE WHOLE DOCUMENT: undefined terms were looked for in "'),
+        "tests": [
+            "tests.test_unanswered_sections.WhatReadsTheFiles."
+            "test_the_note_counts_the_sections_and_is_empty_when_all_answered",
+            "tests.test_unanswered_sections.WhatReadsTheFiles."
+            "test_a_bundle_made_from_a_partial_run_says_so_on_the_page",
+        ],
+    },
+    {
+        "what": "bundle.markdown — the note does not reach the page",
+        "why": "collected, printed to the terminal of whoever ran the "
+               "bundle, and absent from what the reviewer is sent",
+        "module": "bundle",
+        "old": '        out.append(f"- {note}")',
+        "new": '        pass',
+        "tests": [
+            "tests.test_unanswered_sections.WhatReadsTheFiles.test_the_reviewers_page_carries_the_note",
+            "tests.test_unanswered_sections.WhatReadsTheFiles."
+            "test_a_bundle_made_from_a_partial_run_says_so_on_the_page",
+            "tests.test_unanswered_sections.WhatReadsTheFiles."
+            "test_one_made_from_an_older_list_keeps_its_terms_and_says_so",
+        ],
+    },
+    {
+        "what": "score-claims — a score says nothing of the sections the "
+                "index is not of",
+        "why": "MISSED is printed for a defect whose claim sits in a "
+               "section the index was never answered on. The score is of "
+               "the index, not of the document",
+        "module": "score-claims",
+        "old": ('    elif read["not_read"]:\n'
+                '        said.append(f"the index was answered on {read[\'answered\']} of "'),
+        "new": ('    elif False:\n'
+                '        said.append(f"the index was answered on {read[\'answered\']} of "'),
+        "tests": [
+            "tests.test_unanswered_sections.WhatReadsTheFiles."
+            "test_a_score_of_an_index_says_how_many_sections_the_index_is_of",
+        ],
+    },
+    {
+        "what": "score-claims — an index that does not say is scored as the "
+                "whole document",
+        "why": "every index written before 2026-10-04, and the same rule as "
+               "for --reuse: not known is not all",
+        "module": "score-claims",
+        "old": '        said.append(UNSAID)',
+        "new": '        pass',
+        "tests": [
+            "tests.test_unanswered_sections.WhatReadsTheFiles."
+            "test_and_says_so_of_an_index_that_does_not_record_it",
+            "tests.test_unanswered_sections.WhatReadsTheFiles."
+            "test_and_of_one_whose_record_does_not_add_up",
+        ],
+    },
+    # What a review of that change found, on the code and not on an account
+    # of it (2026-10-04). The readers fell short of the tools: the sheet
+    # without the note its page carried, a run no section answered bundled
+    # as "no inputs found", a file that does not say labelled as partial,
+    # and a score silent on the pairs nobody judged. And sixteen ways to
+    # break the new code that no test noticed, each of which has one now.
+    {
+        "what": "inventory.unanswered — a text with no section in it has "
+                "nothing said beside its result",
+        "why": "\"nothing to read\" was the run's first line, and \"0 "
+               "finding(s)\" stood bare at the end of it. A text cut into "
+               "no section is likelier a parse that failed than a document "
+               "with nothing to say, and its file read as answered in full",
+        "module": "inventory",
+        "old": ('    if not read["of"]:\n'
+                '        lines += ["NOTHING WAS READ: no line of the document holds text.",'),
+        "new": ('    if False:\n'
+                '        lines += ["NOTHING WAS READ: no line of the document holds text.",'),
+        "tests": [
+            "tests.test_unanswered_sections.WhatIsSaidBesideTheResult."
+            "test_a_text_with_no_section_in_it_is_said_apart_too",
+            "tests.test_unanswered_sections.UndefinedTerms."
+            "test_a_text_with_no_section_in_it_is_not_one_with_no_such_term",
+            "tests.test_unanswered_sections.ClaimIndex."
+            "test_a_text_with_no_section_in_it_has_not_been_found_consistent",
+        ],
+    },
+    {
+        "what": "inventory.is_answers — a count below nothing is a count",
+        "why": "-1 answered and five not read add up to the four sections "
+               "there were. The one test of a negative count also broke the "
+               "sum, so the sum caught it and this check was never asked",
+        "module": "inventory",
+        "old": '    counted = all(type(value.get(key)) is int and value[key] >= 0\n',
+        "new": '    counted = all(type(value.get(key)) is int\n',
+        "tests": [
+            "tests.test_unanswered_sections.TheRecord."
+            "test_nor_one_with_a_count_below_nothing",
+        ],
+    },
+    {
+        "what": "inventory.is_answers — a list of bare names is a list of "
+                "sections not read",
+        "why": "the readers print each entry's heading and locator. Two "
+               "names in place of two entries still add up",
+        "module": "inventory",
+        "old": '                 and all(isinstance(entry, dict) for entry in value[key])\n',
+        "new": '',
+        "tests": [
+            "tests.test_unanswered_sections.TheRecord."
+            "test_nor_one_that_lists_names_where_it_should_list_entries",
+        ],
+    },
+    {
+        "what": "inventory.is_answers — True and False are counts",
+        "why": "isinstance(True, int) holds, and {of: true, answered: true} "
+               "adds up. No record answers() wrote counts that way",
+        "module": "inventory",
+        "old": 'type(value.get(key)) is int',
+        "new": 'isinstance(value.get(key), int)',
+        "tests": [
+            "tests.test_unanswered_sections.TheRecord."
+            "test_nor_one_that_counts_in_true_and_false",
+        ],
+    },
+    {
+        "what": "inventory.unanswered — a list of exactly `most` ends in "
+                "\"and 0 more\"",
+        "why": "the boundary of the cut. A line that says more follow, "
+               "under a list that is whole",
+        "module": "inventory",
+        "old": '    if len(missing) > most:',
+        "new": '    if len(missing) >= most:',
+        "tests": [
+            "tests.test_unanswered_sections.WhatIsSaidBesideTheResult."
+            "test_a_list_of_exactly_that_many_is_given_whole",
+        ],
+    },
+    {
+        "what": "inventory.unanswered — the list of sections answered in "
+                "fewer passes is not cut",
+        "why": "only the list of sections not read was tested for its cut. "
+               "A run where one pass fails throughout lists every section",
+        "module": "inventory",
+        "old": '                  for entry in short[:most]]',
+        "new": '                  for entry in short]',
+        "tests": [
+            "tests.test_unanswered_sections.WhatIsSaidBesideTheResult."
+            "test_the_list_of_those_answered_in_fewer_passes_is_cut_the_same",
+        ],
+    },
+    {
+        "what": "inventory.unanswered — and when cut it does not say how "
+                "many more",
+        "why": "a list that stops at twelve with nothing under it reads as "
+               "twelve",
+        "module": "inventory",
+        "old": '        if len(short) > most:',
+        "new": '        if False:',
+        "tests": [
+            "tests.test_unanswered_sections.WhatIsSaidBesideTheResult."
+            "test_the_list_of_those_answered_in_fewer_passes_is_cut_the_same",
+        ],
+    },
+    {
+        "what": "claim.py — a run of no pass is run",
+        "why": "`--runs 0` asked about no section and printed \"0 "
+               "finding(s)\". With sections counted it named every one as "
+               "\"extraction failed\", of calls that were never made, and "
+               "`--runs -1` wrote a record no reader would take",
+        "module": "claim",
+        "old": '    if args.runs < 1:',
+        "new": '    if False:',
+        "tests": [
+            "tests.test_unanswered_sections.ClaimIndex."
+            "test_a_run_of_no_pass_is_refused",
+        ],
+    },
+    {
+        "what": "claim.py — and a run of one pass is refused with it",
+        "why": "the other side of that line. One pass is a run, and every "
+               "test took the default of two",
+        "module": "claim",
+        "old": '    if args.runs < 1:',
+        "new": '    if args.runs < 2:',
+        "tests": [
+            "tests.test_unanswered_sections.ClaimIndex."
+            "test_and_a_run_of_one_pass_is_not",
+        ],
+    },
+    {
+        "what": "claim.extract — the count of sections that did not answer "
+                "carries into the next pass",
+        "why": "a section that failed in pass 1 and answered in pass 2 was "
+               "counted out of pass 2's line. The test had its section fail "
+               "in the last pass, where there is nothing to carry",
+        "module": "claim",
+        "old": '        silent = 0\n',
+        "new": '        silent = silent if run else 0\n',
+        "tests": [
+            "tests.test_unanswered_sections.ClaimIndex."
+            "test_the_count_of_answers_starts_again_with_each_pass",
+        ],
+    },
+    {
+        "what": "claim.py — the sections not read are named after the "
+                "findings",
+        "why": "said with the count, as the unjudged pairs are. Under a "
+               "long report it is the last thing on the screen, and the "
+               "test read everything after \"finding(s)\" as one piece",
+        "module": "claim",
+        "old": ('        for line in inventory.unanswered(read, NOT_READ, NOTHING_READ):\n'
+                '            print(line)\n'
+                '    print("=" * 74)'),
+        "new": ('        pass\n'
+                '    print("=" * 74)\n'
+                '    for line in (inventory.unanswered(read, NOT_READ, NOTHING_READ)\n'
+                '                 if read else ()):\n'
+                '        print(line)'),
+        "tests": [
+            "tests.test_unanswered_sections.ClaimIndex."
+            "test_and_it_is_said_between_the_count_and_the_findings",
+        ],
+    },
+    {
+        "what": "claim.py — --reuse believes whatever stands under "
+                "\"sections\"",
+        "why": "only an index with no record was tested. One whose list of "
+               "the unread was emptied says three of four answered and "
+               "none is missing, and prints nothing",
+        "module": "claim",
+        "old": ('        read = saved.get("sections") \\\n'
+                '            if inventory.is_answers(saved.get("sections")) else None'),
+        "new": '        read = saved.get("sections")',
+        "tests": [
+            "tests.test_unanswered_sections.ClaimIndex."
+            "test_nor_is_one_whose_record_does_not_add_up",
+        ],
+    },
+    {
+        "what": "undefined.py — a partial run is told what a run that read "
+                "nothing is told",
+        "why": "the consequence line is this tool's own: terms are missed, "
+               "none is wrongly listed. No test asserted its words",
+        "module": "undefined",
+        "old": '    for line in inventory.unanswered(read, NOT_READ, NOTHING_READ):',
+        "new": '    for line in inventory.unanswered(read, NOTHING_READ, NOTHING_READ):',
+        "tests": [
+            "tests.test_unanswered_sections.UndefinedTerms."
+            "test_and_what_that_costs_the_list_is_said_with_it",
+        ],
+    },
+    {
+        "what": "bundle.py — the note is on the page and not in the sheet",
+        "why": "the defect as the review found it. Two outputs of one pass: "
+               "the page said 3 of 4 sections, and the sheet, built from the "
+               "findings alone, listed the terms as the document's",
+        "module": "bundle",
+        "old": '    write_xlsx(xlsx_path, args.doc[:31], HEADERS, note_rows(notes) + rows)',
+        "new": '    write_xlsx(xlsx_path, args.doc[:31], HEADERS, rows)',
+        "tests": [
+            "tests.test_unanswered_sections.WhatReadsTheFiles."
+            "test_and_in_the_sheet_above_the_terms",
+            "tests.test_unanswered_sections.WhatReadsTheFiles."
+            "test_one_made_from_an_older_list_keeps_its_terms_and_says_so",
+            "tests.test_unanswered_sections.WhatReadsTheFiles."
+            "test_and_beside_other_findings_the_bundle_says_so_everywhere",
+        ],
+    },
+    {
+        "what": "bundle.py — the note is the last row of the sheet",
+        "why": "a reviewer who stops halfway has read the terms and not "
+               "the row that qualifies them",
+        "module": "bundle",
+        "old": '    write_xlsx(xlsx_path, args.doc[:31], HEADERS, note_rows(notes) + rows)',
+        "new": '    write_xlsx(xlsx_path, args.doc[:31], HEADERS, rows + note_rows(notes))',
+        "tests": [
+            "tests.test_unanswered_sections.WhatReadsTheFiles."
+            "test_and_in_the_sheet_above_the_terms",
+        ],
+    },
+    {
+        "what": "bundle.UNSAID — a file that does not say is called partial",
+        "why": "\"NOT THE WHOLE DOCUMENT\" stood over every terms file "
+               "written before 2026-10-04, the ones from complete runs "
+               "among them. Not known is not all, and it is not some either",
+        "module": "bundle",
+        "old": 'UNSAID = ("NOT KNOWN TO BE THE WHOLE DOCUMENT: the undefined terms come from "',
+        "new": 'UNSAID = ("NOT THE WHOLE DOCUMENT: the undefined terms come from "',
+        "tests": [
+            "tests.test_unanswered_sections.WhatReadsTheFiles."
+            "test_a_file_that_does_not_say_is_not_called_partial",
+            "tests.test_unanswered_sections.WhatReadsTheFiles."
+            "test_one_made_from_an_older_list_keeps_its_terms_and_says_so",
+        ],
+    },
+    {
+        "what": "bundle.terms_note — a run no section answered is noted "
+                "like one that missed a few",
+        "why": "the no-result case, in the reader. \"0 of the document's 4 "
+               "sections\" under the words for a partial run lets an empty "
+               "list of terms stand as a result",
+        "module": "bundle",
+        "old": ('    if not read["answered"]:\n'
+                '        return (f"NOTHING WAS READ: undefined terms'),
+        "new": ('    if False:\n'
+                '        return (f"NOTHING WAS READ: undefined terms'),
+        "tests": [
+            "tests.test_unanswered_sections.WhatReadsTheFiles."
+            "test_a_run_no_section_answered_gets_words_of_its_own",
+            "tests.test_unanswered_sections.WhatReadsTheFiles."
+            "test_a_run_no_section_answered_is_not_a_bundle_with_no_input",
+            "tests.test_unanswered_sections.WhatReadsTheFiles."
+            "test_and_beside_other_findings_the_bundle_says_so_everywhere",
+        ],
+    },
+    {
+        "what": "bundle.py — a file that holds no finding was not found",
+        "why": "the defect as the review found it: \"no inputs found — "
+               "check --undefined\", of a terms file that was found and "
+               "says no section answered. The record was dropped",
+        "module": "bundle",
+        "old": '    if not named:\n        return "no inputs found',
+        "new": '    if True:\n        return "no inputs found',
+        "tests": [
+            "tests.test_unanswered_sections.WhatReadsTheFiles."
+            "test_a_run_no_section_answered_is_not_a_bundle_with_no_input",
+        ],
+    },
+    {
+        "what": "bundle.undefined_terms — a file with no list of terms is a "
+                "file with no terms",
+        "why": "as this change first had it. A claim index passed as "
+               "--undefined, whose record says every section answered, "
+               "gave a bundle with no undefined term and not a word",
+        "module": "bundle",
+        "old": ('        raise ValueError(\'not a terms file: it is neither a list of terms \'\n'
+                '                         \'nor an object with one under "terms"\')'),
+        "new": '        terms = []',
+        "tests": [
+            "tests.test_unanswered_sections.WhatReadsTheFiles."
+            "test_a_file_with_no_list_of_terms_is_not_a_terms_file",
+            "tests.test_unanswered_sections.WhatReadsTheFiles."
+            "test_a_file_that_is_not_a_terms_file_stops_the_bundle",
+        ],
+    },
+    {
+        "what": "bundle.collect — a file that cannot be read as a terms "
+                "file is left out of the bundle",
+        "why": "the bundle is then made from the other inputs and says "
+               "nothing of the terms it was given and could not read: a "
+               "claim index passed by mistake, or a terms file cut off "
+               "mid-write, which undefined.py can leave behind",
+        "module": "bundle",
+        "old": '                sys.exit(f"{args.undefined}: {error}")',
+        "new": '                terms, read = [], None',
+        "tests": [
+            "tests.test_unanswered_sections.WhatReadsTheFiles."
+            "test_a_file_that_is_not_a_terms_file_stops_the_bundle",
+            "tests.test_unanswered_sections.WhatReadsTheFiles."
+            "test_nor_does_one_cut_off_mid_write",
+        ],
+    },
+    {
+        "what": "score-claims — a record that does not add up is scored as "
+                "it stands",
+        "why": "only an index with no record was tested. The same check as "
+               "--reuse makes, in the other reader of the index",
+        "module": "score-claims",
+        "old": '    if not inventory.is_answers(read):\n        said.append(UNSAID)',
+        "new": '    if read is None:\n        said.append(UNSAID)',
+        "tests": [
+            "tests.test_unanswered_sections.WhatReadsTheFiles."
+            "test_and_of_one_whose_record_does_not_add_up",
+        ],
+    },
+    {
+        "what": "score-claims — an index no section answered is scored "
+                "like one that missed a few",
+        "why": "every MISSED under it is a defect nobody looked for. Said "
+               "in the words for a partial index, the score reads as one",
+        "module": "score-claims",
+        "old": ('    elif not read["answered"]:\n'
+                '        said.append(f"NOTHING WAS READ: the index was answered on 0 of "'),
+        "new": ('    elif False:\n'
+                '        said.append(f"NOTHING WAS READ: the index was answered on 0 of "'),
+        "tests": [
+            "tests.test_unanswered_sections.WhatReadsTheFiles."
+            "test_and_of_one_no_section_answered",
+        ],
+    },
+    {
+        "what": "score-claims — a score says nothing of the sections a "
+                "pass failed on",
+        "why": "the index lists them and the score did not. A claim only "
+               "the pass that failed would have returned is not in the "
+               "index, and the defect it belongs to is scored MISSED",
+        "module": "score-claims",
+        "old": '    if inventory.is_answers(read) and read["short"]:',
+        "new": '    if False:',
+        "tests": [
+            "tests.test_unanswered_sections.WhatReadsTheFiles."
+            "test_and_of_a_section_a_pass_failed_on",
+        ],
+    },
+    {
+        "what": "score-claims — a score says nothing of the pairs nobody "
+                "judged",
+        "why": "the defect as the review found it, and older than this "
+               "change: six candidate pairs, every judging call failed, and "
+               "the score read \"recall 0/1\" and MISSED over the pair that "
+               "is the defect. A failure to measure is not a miss",
+        "module": "score-claims",
+        "old": ('    elif pairs:\n'
+                '        said.append(f"{len(pairs)} candidate pair(s) could not be judged, "'),
+        "new": ('    elif False:\n'
+                '        said.append(f"{len(pairs)} candidate pair(s) could not be judged, "'),
+        "tests": [
+            "tests.test_unanswered_sections.WhatReadsTheFiles."
+            "test_and_of_the_pairs_nobody_judged",
+        ],
+    },
+    {
+        "what": "score-claims — an index that does not say which pairs "
+                "were judged is taken to have judged them all",
+        "why": "every index written before claim.py kept its unjudged "
+               "pairs dropped them without a word. Not known is not none",
+        "module": "score-claims",
+        "old": '        said.append(UNJUDGED_UNSAID)',
+        "new": '        pass',
+        "tests": [
+            "tests.test_unanswered_sections.WhatReadsTheFiles."
+            "test_an_index_that_does_not_say_which_pairs_were_judged",
+            "tests.test_unanswered_sections.WhatReadsTheFiles."
+            "test_nor_one_whose_record_of_them_cannot_be_read",
+        ],
+    },
+    {
+        "what": "score-claims — a MISSED defect whose pair was never "
+                "judged is not marked",
+        "why": "\"may be one of them\" beside the score leaves the reader "
+               "to work out which. The index holds the pairs, so the score "
+               "can say which defect was not measured",
+        "module": "score-claims",
+        "old": '        if any(matches(pair, entry) for pair in not_judged):',
+        "new": '        if False:',
+        "tests": [
+            "tests.test_unanswered_sections.WhatReadsTheFiles."
+            "test_a_missed_defect_that_an_unjudged_pair_matches_says_so",
+        ],
+    },
+    {
+        "what": "score-claims — every MISSED defect is marked once any "
+                "pair went unjudged",
+        "why": "the mark is a claim about one defect. A defect no pair was "
+               "ever made for is a miss, and marking it excuses it",
+        "module": "score-claims",
+        "old": '        if any(matches(pair, entry) for pair in not_judged):',
+        "new": '        if not_judged:',
+        "tests": [
+            "tests.test_unanswered_sections.WhatReadsTheFiles."
+            "test_a_missed_defect_that_an_unjudged_pair_matches_says_so",
+        ],
+    },
+    {
+        "what": "synthesize.moved — after an entry that says nothing, a "
+                "blank line ties a heading with nothing in it",
+        "why": "the one chunk in doubt is then the one that ties the text, "
+               "and an inventory no chunk of which starts on a heading is "
+               "accepted",
+        "module": "synthesize",
+        "old": '            if first.lstrip("#").strip() == heading and (heading or first):',
+        "new": '            if first.lstrip("#").strip() == heading and (heading or first or blind):',
+        "tests": [
+            "tests.test_pointers.WhichDocument."
+            "test_nor_after_an_entry_that_says_nothing",
         ],
     },
     # An inventory that is not as inventory.py writes one. synthesize.py took
@@ -2128,9 +3447,10 @@ MUTATIONS = [
         "what": 'synthesize.read_items — a null in a list is an item that could '
                 'not be read',
         "why": 'a null holds nothing that could be anything. Set aside as an '
-               "input that was not read, one null among one section's inputs "
-               'made a question of each of the 26 orphans the fixture '
-               'inventory has with --no-embed',
+               'input that was not read, one null among one section\'s inputs '
+               'makes a question of every orphan in the document, and beside '
+               'each the report says that a section holds an input that was '
+               'not read, where no input was',
         "module": "synthesize",
         "old": '            if item is None:\n'
                '                continue\n',
@@ -2211,8 +3531,8 @@ MUTATIONS = [
                'inputs is not text, so it was no consumer, and the output it '
                'names was an orphan, asserted',
         "module": "synthesize",
-        "old": '                                     holding("consumes"),',
-        "new": '                                     holding(),',
+        "old": '                    open_question(holding("consumes"),',
+        "new": '                    open_question(holding(),',
         "tests": [
             "tests.test_malformed_inventory.WhatAnItemSetAsideCouldHaveAnswered."
             "test_an_input_could_be_what_consumes_an_output",

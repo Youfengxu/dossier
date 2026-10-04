@@ -13,13 +13,13 @@ sound inventory:
     "consumes": [{"name": ...}]      the same orphan, asserted
     a file that is not JSON          a traceback
 
-The last test here puts 14 odd values, one at a time, in each of 145 places
-of a sound inventory, and takes each key out in turn: 2,081 inventories that
-differ from the sound one. By this file's own statement of the shape, 1,253 of
+The last test here puts 14 odd values, one at a time, in each of 147 places
+of a sound inventory, and takes each key out in turn: 2,109 inventories that
+differ from the sound one. By this file's own statement of the shape, 1,281 of
 them are still sound (a text replaced by another text, a key no list is asked
 for). The other 828 are not: 27 are no inventory at all, 578 have an entry
 that is not a section, and 223 an item that cannot be read. The code as it was
-raised on 239 of the 2,081, five of them sound ones whose `runs` was not a
+raised on 239 of the 2,109, five of them sound ones whose `runs` was not a
 number, and reported on 536 of the 828 with no word of anything unread. Those
 are the worse ones: a run that exits 0 over a section it could not read
 reports that section's silence as the document's. against(), at the foot of
@@ -275,8 +275,9 @@ class AFileThatIsNotAnInventory(Odd):
 
     def test_a_number_too_long_for_python_to_read(self):
         """Five thousand digits. From Python 3.11 int() will not turn them
-        into a number, and says so with the error it uses for text that is
-        not JSON, which this is. An older Python reads them."""
+        into a number, and the parser passes its error on. The file is JSON
+        all the same, and is not called anything else. An older Python reads
+        them."""
         report = self.run_main(json.dumps(
             {"doc": "d", "runs": 3, "sections": SOUND,
              "source_sha256": self.freeze()}).replace(
@@ -291,9 +292,9 @@ class AFileThatIsNotAnInventory(Odd):
             self.assertIn("inventory: 3 of 3 sections read", report)
 
     def test_a_file_nested_too_deeply_for_python_to_parse(self):
-        """It is JSON all the same, and was called "not JSON". How deep is
-        too deep differs from one Python to the next, so the parser is made
-        to give up here."""
+        """It is JSON all the same, and is not called anything else. How
+        deep is too deep differs from one Python to the next, so the parser
+        is made to give up here."""
         with mock.patch.object(synthesize.json, "load",
                                side_effect=RecursionError("too deep")):
             self.assertEqual(
@@ -302,7 +303,7 @@ class AFileThatIsNotAnInventory(Odd):
                 "Python can read.\n")
 
     def test_a_byte_order_mark_in_front_of_the_file_is_not_part_of_it(self):
-        """An editor puts one there. It made the file "not JSON"."""
+        """An editor puts one there, and the parser will not have it."""
         report = self.run_main("\ufeff" + json.dumps(
             {"doc": "d", "runs": 3, "sections": SOUND,
              "source_sha256": self.freeze()}))
@@ -343,10 +344,10 @@ class AnEntryThatIsNotASection(Odd):
                           "  [the inventory holds nothing for it]")
 
     def test_an_entry_with_an_error_was_not_read_whatever_the_error_says(self):
-        """`"error": ""` beside `"skipped": true` gave an empty reason, and an
-        entry with an empty reason was taken for a section that had been
-        read. One with no lists in it raised, and a whole section marked that
-        way was used."""
+        """The reason `"error": ""` gives beside `"skipped": true` is empty,
+        and an empty reason is not no reason. A first version of this check
+        took it for none: the entry went on to be read as a section, and one
+        with no lists in it raised."""
         unsaid = "skipped, and the inventory does not say why"
         for entry, why in (
                 ({"error": "", "skipped": True}, unsaid),
@@ -820,8 +821,8 @@ class WhatAnItemSetAsideCouldHaveAnswered(Odd):
             "read, which could be this: 2. Hydrology Model (d:21-40)")
 
     def test_a_claim_is_one_that_d3_did_not_check(self):
-        """It dropped out of the count: "checked 1 of 1" where the section
-        holds two."""
+        """It is one of the section's claims all the same, and is counted
+        among those D3 did not check, with the reason."""
         report = self.read(sections(
             0, evidence_claims=[CLAIM, "Limits are in Section 3", 5]))
         self.set_aside(report, items=2)
@@ -832,13 +833,17 @@ class WhatAnItemSetAsideCouldHaveAnswered(Odd):
         self.assertNotIn("no place to check against", report)
 
     def test_and_a_score_says_how_many_items_it_was_made_without(self):
+        """Under the line that says what the inventory left unread, which is
+        printed for this too."""
         planted = [{"id": "GT-D8-001", "class": "D8", "title": "t",
                     "lines": [1, 60]}]
         report = self.scored(sections(1, consumes=[5, True]), planted)
         self.assertIn(
             "  scored over an inventory that left 0 section(s) unread, 0 read "
-            "in part and 0 read in\n  fewer passes than asked, with 2 item(s) "
-            "not read: a miss may be", report)
+            "in part and 0 read in\n  fewer passes than asked, and has 0 "
+            "line(s) in no section: a miss may be", report)
+        self.assertIn("\n  The inventory also holds 2 item(s) that could not "
+                      "be read.\n", report)
         report = self.scored(sections(1, consumes=[]), planted)
         self.assertNotIn("scored over an inventory", report)
 
@@ -848,7 +853,9 @@ class WhatAnItemSetAsideCouldHaveAnswered(Odd):
         planted = [{"id": "GT-D8-001", "class": "D8", "title": "t",
                     "lines": [1, 60]}]
         for entry, left in (
-                (5, "1 section(s) unread, 0 read in part and 0 read in"),
+                ({"error": "x", "heading": "2. Hydrology Model",
+                  "locator": "d:21-40"},
+                 "1 section(s) unread, 0 read in part and 0 read in"),
                 # As the fallback left one before its passes were counted.
                 ({key: held for key, held in
                   {**HYDROLOGY, "degraded": True, "consumes": []}.items()
@@ -858,7 +865,9 @@ class WhatAnItemSetAsideCouldHaveAnswered(Odd):
                  "0 section(s) unread, 0 read in part and 1 read in")):
             report = self.scored([FABRIC, entry, REGISTER], planted)
             self.assertIn(f"  scored over an inventory that left {left}\n  "
-                          f"fewer passes than asked: a miss may be", report)
+                          f"fewer passes than asked, and has 0 line(s) in no "
+                          f"section: a miss may be", report)
+            self.assertNotIn("also holds", report)
 
 
 class WhatIsTakenOfAnItem(Odd):
@@ -867,9 +876,9 @@ class WhatIsTakenOfAnItem(Odd):
     def test_a_key_its_list_is_not_asked_for_is_not_carried(self):
         """`points_to` on an authority entry, `owner` on a claim or on a
         deferral. None is what its list is asked for, so none is checked, and
-        the item is read. Every key of an item used to be carried: the first
-        was joined as a list of places, the others were cut to length where a
-        finding is printed, and each raised."""
+        the item is read. None is taken either: every key of an item used to
+        be carried, and a number under one of these, read as text where a
+        finding is printed, raises."""
         self.all_read(self.read(sections(1, authority=[
             {**OWNS, "points_to": [1, 2], "to": 5}])))
         report = self.read(sections(
@@ -1123,9 +1132,9 @@ class WhereAnEntryThatWasNotReadSaysItIs(Odd):
                               "source_sha256": EXTRACTED}, extracted=True)
 
     def test_one_that_does_not_say_where_in_text_says_nothing(self):
-        """A heading given as a list was compared with the line all the
-        same, and the document was "not the text this inventory was built
-        from"."""
+        """A heading given as a list is not the line its locator names.
+        Compared with it all the same, the document is "not the text this
+        inventory was built from"."""
         for changed in ({"heading": ["3. Calibration Register"]},
                         {"heading": 5}, {"locator": ["d:41-60"]},
                         {"locator": 41}):
@@ -1439,6 +1448,20 @@ class WhatInventoryPyWrites(Odd):
                     bool(aside), said)
                 self.assertEqual("ITEMS NOT READ" in report, bool(aside), said)
 
+    def test_the_file_it_writes_is_one_this_reads(self):
+        """With the hash of the text and the lines that are in no section,
+        which inventory.py has written since 2026-10-04."""
+        digest = self.freeze()
+        written = inventory.record(
+            "d", {"source_sha256": digest, "text_sha256": digest}, 3,
+            [catalogued(index, *(Model(reply(index)) for _ in range(3)))
+             for index in range(3)], [])
+        report = self.run_main(written)
+        self.all_read(report)
+        self.assertIn("no line that holds text is outside those 3 sections",
+                      report)
+        self.assertEqual(self.findings(report), {})
+
     def test_a_section_it_could_not_read_is_one_this_did_not_read(self):
         entry = catalogued(2, Model(), Model())
         self.not_read(self.read([FABRIC, HYDROLOGY, entry]),
@@ -1546,7 +1569,8 @@ def places(data):
     """Every path at which one value of the file can be replaced or taken
     out, or a key added to an item."""
     yield ()
-    for key in ("doc", "runs", "sections", "source_sha256"):
+    for key in ("doc", "runs", "sections", "source_sha256", "text_sha256",
+                "unread_lines"):
         yield (key,)
     for index, entry in enumerate(data["sections"]):
         yield ("sections", index)
@@ -1646,7 +1670,7 @@ def against(path):
     test above makes: the figures at the top of this file. For the code as
     it was before the shape was checked, from the root of the repository:
 
-        git show c239184:synthesize.py > /tmp/as-it-was.py
+        git show a7ee99c:synthesize.py > /tmp/as-it-was.py
         python -m tests.test_malformed_inventory --against /tmp/as-it-was.py
     """
     import collections

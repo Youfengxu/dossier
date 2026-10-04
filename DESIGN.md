@@ -49,6 +49,86 @@ recognising the situation is the hard part, not fixing it:
   so a reader cannot mistake thin evidence for agreement;
 - never let a tie be broken by iteration order.
 
+**Two more turned up on 2026-10-04**, both in tools that take a document a
+section at a time, and neither with an error:
+
+| where | what happened | what it printed |
+|---|---|---|
+| `inventory.py` | its splitter left lines in no section, and nothing checked | "reading 100% of the document" (§3.21) |
+| `claim.py`, `undefined.py` | a section whose call failed came back as `[]`, which is what a section with nothing in it comes back as, and `--limit` cut the list of sections without a word | "4/4 sections", "0 finding(s)", "d: 2 sections" of four |
+
+What was decided for the second. Two of these the author chose, and say so.
+The rest the author delegated, on condition that each is written down, and
+they are here so that any of them can be overruled:
+
+- a failed call is `None` and never `[]`, and a run counts the sections it
+  asked and the ones that answered;
+- the count is printed beside the result it qualifies, the sections that did
+  not answer are named with the reason, and a run in which none answered says
+  NOTHING WAS READ: "0 finding(s)" over nothing is not a clean document;
+- the exit status stays 0, as it does in `inventory.py` when sections fail.
+  The author chose that over a non-zero exit, which would also have failed
+  `smoke.py`, whose stub answers no section validly;
+- a section `--limit` stopped before is listed with the ones that failed, and
+  one that answered in some of several passes is read, and listed apart;
+- the record is written with the result. `undefined.py`'s file was a bare
+  list of terms with nowhere to put it and is now an object, which the author
+  chose over a second file; `bundle.py` reads both;
+- a file with no such record, or one whose counts do not add up, is said not
+  to say how many sections it rests on. It is never taken for the whole
+  document: not known is not all;
+- what reads those files says what they say: `score-claims.py` and
+  `undefined.py --score` beside the score, `bundle.py` on the reviewer's page;
+- nothing is marked `unverifiable`. Neither tool asserts an absence over the
+  sections it did not read (one checks a definition against the whole text,
+  the other compares the claims it has), so what an unread section costs is a
+  finding missed, and the output says that in those words;
+- neither tool checks at run time that every line of the document is in a
+  section, as `inventory.py` does (§3.21). Both cut the document with its
+  splitter, which holds that by construction and under test.
+
+**That change was then reviewed on its code, by a reviewer given no account
+of it**, and the readers were where it fell short. Each of these was
+reproduced before it was touched, and each is a delegated decision:
+
+| what the review found | what was decided |
+|---|---|
+| `bundle.py` put the note on its page and not in its sheet, which is built from the findings alone | the notes are rows of the sheet, under its header and above every finding |
+| a terms file from a run no section answered holds no term, and `bundle.py` stopped with "no inputs found", sending its reader to check the flags | it stops with "nothing to bundle: no finding in" the files it did find, and what they say of their sections. "no inputs found" is kept for when none was. A bundle of no finding is still not written |
+| "NOT THE WHOLE DOCUMENT" stood over every terms file written before the record existed, the complete runs among them | three things under three names: NOT KNOWN TO BE THE WHOLE DOCUMENT, NOTHING WAS READ, NOT THE WHOLE DOCUMENT |
+| an object with no list of terms was read as a file with no terms. This change did that: before it such a file stopped the bundle with a traceback | it stops the bundle again, with the file's name and "not a terms file" |
+| `score-claims.py` said nothing of the pairs `claim.py` could not judge, which is older than this change, nor of the sections a pass failed on: "recall 0/1" and MISSED, over a defect whose pair was never judged | both are said beside the score, an index that does not record its unjudged pairs is said not to say, and a MISSED defect that an unjudged pair matches says so under its own line |
+| `claim.py --runs 0` made no call, and named every section as "extraction failed" | refused as a usage error, before anything is read |
+| a text with no section in it said so on the run's first line, and its result and its file read as a document answered in full | NOTHING WAS READ, beside the result, and to every reader of the file |
+
+**The score's figures were not changed, and that is the decision most worth
+a second look.** Recall still counts a defect whose pair was never judged as
+missed. For a figure that is reported, the rule is the other one: a failure
+to measure is left out and reported as left out. The score now names which
+defects those are, so whoever carries a figure out of a run with unjudged
+pairs can leave them out; doing it in the scorer would change what the recall
+figures already in this file mean, and was not done on the author's behalf.
+
+Three things the review found were left as they are, each for a reason:
+
+- `synthesize.moved()` does not see a line added between two sections in a
+  row that share a heading (two tables that each open on a bare "#"). The
+  second chunk looks exactly like a later piece of the first, and nothing an
+  entry holds tells them apart, so there is no check to add. The limit is in
+  its docstring and pinned by a test. It bears only on an inventory that
+  does not record the hash of its text (they do since 2026-10-04), of a
+  document that is not Markdown;
+- a terms entry whose `uses` is not a number, and an index that is not an
+  object, each stop their reader with a traceback. That is loud, and already
+  on the cautious side. `undefined.py` still writes its file in place, where
+  `claim.py` renames one into place; a terms file cut off mid-write is not
+  JSON, and stops the bundle by name;
+- `--limit -1` reads all but the last section. It says so and its counts add
+  up, here as in `inventory.py`.
+
+The same review ran 48 mutations of its own against the whole suite, and 16
+went unnoticed. Each of the 16 has a test now.
+
 *Sibling candidates not hoisted, for later judgement:* §3.4 (the model may not
 invent the evidence for its own verdict), §3.12 (ground truth is a hypothesis,
 not an oracle), §3.17 (where a deterministic check exists, it wins). Each may be
@@ -460,7 +540,8 @@ rather than whether an obligation is met. Description, not judgement.
   97%, not the 83% at 52k (§3.18)
 - no agent asserts absence. Absence is a property of the whole document, and
   becomes a deterministic query over a finished inventory
-- 100% coverage instead of 47%
+- 100% coverage instead of 47% (of the lines that hold text; checked on every
+  run since 2026-10-04, and not true before it: the second note below)
 
 Measured on the fixture: 72 sections yield 84 capabilities, 127 identifiers, 62
 evidence claims, 20 authority assertions, 8 deferrals, 24 produces / 31 consumes.
@@ -497,12 +578,12 @@ inventory.** The extraction stage is not the hard part.
 > and that each item of a section's lists is what the list is asked for. The
 > last test of `tests/test_malformed_inventory.py` changes a sound inventory
 > of three sections in one place at a time. It puts each of 14 odd values in
-> each of 145 places and takes each key out, which makes 2,081 inventories
+> each of 147 places and takes each key out, which makes 2,109 inventories
 > that differ from the sound one. By the test's own statement of the shape,
-> 1,253 of them are still sound (a text replaced by another text, a key no
+> 1,281 of them are still sound (a text replaced by another text, a key no
 > list is asked for) and 828 are not: 27 are no inventory at all, 578 have an
 > entry that is not a section, and 223 have an item that cannot be read. The
-> code as it was raised on 239 of the 2,081, and a run that raises loses every
+> code as it was raised on 239 of the 2,109, and a run that raises loses every
 > finding of every class. A section given as a number and a heading of -1 are
 > two of those; five were sound inventories whose `runs` was not a number. It
 > reported on 536 of the 828 with no word of anything unread, and those
@@ -567,11 +648,13 @@ inventory.** The extraction stage is not the hard part.
 >   and it is the false assertion this note opens with.
 > - *Refuse its section.* The first version of this check did, and called the
 >   entry "not as inventory.py writes it", which was untrue of 33 of the 34
->   shapes. It also cost a run everything. On the committed fixture inventory
->   (74 sections; 35 candidates with `--no-embed`, all asserted), one
->   authority entry's quote given as a list of two left 73 of 74 sections
->   read and all 35 candidates `unverifiable`, because an unread section can
->   answer any absence. An independent review of that version found both.
+>   shapes. It also cost a run everything. On the committed fixture
+>   inventory, measured on the code as it was before the lines in no section
+>   were counted (the note further down), when all 35 of the candidates it
+>   has with `--no-embed` were asserted, one authority entry's quote given
+>   as a list of two left 73 of 74 sections read and all 35 `unverifiable`,
+>   because an unread section can answer any absence. An independent review
+>   of that version found both.
 > - *Set the item aside.* `read_items()` does this. The section is read. The
 >   item is not used. It is counted, and named on the inventory line under
 >   ITEMS NOT READ with what is wrong with it. An absence that it could have
@@ -597,8 +680,9 @@ inventory.** The extraction stage is not the hard part.
 >   and nothing is decided on it, so it is not shown and the item is read.
 > - *A null in a list.* It is an empty place and not an item: it holds
 >   nothing that could be anything. Counted as an input that was not read,
->   one null made a question of each of the 26 orphans the fixture has with
->   `--no-embed`.
+>   one null made a question of every orphan, 26 of them on the fixture with
+>   `--no-embed` as it was then read, each with "a section holds an input
+>   that was not read" beside it where no input was.
 > - *A key the list is not asked for.* `"owner": 5` on a claim is not
 >   checked, and it is not read either: of a mapping, the keys its list is
 >   asked for are taken and no others.
@@ -642,11 +726,13 @@ inventory.** The extraction stage is not the hard part.
 >
 > Not done. `inventory.py`'s validators still let through every item this
 > sets aside, where a stricter validator would have asked the model again.
-> An inventory with no entry for a section of the document says "2 of 2
-> sections read" beside a document of three headings, and its absences are
-> asserted: the inventory is held to its own shape here, not to the
-> document. A count of `passes` above the `runs` the file gives is not
-> remarked on. Only a value of the wrong kind is cut to fit a line: a
+> The inventory is held to its own shape here and not to the document: an
+> entry taken out of the file is seen only as a gap between its neighbours'
+> line numbers (the note on lines in no section, further down). One taken
+> off the end is not seen, nor one taken out of an inventory whose
+> `unread_lines` says that no line was left out, and the absences it could
+> answer are asserted. A count of `passes` above the `runs` the file gives
+> is not remarked on. Only a value of the wrong kind is cut to fit a line: a
 > heading of 5,000 characters is printed whole. A pointer of 80,000
 > characters takes this half a minute, the time growing with the square of
 > the length (the longest of the 354 at hand has 131). `components.yaml` and
@@ -744,11 +830,12 @@ inventory.** The extraction stage is not the hard part.
 > a numbered section is looked for in its sub-sections only, and is a question
 > when it is not found there.
 >
-> One consequence is not D3's to fix. The splitter leaves some lines in no
+> One consequence was not D3's to fix. The splitter left some lines in no
 > chunk (a numbered step replaced by the next, a passage of sixty characters
 > or fewer), and a claim about a section with such lines in it is
-> `unverifiable` where the rest of the section does not hold it. On the
-> fixture that is Section 12, whose lines 284 and 285 nothing read.
+> `unverifiable` where the rest of the section does not hold it. In the
+> committed inventory that is Section 12, whose lines 284 and 285 nothing
+> read. The splitter no longer does it: the next note.
 >
 > **Every arm on `inv-ablation.json` now emits one candidate fewer.** Reading
 > "Sections 2 to 13" as the pointer it is brought one more traceability
@@ -777,6 +864,80 @@ inventory.** The extraction stage is not the hard part.
 > change is 4 of 36 candidates to 4 of 35, recall 4 of 6 both times. The other
 > inventory quoted below (4 of 6 and 40 candidates) is not in the repository
 > either, so its figures cannot be re-run and stand as they were written.
+
+> **"100% coverage" was a constant, and until 2026-10-04 it was not true.**
+> `inventory.py` printed "reading 100% of the document" whatever its splitter
+> had done, and the splitter left two kinds of line in no section, where no
+> call is shown them. A heading-like line followed at once by another was
+> replaced by it, and a numbered list is a run of such lines, so each step
+> replaced the one before. A section of sixty characters or fewer was dropped
+> whole, heading included.
+>
+> Measured on the fixture with the splitter as it was: 572 of the 574 lines of
+> `deliverable-v1` were in a section (396 of the 398 that hold text), and 530
+> of the 532 of `deliverable-v2`. The sixty-character rule drops nothing in
+> either. The two lines are steps 2 and 3 of the per-tick sequence in the
+> fixture's Section 12, and step 3, "AS reorders the frozen execution order by
+> candidate severity and evaluates", is a corroborating anchor of the planted
+> D5 defect. A document nobody here wrote fares worse: `kep-1287`, at the
+> revision `fixtures/kep` pins, had 55 of its 1,467 lines that hold text in no
+> section, every one a step of a numbered list, and the KEP template lost its
+> Drawbacks section, a heading over a three-line comment, to the
+> sixty-character rule.
+>
+> The loss had been seen, and put down to the model. `claim.py` cuts with the
+> same splitter, and since the first commit its docstring had given this as
+> the example of extraction sampling a section instead of enumerating it:
+> "steps 1, 4 and 5 of a five-step sequence came back and step 3 … did not".
+> Steps 2 and 3 were in no section. The three that came back are the three
+> that were shown, and no number of passes returns a line no pass is given.
+>
+> The splitter now keeps both kinds. The first heading keeps its section and
+> the next becomes its first line of text, which is what a heading arriving
+> within `min_lines` already did; and a section is kept if it has a heading
+> line of its own or any text. Blank lines under no heading are all that is
+> still in no section. The claim is also checked now, which matters more than
+> the fix: on every run `inventory.py` compares the text of each section with
+> the lines its locator names, prints "100%" only when no line that holds text
+> is left out, and writes the lines that are into the inventory as
+> `unread_lines`, `[]` included. `synthesize.py` prints them under its
+> inventory line and marks an ownership gap or an orphan `unverifiable` when
+> there are any, because both assert an absence over every line. D3 asks the
+> same of the place a pointer names and of no other lines, as the note above
+> says.
+>
+> **Keeping the line would have cost D3 a false finding, had it still read
+> headings from the inventory.** A sub-heading on the line straight after its
+> parent, which is how `extract.py` lays out a `.docx`, used to replace the
+> parent and head the chunk. It is now the parent's first line of text, as a
+> heading within `min_lines` of the one before always was. Matched against the
+> headings of chunks, a pointer to it read "no such section in the document",
+> asserted: an independent review of this change found that by running it
+> against `synthesize.py` as it then was. D3 looks the heading up in the
+> document now, and where the document marks no headings or was not consulted
+> it asserts nothing, so which heading a chunk carries no longer decides a
+> finding. On the fixture the headings that head no chunk are the same 15.
+> Over the thirteen frozen documents of the floodtwin, kep, cm1, cuad and ntsb
+> fixtures they are 156 of 621 marked headings before and 154 now, three of
+> them new.
+>
+> The committed inventory was cut the old way and has the two lines in no
+> section. It records no `unread_lines`, so `synthesize.py` reads them off the
+> gap between its sections' line numbers, and says that it cannot see past the
+> last section or tell a blank line from text. Re-run on it in every arm of
+> §3.24–§3.30: no count, no score and no finding moves, and the eleven D8
+> candidates are marked `unverifiable`. A fresh cut of the same text differs
+> from it in one section of 74: lines 286–293, headed by step 4, become
+> 284–293, headed by step 2.
+>
+> **Whether reading step 3 would have found the D5 defect is not known.** Its
+> primary anchor is in Section 5.2, which was read. The inventory shows both
+> outcomes for the neighbours of the missing step: step 1, read as text, is
+> recorded as an authority entry, in two spellings; steps 4 and 5, read as
+> well, are recorded as capabilities and as no authority at all. Nothing has
+> been re-extracted, and "the D5 defect is missed in every arm" below is a
+> statement about an inventory that was never shown one of that defect's
+> three statements.
 
 > **§3.22–§3.31 were re-measured on 2026-08-19 and the numbers below are the old
 > ones.** Every "N of 6" in this range was produced by a scorer that has since
@@ -1146,6 +1307,8 @@ No new threshold — the action grouping reuses the object grouping's.
 > D5 defect is missed in every arm, baseline included, so this section's
 > both-directions verification survives only in the direction that says the
 > handoff is ignored. The other direction is untested here rather than refuted.
+> One of the defect's three statements was in no section of this inventory, so
+> no arm was shown it (§3.21).
 >
 > **The flag is the weakest of the four and should not be quoted as a faithful
 > restoration.** The fix itself lives in the extraction prompt, held constant
