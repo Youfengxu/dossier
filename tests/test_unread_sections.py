@@ -27,9 +27,11 @@ so run-tests.py --mutate reaches what is tested here.
 import contextlib
 import copy
 import csv
+import hashlib
 import io
 import json
 import os
+import re
 import shutil
 import sys
 import tempfile
@@ -86,7 +88,8 @@ def fallback(section, full_passes=0):
 
 
 class Run(unittest.TestCase):
-    """main() over an inventory written to a scratch project."""
+    """main() over an inventory written to a scratch project, beside the frozen
+    document it was built from."""
 
     def setUp(self):
         self.project = tempfile.mkdtemp()
@@ -94,9 +97,37 @@ class Run(unittest.TestCase):
     def tearDown(self):
         shutil.rmtree(self.project, ignore_errors=True)
 
+    def freeze(self, sections):
+        """Write the document these sections were split from, the way freeze.py
+        leaves one: each heading on the first line its section's locator
+        names. Returns its hash. Which sections a document has is the
+        document's to say (tests/test_pointers.py), so D3 calls a section
+        missing only with this beside the inventory."""
+        lines = []
+        for entry in sections:
+            entry = entry or {}
+            found = re.search(r":(\d+)-(\d+)$", str(entry.get("locator", "")))
+            if found and entry.get("heading") is not None:
+                lines += ["Body text."] * (int(found.group(2)) - len(lines))
+                lines[int(found.group(1)) - 1] = "## " + entry["heading"]
+        text = ("\n".join(lines) + "\n").encode("utf-8")
+        digest = hashlib.sha256(text).hexdigest()
+        os.makedirs(os.path.join(self.project, "parsed"), exist_ok=True)
+        with open(os.path.join(self.project, "parsed", "d.txt"), "wb") as handle:
+            handle.write(text)
+        with open(os.path.join(self.project, "parsed", "MANIFEST.json"),
+                  "w") as handle:
+            json.dump({"documents": [{"slug": "d", "role": "draft",
+                                      "path": "d.md",
+                                      "parsed": "parsed/d.txt",
+                                      "source_sha256": digest,
+                                      "text_sha256": digest}]}, handle)
+        return digest
+
     def run_on(self, sections, *extra, runs=3):
         with open(os.path.join(self.project, "inventory.json"), "w") as handle:
-            json.dump({"doc": "d", "runs": runs, "sections": sections}, handle)
+            json.dump({"doc": "d", "runs": runs, "sections": sections,
+                       "source_sha256": self.freeze(sections)}, handle)
         out, err, argv = io.StringIO(), io.StringIO(), sys.argv
         sys.argv = ["synthesize.py", "--project", self.project, "--no-embed",
                     *extra]
@@ -245,10 +276,8 @@ class AnAbsenceAnUnreadSectionCouldAnswer(Run):
         3.1, a table can sit anywhere, and a heading may be spelled "Section 3:
         ...". With a section unread, no D3 absence is asserted at all."""
         pointers = ("Section 3.1",                    # inside the unread section
-                    "Table 4",                        # in any section
                     "Section 9",                      # nothing like the heading
-                    "the calibration register section",          # by name alone
-                    "the Calibration Register section, page 12")
+                    "Section 9 and Appendix F")
         asserted = {}
         for pointer in pointers:
             claim = dict(FABRIC, evidence_claims=[
@@ -259,6 +288,21 @@ class AnAbsenceAnUnreadSectionCouldAnswer(Run):
             if "no such section in the document" in d3 or "unverifiable" not in d3:
                 asserted[pointer] = d3
         self.assertEqual(asserted, {})
+
+    def test_and_a_pointer_that_names_no_section_is_not_a_finding_at_all(self):
+        """A table can sit in any section and a section may be named by its
+        title alone. Neither is looked up, read or unread: it is counted among
+        the claims D3 did not check (tests/test_pointers.py)."""
+        listed = {}
+        for pointer in ("Table 4", "the calibration register section",
+                        "the Calibration Register section, page 12"):
+            claim = dict(FABRIC, evidence_claims=[
+                {"claim": "Calibration drift limits are recorded",
+                 "points_to": pointer, "quote": "q"}])
+            report = self.run_on([claim, HYDROLOGY, failed(REGISTER)])
+            if "D3" in self.findings(report) or "0 of 1 evidence claims" not in report:
+                listed[pointer] = report
+        self.assertEqual(listed, {})
 
     def test_nor_by_how_the_unread_heading_spells_its_number(self):
         asserted = {}
@@ -395,7 +439,9 @@ class WhatTheFallbackMayHaveWritten(Run):
         nowhere = dict(FABRIC, evidence_claims=[
             {"claim": "Calibration drift limits are recorded",
              "points_to": ["Section 9", "Appendix Q"], "quote": "q"}])
-        report = self.run_on([nowhere, HYDROLOGY, REGISTER])
+        mapping = dict(REGISTER, heading="Appendix A — Requirement mapping",
+                       locator="d:61-80")
+        report = self.run_on([nowhere, HYDROLOGY, REGISTER, mapping])
         self.assertIn("[D3] Section 9 and Appendix Q — no such section",
                       report)
 

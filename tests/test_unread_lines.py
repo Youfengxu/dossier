@@ -573,6 +573,12 @@ class Synthesized(unittest.TestCase):
     def head(self, report):
         return report.split("-- candidate defects")[0]
 
+    def listed(self, report):
+        """Everything printed from the findings on: the count of them and
+        each one. The header above says the word "unverifiable" for reasons
+        of its own (the document these inventories name is not frozen here)."""
+        return report.split("-- candidate defects")[1]
+
     def findings(self, report):
         """{class: the lines printed under it}, for each finding listed."""
         found, current = {}, None
@@ -653,7 +659,7 @@ class AnAbsenceALineInNoSectionCouldAnswer(Synthesized):
     def test_with_no_line_left_out_the_gap_and_the_orphan_are_findings(self):
         report = self.run_on(SECTIONS, unread_lines=[])
         self.assertEqual(sorted(self.findings(report)), ["D6", "D8"])
-        self.assertNotIn("unverifiable", report)
+        self.assertNotIn("unverifiable", self.listed(report))
 
     def test_an_orphan_a_line_in_no_section_could_consume(self):
         report = self.run_on(SECTIONS, unread_lines=[21, 22])
@@ -677,7 +683,7 @@ class AnAbsenceALineInNoSectionCouldAnswer(Synthesized):
         whole = [FABRIC, dict(HYDROLOGY, locator="d:21-40"), REGISTER]
         report = self.run_on(whole)
         self.assertEqual(sorted(self.findings(report)), ["D6", "D8"])
-        self.assertNotIn("unverifiable", report)
+        self.assertNotIn("unverifiable", self.listed(report))
 
     def test_two_owners_found_is_a_finding_whatever_was_left_out(self):
         def owning(entry, owner):
@@ -726,44 +732,15 @@ class AnAbsenceALineInNoSectionCouldAnswer(Synthesized):
                          {"D6": "unverifiable", "D8": "unverifiable"})
         self.assertIn("lines 21-22", rows["D8"]["reason"])
 
-    def test_limit_a_pointer_is_not_put_in_doubt_and_the_header_says_so(self):
-        """LIMIT (stated, not fixed). D3 asks whether the sections a pointer
-        names hold what a claim says they do, and an inventory cannot say
-        which section a line in none belongs to: that takes the document's
-        own outline. So a pointer to a section an older inventory dropped is
-        still called a pointer to no section. The header says that D3 is not
-        marked, so that the silence under the finding is not read as a check."""
-        claim = dict(FABRIC, evidence_claims=[
-            {"claim": "Calibration drift limits are recorded",
-             "points_to": "Section 9", "quote": "q"}])
-        report = self.run_on([claim, HYDROLOGY, REGISTER], unread_lines=[21, 22])
-        d3 = " ".join(self.findings(report)["D3"])
-        self.assertIn("no such section in the document", d3)
-        self.assertNotIn("unverifiable", d3)
-        self.assertIn("A pointer (D3)", self.head(report))
-        self.assertIn("NOT marked", self.head(report))
-
-    def test_bug_a_sub_heading_straight_under_its_parent_is_no_section_to_d3(self):
-        """BUG (reported, not fixed here), and one this change widens. D3
-        finds a section by the heading of a chunk. "5.1 Responsibility" on
-        the line after "5. Runtime Orchestrator" used to replace it and head
-        the chunk; it is now that chunk's first line of text, as a heading
-        within min_lines of the one before always was, and a pointer to it is
-        called a pointer to no section. Nothing is unread, so nothing marks
-        it. The remedy is to read the headings from the document."""
-        lines = [PROSE, PROSE, PROSE, PROSE,
-                 "5. Runtime Orchestrator", "5.1 Responsibility", PROSE, PROSE]
-        self.assertEqual(cut(lines), [(1, 4, "(front matter)"),
-                                      (5, 8, "5. Runtime Orchestrator")])
-        claim = dict(FABRIC, locator="d:1-4", evidence_claims=[
-            {"claim": "Tick scheduling duties are described",
-             "points_to": "Section 5.1", "quote": "q"}])
-        parent = dict(HYDROLOGY, heading="5. Runtime Orchestrator",
-                      locator="d:5-8")
-        report = self.run_on([claim, parent], unread_lines=[])
-        d3 = " ".join(self.findings(report)["D3"])
-        self.assertIn("Section 5.1 — no such section in the document", d3)
-        self.assertNotIn("unverifiable", d3)
+    def test_a_pointer_is_not_marked_for_a_line_of_some_other_place(self):
+        """D3 reads the lines of the place a pointer names, and says under
+        the finding when some of those are in no section
+        (tests/test_pointers.py). A line in none somewhere else is no reason
+        to doubt it, and the header says which findings are marked for it."""
+        report = self.run_on(SECTIONS, unread_lines=[21, 22])
+        self.assertIn("A pointer (D3) is put in", self.head(report))
+        self.assertIn("only where it is a line of the place it names",
+                      self.head(report))
 
     def test_a_score_says_what_the_inventory_did_not_read(self):
         with open(os.path.join(self.project, "ground-truth.yaml"), "w") as handle:

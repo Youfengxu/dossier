@@ -26,7 +26,7 @@ orchestrator, and deliberately so (`DESIGN` §3.22).
 | 3 | `closure.py` | two frozen revisions, `register-map.yaml`, `lexicon.yaml` | stdout; CSV with `--out` | no |
 | 4 | `obligations.py` | the frozen requirements document | `obligations.yaml` | yes — unless `--no-model` |
 | 5 | `trace.py` | `obligations.yaml`, the frozen deliverable, `lexicon.yaml` | `coverage.csv` | yes — chat **and** embeddings |
-| 6 | `synthesize.py` | `inventory.json` from `inventory.py`, `components.yaml` | stdout; candidate CSV with `--out` | embeddings; chat only with `--adjudicate` |
+| 6 | `synthesize.py` | `inventory.json` from `inventory.py`, the frozen text it was built from, `components.yaml` | stdout; candidate CSV with `--out` | embeddings; chat only with `--adjudicate` |
 | 7 | `verify.py` | `coverage.csv`, the frozen deliverable | `findings.csv` | yes |
 | 8 | `register.py` | `register-map.yaml`, both frozen revisions, and whichever of `coverage.csv` / candidates / synthesis / an `.xlsx` matrix exist | `review-<slug>.md` | no |
 
@@ -300,8 +300,30 @@ rather than asserted. `inventory.py` checks the other half, that every line
 which holds text is in a section: it compares each section's text with the
 lines its locator names, and writes the lines in none into the inventory as
 `unread_lines`. `synthesize.py` prints those too, and lists an ownership gap or
-an orphan over them as `unverifiable`. A pointer (D3) is not marked for them,
-and the report says so.
+an orphan over them as `unverifiable`. A pointer (D3) is put in doubt by such
+a line only where it is a line of the place the pointer names.
+
+One absence is not the inventory's to assert at all. Whether a section a
+pointer names is in the document is a question about the document, and the
+inventory keeps only the first heading of each chunk. So the untrue-self-claim
+query reads the headings from the frozen text, after checking that it is the
+text the inventory's line numbers are in, and looks for the claim in the
+chunks that cover the section's own lines.
+
+It stands behind a finding only where four things hold (`DESIGN` §3.21): the
+document marks its headings, which is a Markdown source with "#" on two of
+them or more; the pointer is its places and nothing else, "Section 14 and
+Appendix F" and not "Tables 4 and 5 of the calibration section"; each place
+is found under a heading that is one of the document's own, or shown to be
+missing; and every line of what was found is in a chunk that was read. What
+falls short of that is listed as `unverifiable` with the reason. Text
+extracted from a `.docx` or a `.pdf` does not say which of its lines are
+headings, and every rule tried for telling a heading from a cell of a table
+or a numbered step asserted something false about some document. So there
+the query reads the headings off the numbering only to decide where to look,
+passes a claim it finds, and lists the rest as `unverifiable`, as it does
+when the document cannot be consulted. Its header counts the evidence claims
+it checked and the ones it did not, by reason.
 
 ### Where it does not
 

@@ -391,6 +391,25 @@ def reading(sections, everything, beyond, left_out, concurrency):
     return said
 
 
+def record(slug, doc, runs, results, left_out):
+    """What is written to disk: the sections, which text they were read from,
+    and the lines of it that are in none of them.
+
+    `text_sha256` is the frozen text's own hash, and every locator below is a
+    line number in that text. Only the source's hash used to be kept, and a
+    re-freeze leaves that unchanged while it moves every line: synthesize.py
+    now looks sections up in the document by line, and has to be able to tell
+    that the document is still the one these line numbers are in.
+
+    `unread_lines` is written even when it is empty. synthesize.py asserts
+    absences over this file, and an inventory that does not say which lines
+    it left out cannot be told from one that left out none.
+    """
+    return {"doc": slug, "source_sha256": doc["source_sha256"],
+            "text_sha256": doc.get("text_sha256"),
+            "runs": runs, "unread_lines": left_out, "sections": results}
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -462,13 +481,9 @@ def main():
     counts = {k: sum(len(r.get(k, [])) for r in results if r and "error" not in r)
               for k in FIELDS}
 
-    # `unread_lines` is written even when it is empty. synthesize.py asserts
-    # absences over this file, and an inventory that does not say which lines
-    # it left out cannot be told from one that left out none.
     with open(os.path.join(project, args.out), "w", encoding="utf-8") as handle:
-        json.dump({"doc": args.doc, "source_sha256": doc["source_sha256"],
-                   "runs": args.runs, "unread_lines": left_out,
-                   "sections": results}, handle, indent=1)
+        json.dump(record(args.doc, doc, args.runs, results, left_out), handle,
+                  indent=1)
 
     # With nothing to read the loop above takes no time, and a rate is a
     # division by it: an empty document wrote its inventory and then crashed.
