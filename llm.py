@@ -572,11 +572,13 @@ def load_doc(project, slug, verify=True):
     manifest_path = os.path.join(project, "parsed", "MANIFEST.json")
     if not os.path.exists(manifest_path):
         raise LLMError("corpus not frozen — run freeze.py first")
-    manifest = json.load(open(manifest_path))
+    with open(manifest_path) as handle:
+        manifest = json.load(handle)
     for doc in manifest["documents"]:
         if doc["slug"] == slug:
             path = os.path.join(project, doc["parsed"])
-            raw = open(path, "rb").read()
+            with open(path, "rb") as handle:
+                raw = handle.read()
             pinned = doc.get("text_sha256")
             if verify and pinned:
                 actual = hashlib.sha256(raw).hexdigest()

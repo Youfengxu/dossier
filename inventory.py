@@ -292,6 +292,21 @@ def shortfall(results, runs):
             "skipped": skipped}
 
 
+def record(slug, doc, runs, results):
+    """What is written to disk: the sections, and which text they were read
+    from.
+
+    `text_sha256` is the frozen text's own hash, and every locator below is a
+    line number in that text. Only the source's hash used to be kept, and a
+    re-freeze leaves that unchanged while it moves every line: synthesize.py
+    now looks sections up in the document by line, and has to be able to tell
+    that the document is still the one these line numbers are in.
+    """
+    return {"doc": slug, "source_sha256": doc["source_sha256"],
+            "text_sha256": doc.get("text_sha256"),
+            "runs": runs, "sections": results}
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -370,8 +385,7 @@ def main():
               for k in FIELDS}
 
     with open(os.path.join(project, args.out), "w", encoding="utf-8") as handle:
-        json.dump({"doc": args.doc, "source_sha256": doc["source_sha256"],
-                   "runs": args.runs, "sections": results}, handle, indent=1)
+        json.dump(record(args.doc, doc, args.runs, results), handle, indent=1)
 
     print(f"\n{client.summary()}")
     print(f"  {elapsed:.0f}s wall clock, {len(sections)/elapsed:.2f} sections/s"

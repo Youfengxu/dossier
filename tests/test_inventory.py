@@ -132,6 +132,19 @@ class ARunToldToStopEarly(unittest.TestCase):
         self.assertEqual(inventory.limited([SECTION], "d", 0), ([SECTION], []))
 
 
+class WhatIsWritten(unittest.TestCase):
+
+    def test_the_inventory_says_which_text_its_line_numbers_are_in(self):
+        """Every locator is a line number in the frozen text. Only the hash of
+        the source was kept, and freeze.py --refreeze leaves that as it was
+        while it moves every line."""
+        doc = {"slug": "d", "source_sha256": "5" * 64, "text_sha256": "7" * 64}
+        self.assertEqual(
+            inventory.record("d", doc, 3, [SECTION]),
+            {"doc": "d", "source_sha256": "5" * 64, "text_sha256": "7" * 64,
+             "runs": 3, "sections": [SECTION]})
+
+
 class WhatTheRunReports(unittest.TestCase):
 
     def test_the_shortfall_is_counted_beside_the_failures(self):

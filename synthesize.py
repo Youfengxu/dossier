@@ -32,6 +32,29 @@ were not, and every finding that asserts an absence one of those could answer is
 marked `unverifiable` and says which. It is still listed: a reviewer is owed the
 question, not a verdict the tool could not reach.
 
+WHICH SECTIONS THE DOCUMENT HAS is not the inventory's to say either. It keeps
+the first heading of each chunk, and a chunk also holds every heading that came
+too soon to start one of its own, so D3 called a sub-section, a stub, and a
+heading spelled "Section 3: ..." missing when each was in the document. D3 now
+reads the headings from the frozen document beside the inventory, looks for
+what a pointer claims in the chunks that cover the place's own lines, and
+prints how many evidence claims it checked and why it did not check the rest.
+
+D3 STANDS BEHIND A FINDING ONLY IN A DOCUMENT THAT MARKS ITS HEADINGS: a
+Markdown source with "#" on two of them or more, and only for a pointer that is
+its places and nothing else ("Section 14 and Appendix F", not "Tables 4 and 5
+of the calibration section"). There it asserts two things and no others. "No
+such section in the document": the document's own headings show it numbering
+its sections the way the pointer does, no line of it opens with that number or
+letter, and no heading has it anywhere in it. "Section N holds no such thing":
+every place the pointer names was found under a heading that is the document's
+own, or shown to be missing, and every line of what was found is in a chunk
+that was read. Whatever falls short of that is listed as `unverifiable` with
+the reason. Text extracted from a .docx or a .pdf does not say which of its
+lines are headings. There D3 reads them off the numbering to decide where to
+look, passes a claim it finds, and lists the rest as `unverifiable`, as it
+does when the document could not be consulted at all.
+
     ./synthesize.py --project . --inventory inventory.json
     ./synthesize.py --project . --inventory inventory.json --ground-truth ground-truth.yaml
 """
@@ -477,13 +500,946 @@ def open_question(sections, what):
     return f"{what}: {names}"
 
 
-def pointed_at(heading, numbers, appendices):
-    """Whether a pointer naming these section numbers, or these appendix
-    letters, names the section with this heading."""
-    key = re.sub(r"\s+", " ", heading or "").lower()
-    if any(f"appendix {letter.lower()}" in key for letter in appendices):
+# -- D3: where a pointer points ----------------------------------------------
+#
+# "Recorded in Section 3.1" is checked two ways: is there such a place, and
+# does it hold what the sentence says. The first is a question about the
+# DOCUMENT. It used to be put to the inventory, which keeps the first heading
+# of each chunk and nothing else. A sub-section folded into its parent's chunk,
+# a heading spelled "Section 3: ...", a section too short to be given a chunk:
+# each was reported as "no such section in the document", and each is in the
+# document. So the document is asked, and the inventory only for what the
+# place holds.
+#
+# WHAT D3 STANDS BEHIND. Two independent reviews of earlier versions of this
+# each found a dozen ways to make it assert something false, and nearly all
+# ran through one step: deciding which lines of a text are headings when the
+# text does not say. A cell of a table reads "10 km", a step reads "1. Stop
+# the pump", a tab lost on extraction leaves "3.1Drift limits", and every
+# rule that tells those from a heading is wrong about some document. So the
+# line is drawn where no rule is needed. D3 asserts a finding only in a
+# document that marks its headings, which is a Markdown source with "#" on
+# them. In any other text it reads the headings off the numbering to decide
+# where to look, clears a claim it finds there, and lists the rest as
+# unverifiable: questions for a reviewer, with what it looked at.
+#
+# A third review then found a dozen more on the Markdown side. They came down
+# to four things, and each now puts a finding in doubt where it used to be
+# asserted: a pointer with more in it than its places, where whose a number
+# is has to be guessed (bare); a numbered heading that is not one of the
+# document's own sections, such as a step under "## Operations" (apart); a
+# line that may be the place and is not a heading (unlisted, renamed); and a
+# heading that is not one, in a listing or in the front matter of the file
+# (prose). A place is also taken wide. It runs to the next NUMBERED heading
+# that is not inside it (inside), because taking in too little reports a
+# claim that the place holds.
+
+NUMBER = r"\d+(?:\.\d+)*"
+SIGN = "\N{SECTION SIGN}"
+# Whatever a range is written with: "2-4", and the same with a hyphen, a
+# non-breaking hyphen, a figure dash, an en or em dash, a minus sign.
+DASH = ("\N{HYPHEN}\N{NON-BREAKING HYPHEN}\N{FIGURE DASH}\N{EN DASH}"
+        "\N{EM DASH}\N{MINUS SIGN}-")
+ELLIPSIS = "\N{HORIZONTAL ELLIPSIS}"    # "2…4", and so is "2..4"
+YEAR = re.compile(r"(?:19|20)\d\d$")
+# The words a numbered part of a document goes by. Not as the tail of another
+# word: a river's cross-section 12 is not Section 12.
+PART = (r"(?<![\w-])(?i:(?:sub-?)?sections?\b|sect?\b\.?|clauses?\b"
+        r"|chapters?\b|chap\.|ch\.)")
+TOKEN = re.compile("|".join((
+    # R-012, IF-RO-001: an identifier, and its digits are nobody's section
+    r"(?P<ident>\b[A-Z]{1,6}(?:[-_][A-Z]{1,6})*[-_]?\d+\b)",
+    # A.1: a part of Appendix A, whatever word stands in front of it
+    r"(?P<lettered>\b[A-Z]\.\d+(?:\.\d+)*)",
+    rf"(?P<section>{PART}|{SIGN}+)",
+    r"(?P<appendix>(?<![\w-])(?i:appendix|appendices)\b)",
+    r"(?P<annex>(?<![\w-])(?i:annex|annexes)\b)",
+    # Places D3 does not look up, and words that count something. The number
+    # straight after one is its own: "Table 4" was looked up as section 4.
+    r"(?P<other>(?<![\w-])(?i:tables?\b|figures?\b|figs?\b\.?|pages?\b|pp?\."
+    r"|paragraphs?\b|paras?\b\.?|par\.))",
+    r"(?P<count>(?<![\w-])(?i:lines?\b|rows?\b|items?\b|steps?\b|versions?\b"
+    r"|revisions?\b|issues?\b|rev\.|v\.))",
+    r"(?P<between>\b(?i:between)\b)",
+    rf"(?P<range>\b(?i:up\s+to|through\s+to|to|through|thru|until|till)\b"
+    rf"|[{ELLIPSIS}{DASH}]|\.{{2,}})",
+    # "Section 2 onwards": more places than the pointer lists
+    r"(?P<open>\b(?i:onwards?|et\s+seq|ff|following|subsequent|passim"
+    r"|elsewhere|throughout|various|several|etc)\b)",
+    rf"(?P<number>{NUMBER}[A-Za-z]?(?!\w))",
+    r"(?P<letter>\b(?:[IVX]{2,5}|[A-Z])\b"
+    r"|(?<=(?i:appendix)\s)[a-z]\b|(?<=(?i:annex)\s)[a-z]\b)",
+    r"(?P<word>\w+)")))
+# A place in this document, named by what it is. "Closure evidence: Load test
+# report" is a deliverable still to be produced, not an assertion that
+# something is already recorded here: only a pointer at a place inside this
+# document is a self-claim.
+LOCATION = re.compile(rf"{PART}|{SIGN}|(?<![\w-])(?i:appendix|appendices"
+                      rf"|annex|annexes)\b")
+# "this section", "the same section", "here" point at the passage making the
+# claim, and "the above section", "the following section" at one beside it,
+# which D3 does not go and find. Alone none of them is checked, and beside
+# another place ("this section and Appendix A") the passage is one of the
+# places.
+OWN = re.compile(r"(?i)\b(?:this|the\s+(?:same|above|following|preceding))\s+"
+                 r"(?:sub-?)?(?:section|clause|chapter|appendix|annex|paragraph"
+                 r"|table|figure|passage|page)\b|\bhere(?:in)?\b")
+# Traceability boilerplate. A claim reading "Requirement R-050 is addressed in
+# Section 21" has nothing to verify once the identifier and the pointer are
+# removed: whether the requirement is genuinely discharged is the coverage
+# pipeline's question, and matching "requirement addressed" against a section's
+# capability names is noise. Ten of nineteen candidates on the fixture were
+# this shape. "through" and "across" joined the list when pointers to several
+# sections began to be read: "Requirements R-001 through R-042 are addressed
+# across Sections 2 to 13" is the same sentence about a range.
+BOILERPLATE = {"requirement", "requirements", "addressed", "covered",
+               "satisfied", "section", "sections", "appendix", "annex",
+               "described", "detailed", "provided", "given", "listed",
+               "shown", "documented", "stated", "above", "below", "this",
+               "through", "across"}
+IDENTIFIER = re.compile(r"^[A-Z]{1,4}[-_]?\d{1,4}$|^\d+(\.\d+)*$")
+
+
+def content_words(text):
+    out = set()
+    for word in re.findall(r"[A-Za-z][A-Za-z0-9-]{3,}", text or ""):
+        if word.lower() in BOILERPLATE or IDENTIFIER.match(word):
+            continue
+        out.add(word.lower())
+    return out
+
+
+def plain(name):
+    """A number or a letter as it is compared: "03.1" is 3.1, "3.0" is 3, "B"
+    is b."""
+    parts = [part.lstrip("0") or "0" for part in name.lower().split(".")]
+    while len(parts) > 1 and parts[-1] == "0":
+        parts.pop()
+    return ".".join(parts)
+
+
+ROMAN = ((10, "x"), (9, "ix"), (5, "v"), (4, "iv"), (1, "i"))
+
+
+def roman(name):
+    """The number a Roman numeral stands for, or 0."""
+    total, rest = 0, name
+    for value, letters in ROMAN:
+        while rest.startswith(letters):
+            total, rest = total + value, rest[len(letters):]
+    return total if name and not rest and numeral(total) == name else 0
+
+
+def numeral(number):
+    out = ""
+    for value, letters in ROMAN:
+        while number >= value:
+            out, number = out + letters, number - value
+    return out
+
+
+def run_of(first, last):
+    """What a range names, or [] when that cannot be told. "5" to "8": 5 6 7
+    8. "5.2" to "5.4": 5.2 5.3 5.4. "4a" to "4c": 4a 4b 4c. "a" to "c": a b c.
+    "i" to "iii": i ii iii. "3.1" to "4.2" crosses from one parent to the
+    next, and is taken as the whole of 3 and the whole of 4, which hold it.
+    "i" to "v" is five appendices, or the letters from I to V, and is taken as
+    both."""
+    if first[:1].isalpha() or last[:1].isalpha():
+        out = []
+        if len(first) == len(last) == 1 and first < last:
+            out += [chr(n) for n in range(ord(first), ord(last) + 1)]
+        low, high = roman(first), roman(last)
+        if 0 < low < high:
+            out += [numeral(n) for n in range(low, high + 1)]
+        return list(dict.fromkeys(out))
+    a, b = first.split("."), last.split(".")
+    if a[:-1] != b[:-1]:
+        a, b = a[:1], b[:1]
+    ends = [re.fullmatch(r"(\d+)([a-z])", part) for part in (a[-1], b[-1])]
+    if all(ends) and ends[0].group(1) == ends[1].group(1) \
+            and ends[0].group(2) < ends[1].group(2):
+        return [".".join(a[:-1] + [ends[0].group(1) + chr(n)]) for n in
+                range(ord(ends[0].group(2)), ord(ends[1].group(2)) + 1)]
+    if not (a[-1].isdigit() and b[-1].isdigit()) \
+            or max(len(a[-1]), len(b[-1])) > 4:
+        return []                   # "4a" to "7", or a number no section has
+    low, high = int(a[-1]), int(b[-1])
+    if not low <= high <= low + 200:
+        return []                   # not a run that can be filled in
+    return [".".join(a[:-1] + [str(n)]) for n in range(low, high + 1)]
+
+
+def places(target):
+    """What a pointer names: ([(kind, id), ...], whether it names a table, a
+    figure, a page or a paragraph, whether it names more than it lists).
+
+    kind is "section", "appendix" or "annex". Once a pointer has said
+    "Section", every number after it is a section's, through commas, "and",
+    brackets and whatever words stand between. The one exception is the
+    number straight after a word for another kind of thing: the 4 of "Table
+    4", the 12 of "page 12", the 3 of "step 3". Reading too few is the worse
+    mistake. "Sections 5, 6, and 7" read as 5 and 6 reports a claim that
+    Section 7 holds, so a number is given up only to the word that owns it.
+
+    "Section 2 onwards" names more sections than it lists, and so does a range
+    that cannot be filled in ("Sections 7 to 3", "4a to 7"). The third value
+    says so: what such a pointer does not hold cannot be told from its list.
+
+    The test for a place used to be the whole word `section`, which "Sections
+    6.4, 7.4" does not contain, so a pointer to several sections was skipped
+    as pointing outside the document.
+    """
+    tokens = [(found.lastgroup, found.group()) for found in TOKEN.finditer(target)]
+    # A number in front of every place word is a section's if the pointer
+    # names sections at all: "3.1 and Section 4".
+    carrier = "section" if any(kind == "section" for kind, _ in tokens) else None
+    keys, other, more = [], False, False
+    last = start = None         # the last place named; where a range runs from
+    owed = 0                    # 1: a table's number is due; 2: it has just come
+    between = False             # "between Sections 2 and 4"
+    named = False               # the token before this one was a place word
+    for kind, text in tokens:
+        after, named = named, kind in ("section", "appendix", "annex")
+        if owed == 1 and kind == "number":
+            owed = 2            # the table's own number, the page's, the step's
+            continue
+        if owed == 2 and kind == "range":
+            owed = 1            # "Tables 4 to 6", "pp. 12-14": all of them
+            continue
+        owed = 0
+        if kind in ("section", "appendix", "annex"):
+            if kind != carrier:
+                start = None        # no range runs from one kind into another
+            carrier, last = kind, None
+        elif kind in ("other", "count"):
+            other, owed, last, start = other or kind == "other", 1, None, None
+        elif kind == "between":
+            between = True
+        elif kind == "range" or (between and last and text.lower() == "and"):
+            # "2--4" and "2 thru to 4" are one range written with two marks
+            start, last, between = last or start, None, False
+        elif kind == "open":
+            more, last, start = True, None, None
+        elif kind == "lettered":
+            keys.append(("appendix", text[0].lower()))
+            last = start = None
+        else:
+            name = None
+            # "the 2024 roadmap" is not a section. "Section 2024" is.
+            if kind == "number" and carrier and not (
+                    carrier == "section" and YEAR.match(text) and not after):
+                name = plain(text)
+            elif kind == "letter" and carrier in ("appendix", "annex"):
+                name = text.lower()
+            if name is None:
+                last = start = None         # a word: no range runs across it
+                continue
+            if start and keys[-1:] == [(carrier, start)]:
+                keys.pop()      # the range says what its first end stood for
+            run = run_of(start, name) if start else [name]
+            # "5 to 2", "4a to 7": a range that cannot be filled in names
+            # more than its two ends, whatever lies between them.
+            more = more or not run
+            keys += [(carrier, each) for each in run or [start, name]]
+            last, start = name, None
+    return list(dict.fromkeys(keys)), other, more
+
+
+# What may stand between the places of a pointer that names nothing else.
+JOINT = re.compile(r"""[\s,;&/()\[\].:'"]*""")
+
+
+def bare(target):
+    """Whether a pointer is its places and nothing else: the words for a
+    place, numbers and letters, "and", "or", commas and ranges.
+
+    "Section 14 and Appendix F" is. "Tables 4 and 5 of the calibration
+    section", "Section 4.2 of the ICD", "Sections 2 up to and including 4"
+    and "the calibration section (2 tables)" are not, and each was read wrong
+    by a rule that guesses whose a number is. places() still reads them as
+    far as it can, to know where to look. What is not found there is listed
+    and not asserted.
+    """
+    at = 0
+    for found in TOKEN.finditer(target):
+        if not JOINT.fullmatch(target, at, found.start()) \
+                or found.lastgroup in ("ident", "other", "count", "open") \
+                or (found.lastgroup == "word"
+                    and found.group().lower() not in ("and", "or")):
+            return False
+        at = found.end()
+    return bool(JOINT.fullmatch(target, at))
+
+
+LETTERED = re.compile(rf"(?i:(appendix|annex))\s+((?i:[a-z])(?![A-Za-z])"
+                      rf"|[IVX]{{2,5}}(?![A-Za-z])|{NUMBER})")
+NUMBERED = re.compile(rf"(?:(?i:section|clause|chapter)\s+)?({NUMBER})")
+# What stands in front of a heading's number without being part of it: a list
+# mark, a table bar, a quotation mark, asterisks, an anchor.
+FRONT = re.compile(r"^(?:<[^>]*>|[\W_])+")
+
+
+def leading(text):
+    """The place a line opens with, and the rest of the line:
+    (("section", "3.1"), " Drift limits"), or None.
+
+    The number is taken whole. "3.1Drift limits", which is what a tab between
+    them becomes on extraction, opens with 3.1 and not with 3. One letter
+    after it is part of it when it stands alone ("4a.", and "4A." but not the
+    3D of "3D flood twin design"), and a number that reads as a year is
+    nobody's section.
+    """
+    found = LETTERED.match(text)
+    if found:
+        return ((found.group(1).lower(), plain(found.group(2))),
+                text[found.end():])
+    found = NUMBERED.match(text)
+    if not found:
+        return None
+    number, rest = found.group(1), text[found.end():]
+    if re.match(r"[a-z](?=[\s.:)]|$)|[A-Z](?=[.:)]|$)", rest):
+        number, rest = number + rest[0], rest[1:]
+    elif YEAR.match(number):
+        return None
+    return ("section", plain(number)), rest
+
+
+def heading_key(text, strict=False):
+    """What a heading says it is: ("section", "5.1"), ("appendix", "b"),
+    ("annex", "3"), or None. Whatever marks stand in front are not part of it.
+
+    `strict` is for a heading the document has marked as one. There the number
+    has to end where a number ends: "3D flood twin design" is a title, not
+    section 3. A line of extracted text is not held to that, because its
+    tabs are gone.
+    """
+    found = leading(FRONT.sub("", str(text or "")))
+    if not found or (strict and found[1] and found[1][0] not in " \t.:)]*_`<"
+                     + DASH):
+        return None
+    return found[0]
+
+
+def same(key, other):
+    """Whether two keys name one place. An appendix numbered II is Appendix
+    2, and one lettered I may be Appendix 1."""
+    if key == other or not other or key[0] != other[0]:
+        return key == other
+    return key[0] != "section" and any(
+        a.isdigit() and len(a) < 5 and roman(b) == int(a)
+        for a, b in ((key[1], other[1]), (other[1], key[1])))
+
+
+def under(key, other):
+    """Whether `other` is `key` or a sub-section of it."""
+    return same(key, other) or (
+        bool(other) and key[0] == other[0] == "section"
+        and other[1].startswith(key[1] + "."))
+
+
+FENCE = re.compile(r"(\s*)(`{3,}|~{3,})(.*)$")
+# Raw HTML that Markdown does not read into: from the line that opens with one
+# of these tags to the line that closes it.
+RAW = re.compile(r"(?i)\s*<(pre|script|style|textarea)\b")
+# One to six "#", then a space, at most three spaces in: Markdown's own rule.
+# "#1 priority" is not a heading, nor is "# restart the service" in an
+# indented block of shell.
+MARK = re.compile(r" {0,3}(#{1,6})(?:[ \t]+(.*))?$")
+
+
+def prose(lines):
+    """(number, line) for each line Markdown reads as the document's own: not
+    in a fenced block, not between <pre> and </pre>, not in a comment that
+    runs over several lines. "# install" there is a comment in somebody's
+    shell, and "## 5. Deployment (old)" a heading the author took out.
+
+    A fence is closed only by one of its own mark, at least as long, with
+    nothing after it and set in no more than three spaces further: "```sh"
+    inside "````markdown" closes nothing. And "```twin status``` shows the
+    state" opens nothing: it is a code span. Where this is wrong about a
+    fence it is wrong towards reading less, which finds fewer headings and so
+    asserts less. Other raw HTML (a <div>, say) is read as Markdown.
+    """
+    fence = raw = ""            # the fence that is open; the tag that is
+    depth, commented = 0, False     # how far in the open fence is set
+    # The front matter of a file: from a first line of "---" to the next one,
+    # or to "...". "# template version 3" in it is a comment in YAML, and as
+    # a heading it stood where the title of the document is looked for.
+    front = lines[:1] == ["---"] and next(
+        (number for number, line in enumerate(lines[1:], 2)
+         if line.rstrip() in ("---", "...")), 0)
+    for number, line in enumerate(lines, 1):
+        found = FENCE.match(line)
+        opened = RAW.match(line)
+        if number <= front:
+            continue
+        if commented:
+            commented = "-->" not in line
+        elif raw:
+            raw = "" if f"</{raw}>" in line.lower() else raw
+        elif fence:
+            if found and found.group(2)[0] == fence[0] \
+                    and len(found.group(2)) >= len(fence) \
+                    and not found.group(3).strip() \
+                    and len(found.group(1)) < depth + 4:
+                fence = ""
+        elif found and not (found.group(2)[0] == "`" and "`" in found.group(3)):
+            fence, depth = found.group(2), len(found.group(1))
+        elif opened and f"</{opened.group(1).lower()}>" not in line.lower():
+            raw = opened.group(1).lower()
+        elif line.lstrip().startswith("<!--") and "-->" not in line:
+            commented = True
+        else:
+            yield number, line
+
+
+def marks(lines):
+    """The headings a Markdown document marks with "#": [(line, depth, title)].
+
+    Markdown has another way, a rule of "=" or "-" under the line. That is
+    not taken for a mark. A rule under the last item of a list is a rule, and
+    one under "title: 1. design" closes the front matter of a file: telling
+    those from a heading takes the kind of rule that asserted false things.
+    Such a line is still one that opens with its number, which is enough to
+    keep its section from being called missing.
+    """
+    found = []
+    for number, line in prose(lines):
+        mark = MARK.match(line.rstrip())
+        if mark:
+            title = re.sub(r"[ \t]+#+$", "", (mark.group(2) or "").strip())
+            found.append((number, len(mark.group(1)), title))
+    return found
+
+
+def outline(lines, marked):
+    """The places a document is divided into, each with the lines it runs
+    over: [{"key", "text", "level", "line", "end"}].
+
+    A document that marks its headings has those and no others: a numbered
+    step in a list is not a section, though the splitter takes it for one and
+    gives it a chunk. A place runs until the next heading that is not inside
+    it, and inside() says which those are.
+
+    Text that marks nothing has no headings to go by. Every line that opens
+    with a section number and a word with a capital, or with an appendix
+    letter, is taken as the start of something, and what it starts runs to
+    the next such line that is not one of its own sub-sections. That takes
+    "5 GHz" in a table for a section and stops a section at a numbered step,
+    and it is why nothing found this way is asserted: it says where to look.
+    """
+    if marked:
+        heads = [{"key": heading_key(title, strict=True), "text": title,
+                  "level": level, "line": number}
+                 for number, level, title in marks(lines)]
+    else:
+        heads = []
+        for number, line in enumerate(lines, 1):
+            found = leading(line.strip())
+            # "3.1 Drift limits", "3.1Drift limits", "Appendix A". Not "3)",
+            # which is a step; nor a bare "7", a cell or a page; nor "10 km"
+            # and "Section 4 describes", which go on in a small letter.
+            title = found[1].lstrip(" \t.:") if found else ""
+            if found and (found[0][0] != "section" or (
+                    title[:1].isalpha() and not title[:1].islower())):
+                heads.append({"key": found[0], "text": line.strip(),
+                              "level": 1, "line": number})
+    above = []                  # the headings a heading stands under
+    for position, head in enumerate(heads):
+        head["end"] = next((later["line"] - 1 for later in heads[position + 1:]
+                            if not inside(head, later, marked)), len(lines))
+        above = [other for other in above if other["level"] < head["level"]]
+        head["over"] = next((other for other in reversed(above)
+                             if apart(other, head, heads[0])), None)
+        above.append(head)
+    return heads
+
+
+def inside(head, later, marked):
+    """Whether the heading `later` is still inside what `head` starts.
+
+    Its sub-sections are, by number, at whatever depth they are marked: "5."
+    and "5.1" are sometimes marked alike. So is every heading marked deeper.
+
+    Where headings are marked, a numbered place ends at the next numbered
+    heading that is neither of those, and at no other. A heading with no
+    number does not end it, at any depth: "## Detailed design" after "## 3.
+    Design" and "## A.1 Method" after "## Appendix A" say nothing of being
+    another place, and "# restart the fabric" in a listing is no heading at
+    all. Nor, under an appendix, does a numbered section at its own depth:
+    numbering that starts again under "Appendix A" is the appendix's, which
+    ends at the next appendix. Taking in too much looks for a claim in more
+    lines than it need. Taking in too little reports a claim that the place
+    holds.
+    """
+    if head["key"] and under(head["key"], later["key"]):
         return True
-    return any(re.match(rf"^{re.escape(n)}\b", key) for n in numbers)
+    if not (marked and head["key"]):
+        return later["level"] > head["level"]
+    if not later["key"] or later["level"] > head["level"]:
+        return True
+    return later["level"] == head["level"] and \
+        head["key"][0] != "section" and later["key"][0] == "section"
+
+
+def apart(other, head, title):
+    """Whether a numbered section, standing under the heading `other`, is
+    numbered apart from the document's sections.
+
+    "### 2. Apply the migration" under "## Operations" is the second step of
+    that heading, in a document whose own sections may have no numbers in the
+    source at all, and "### 1. Method" under "## Appendix A" is the appendix's.
+    A section stands under the document's title, and under the section whose
+    number its own begins with, and under those it is the document's.
+    """
+    return bool(head["key"]) and head["key"][0] == "section" \
+        and other is not title \
+        and not (other["key"] and under(other["key"], head["key"]))
+
+
+def located(key, heads):
+    """The headings a place names: its own and its sub-sections'. A document
+    can number 5.1 and 5.2 and never write a line for 5."""
+    return [head for head in heads if head["key"] and under(key, head["key"])]
+
+
+def lines_of(entry):
+    """(first line, last line) of a chunk, from its locator "slug:a-b"."""
+    found = re.search(r":(\d{1,9})-(\d{1,9})$", str(entry.get("locator", "")))
+    return (int(found.group(1)), int(found.group(2))) if found else None
+
+
+def moved(entries, lines):
+    """How the text differs from the one the inventory was split from, by the
+    first chunk that is not where its locator says, or "" when every chunk is.
+
+    The splitter starts a chunk on its heading line, or carries the heading of
+    the chunk before when it cut one for size. An entry with no heading (a
+    failed section, as it was once recorded) says nothing, and the chunk after
+    it may be a later piece of it. This sees a text that moved above the last
+    chunk that starts on a heading, and not one that only changed below it.
+    It refuses, on the cautious side, a text in which the splitter dropped
+    the first piece of a section it cut for size.
+    """
+    before, blind, tied = None, False, 0
+    for entry in entries:
+        heading = entry.get("heading") if isinstance(entry, dict) else None
+        span = lines_of(entry) if isinstance(entry, dict) else None
+        if heading is None or not span:
+            blind = True
+            continue
+        if not 1 <= span[0] <= span[1] <= len(lines):
+            return (f"the inventory has {heading!r} on lines {span[0]}-"
+                    f"{span[1]}, and the text has {len(lines)} lines")
+        if heading not in ("(front matter)", before):
+            if lines[span[0] - 1].strip().lstrip("#").strip() == heading:
+                tied += 1
+            elif not blind:
+                return (f"line {span[0]} is not the heading the inventory "
+                        f"has there, {heading!r}")
+        before, blind = heading, False
+    if not tied:
+        return ("no chunk of the inventory starts on a heading, so nothing "
+                "ties its line numbers to this text")
+    return ""
+
+
+# freeze.py keeps a .md as it is, and puts a .markdown through an extractor
+# that cannot read one.
+MARKDOWN = ".md"
+
+
+def consult(project, data):
+    """(what the document says its sections are, None), or (None, why the
+    document was not consulted).
+
+    The document is the frozen text beside the inventory. Its line numbers
+    have to be the inventory's, or a heading found at line 300 says nothing
+    about the chunk the inventory has at 300. An inventory records the hash of
+    the text it read. One written before it did records the hash of the
+    SOURCE, which a re-freeze leaves unchanged while it moves every line
+    (freeze.py says so when it happens), so for those each chunk's heading is
+    looked for at the line its locator gives. Not where the text is the
+    source itself, as a .md is: there the source's hash is the text's.
+
+    Whether the document marks its headings is not read off its text. Two
+    lines of shell in a .docx open with "# ", and taken for marks they left
+    no real heading a heading. The manifest says what the source was: a
+    Markdown file marks its headings if it marks two, and nothing else does.
+    """
+    slug = data.get("doc")
+    if not slug:
+        return None, "the inventory does not name the document it was built from"
+    try:
+        doc, lines = llm.load_doc(project, slug)
+    except Exception as error:      # noqa: BLE001: whatever a manifest can do
+        said = (str(error).strip() or type(error).__name__).splitlines()[0]
+        return None, f"{slug} could not be read: {said}"
+    changed = (f"the frozen text of {slug} is not the text this inventory was "
+               f"built from")
+    if data.get("text_sha256"):
+        if data["text_sha256"] != doc.get("text_sha256"):
+            return None, changed
+    elif data.get("source_sha256"):
+        if data["source_sha256"] != doc.get("source_sha256"):
+            return None, changed
+        # Where the text is the source, as it is for a .md, the source's hash
+        # is the text's own and there is nothing more to ask.
+        astray = data["source_sha256"] != doc.get("text_sha256") and \
+            moved(data.get("sections") or [], lines)
+        if astray:
+            return None, f"{changed}: {astray}"
+    else:
+        return None, (f"the inventory records no hash of {slug}, so nothing "
+                      f"says the frozen text is the one it was built from")
+    marked = str(doc.get("path") or "").lower().endswith(MARKDOWN) and \
+        sum(1 for _, _, title in marks(lines) if title) >= 2
+    # Every line that opens the way a heading would, heading or not, behind
+    # whatever a list, a table or a quotation puts in front of it. A section
+    # is called missing only when no line at all opens with it.
+    opens = {}
+    for number, line in enumerate(lines, 1):
+        key = heading_key(line)
+        if key:
+            opens.setdefault(key, number)
+    heads = outline(lines, marked)
+    return {"slug": slug, "marked": marked, "heads": heads, "opens": opens,
+            "loose": unlisted(lines, heads), "lines": lines}, None
+
+
+def unlisted(lines, heads):
+    """{section: line} for each line that opens with a section's number, is
+    not one of the headings, and is not an item of a list: blank and indented
+    lines apart, neither the line before it nor the one after opens with a
+    number too.
+
+    "2. Hydrology Model" with a paragraph of its own under it is a heading in
+    all but the mark, and so is the same line set in bold. A document whose
+    sections are written that way may still mark two numbered steps with "#",
+    and a pointer to Section 2 was looked for in the second step.
+    """
+    marked = {head["line"] for head in heads}
+    keys = {number: heading_key(line) for number, line in enumerate(lines, 1)
+            if number not in marked}
+    flush = [number for number, line in enumerate(lines, 1)
+             if line.strip() and not line[:1].isspace()]
+    found = {}
+    for position, number in enumerate(flush):
+        key = keys.get(number)
+        beside = flush[max(position - 1, 0):position] + flush[position + 1:position + 2]
+        if key and key[0] == "section" and not any(
+                (keys.get(other) or ("",))[0] == "section" for other in beside):
+            found.setdefault(key, number)
+    return found
+
+
+KIND = {"section": "a numbered section", "appendix": "an appendix",
+        "annex": "an annex"}
+UNMARKED = ("the document does not mark its headings: which of its lines are "
+            "headings is read off its numbering")
+UNCONSULTED = ("the document was not consulted: only the chunks the "
+               "inventory heads with that number were looked in")
+
+
+def numbered(name, names):
+    """Whether its headings show the document numbering its sections the way
+    a pointer does: two sections numbered one after the other, or, for 3.7, a
+    section 3 or another 3.x. One heading that happens to open with a number
+    ("3 options considered") shows nothing."""
+    tops = {int(other) for other in names if other.isdigit() and len(other) < 5}
+    if any(n + 1 in tops for n in tops):
+        return True
+    stem = name.rpartition(".")[0]
+    return bool(stem) and any(other == stem or other.startswith(stem + ".")
+                              for other in names)
+
+
+def spelled(key):
+    return key[1] if key[0] == "section" else \
+        f"{key[0].capitalize()} {key[1].upper()}"
+
+
+def own(kind, heads):
+    """The numbers, or the letters, of the document's own headings of one
+    kind: not those of a section numbered apart from its sections."""
+    return [head["key"][1] for head in heads
+            if head["key"] and head["key"][0] == kind and not head["over"]]
+
+
+# A number or a letter that stands on its own in a heading.
+STANDING = re.compile(rf"(?<![\w.])(?:{NUMBER}[A-Za-z]?|[A-Z]|[IVX]{{2,5}})(?!\w)")
+
+
+def renamed(key, heads):
+    """Why a heading that is not headed with a place's number or letter may
+    be that place all the same, or "": the 3 of "Part 3: Design" and of
+    "Design (3)", the C of "C. Register of gauges" under "Appendices"."""
+    for head in heads:
+        if head["key"] and under(key, head["key"]):
+            continue                    # headed with it: found, not renamed
+        for token in STANDING.findall(head["text"]):
+            if under(key, (key[0], plain(token))):
+                return (f"the heading on line {head['line']} has {token} in "
+                        f"it, and may be the place under another name")
+    return ""
+
+
+def unsettled(key, document):
+    """Why a place with no heading of its own cannot be called missing, or ""
+    when it can: the document marks its headings, has headings of that kind,
+    numbered the way the pointer numbers them, no line of it opens with this
+    one's number or letter, and no heading has it standing anywhere in it."""
+    if not document["marked"]:
+        return UNMARKED
+    names = own(key[0], document["heads"])
+    if not names:
+        return f"none of the document's headings is {KIND[key[0]]}"
+    if key[0] == "section" and not numbered(key[1], names):
+        return ("the document's headings do not show it numbering its "
+                "sections this way")
+    for other, line in document["opens"].items():
+        if under(key, other):
+            return (f"line {line} of the document opens with "
+                    f"{spelled(other)}, and is not one of its headings")
+    return renamed(key, document["heads"])
+
+
+def runs(numbers):
+    """[3, 4, 5, 9] as "lines 3-5, 9"; [7] as "line 7"."""
+    out, numbers = [], sorted(numbers)
+    for number in numbers:
+        if out and out[-1][1] == number - 1:
+            out[-1][1] = number
+        else:
+            out.append([number, number])
+    return ("line " if len(numbers) == 1 else "lines ") + ", ".join(
+        str(a) if a == b else f"{a}-{b}" for a, b in out)
+
+
+# Why a claim was not checked, in the order the reasons are tried.
+NO_POINTER = "no pointer"
+NO_PLACE = "a pointer that names no place in the document"
+OWN_SECTION = "a pointer to the passage it is in or the one beside it"
+NOT_A_SECTION = "a pointer to a table, figure, page or paragraph"
+NO_NUMBER = "a pointer to a place without a number or a letter"
+TOO_LITTLE = "a claim that says too little to check"
+REPEAT = "a repeat of an earlier claim"
+NOT_CHECKED = (NO_POINTER, NO_PLACE, OWN_SECTION, NOT_A_SECTION, NO_NUMBER,
+               TOO_LITTLE, REPEAT)
+
+
+def self_claims(claims, sections, unread, document):
+    """D3: an evidence claim pointing somewhere that holds no such thing.
+    -> ([finding, ...], {why a claim was not checked: how many}, how many
+    claims were looked for in the place they point to).
+
+    A claim is checked when its pointer names a section, an appendix or an
+    annex by number or letter, and the claim has two words of content. Every
+    other claim is counted under the reason it was left out, so that the
+    report can say how many of the document's evidence claims D3 answers for.
+
+    `document` is what consult() returned, or None. A finding is asserted
+    only when it is there and marks its headings; `doubts` below is
+    everything else that stands between a claim the place does not hold and
+    saying so.
+    """
+    findings, skipped, seen, looked = [], defaultdict(int), set(), 0
+    homes = {str(section.get("locator")): section for section in sections}
+    if document:
+        read = set()
+        for section in sections:
+            held = lines_of(section)
+            if held:        # no further than the text: a locator can say anything
+                read.update(range(held[0], min(held[1], len(document["lines"])) + 1))
+        headings = {head["line"] for head in document["heads"]}
+        names = own("section", document["heads"])
+        known = {}      # each place, asked of the document once
+    for claim in claims:
+        # The extraction schema does not say the pointer must be one string,
+        # and "Section 3 and Appendix B" has come back as a list of two.
+        target = claim.get("points_to") or ""
+        if isinstance(target, (list, tuple)):
+            target = " and ".join(str(place) for place in target)
+        target = str(target).strip()
+        said = str(claim.get("claim") or "")
+        # One pointer can name several places — "Section 14 and Appendix F".
+        # The claim is only untrue if NONE of them holds the content.
+        keys, other, more = places(target)
+        # A claim must carry something checkable. Two content words is the
+        # least that can distinguish "maturity is assessed" from "is addressed".
+        words = content_words(said)
+        # Deduplicate on what the finding actually is: this claim, these
+        # places. "This section" is a different place wherever it is said.
+        fingerprint = (" ".join(sorted(words)), tuple(sorted(keys)),
+                       OWN.search(target) and str(claim.get("_locator")))
+        if not target:
+            why = NO_POINTER
+        elif keys:
+            why = TOO_LITTLE if len(words) < 2 else \
+                REPEAT if fingerprint in seen else ""
+        elif OWN.search(target):
+            why = OWN_SECTION
+        else:
+            why = NOT_A_SECTION if other else \
+                NO_NUMBER if LOCATION.search(target) else NO_PLACE
+        if why:
+            skipped[why] += 1
+            continue
+        seen.add(fingerprint)
+
+        spans, doubts, hits = [], [], []
+        if document:
+            for key in keys:
+                if key not in known:
+                    heads = located(key, document["heads"])
+                    known[key] = heads, "" if heads else unsettled(key, document)
+                heads, why = known[key]
+                # A sub-section that may be there without a heading of its
+                # own (one set in bold, say) is somewhere in the section it is
+                # part of. A claim found there is no finding, and one that is
+                # not found there is still only a question.
+                stem = key[1]
+                while why and key[0] == "section" and "." in stem and not heads:
+                    stem = stem.rpartition(".")[0]
+                    heads = located(("section", stem), document["heads"])
+                spans += [(head["line"], head["end"]) for head in heads]
+                if why or not heads:
+                    doubts.append(why)
+                    continue
+                if not document["marked"]:
+                    doubts.append(UNMARKED)
+                    continue
+                if not any(same(key, head["key"]) for head in heads):
+                    # Found by its sub-sections alone. A line that opens with
+                    # its own number (a heading set in bold, say), or a
+                    # heading that has the number in it ("Part 3: Design"),
+                    # may be its start, and the text between that and 3.1 was
+                    # looked at by nobody.
+                    start = (f"a line of the document opens with {spelled(key)} "
+                             f"and is not one of its headings"
+                             if any(same(key, opened)
+                                    for opened in document["opens"])
+                             else renamed(key, document["heads"]))
+                    doubts.append(start and f"{start}, so only its "
+                                            f"sub-sections were looked in")
+                elif key in document["loose"]:
+                    doubts.append(
+                        f"line {document['loose'][key]} of the document opens "
+                        f"with {spelled(key)}, is not in a list and is not one "
+                        f"of its headings: it may be the place the pointer "
+                        f"means")
+                if all(head["over"] for head in heads):
+                    # "### 2. Apply the migration" under "## Operations": a
+                    # step of that heading, which a pointer to Section 2 may
+                    # not mean at all.
+                    doubts.append(
+                        f"{spelled(key)} is found only under the heading on "
+                        f"line {heads[0]['over']['line']}, and may be numbered "
+                        f"apart from the document's sections")
+                if key[0] == "section" and "." not in key[1] \
+                        and not numbered(key[1], names):
+                    doubts.append("the document's headings do not show it "
+                                  "numbering its sections this way")
+            # What the place holds is what the inventory read on its lines.
+            for section in sections:
+                held = lines_of(section)
+                if held and any(first <= held[1] and held[0] <= last
+                                for first, last in spans):
+                    hits.append(section)
+            # The splitter leaves some lines in no chunk: a heading-like line
+            # replaced by the next, a passage of sixty characters or fewer.
+            unseen = {number for first, last in spans
+                      for number in range(first, last + 1)
+                      if number not in read and number not in headings
+                      and document["lines"][number - 1].strip()}
+            if hits and unseen:
+                doubts.append(f"{runs(unseen)} of it "
+                              f"{'is' if len(unseen) == 1 else 'are'} in no "
+                              f"section of the inventory")
+        else:
+            hits = [section for section in sections
+                    if any(under(key, heading_key(section.get("heading")))
+                           for key in keys)]
+            doubts.append(UNCONSULTED)
+        if more:
+            doubts.append("the pointer names more places than it lists")
+        elif not bare(target):
+            doubts.append("the pointer has more in it than the places it "
+                          "names, and only those were read")
+        doubt = "; ".join(dict.fromkeys(filter(None, doubts)))
+        # "This section and Appendix A": the passage the claim is in is one
+        # of the places, and the claim is not untrue if it is held there, or
+        # further on in the section that passage is part of. Said in the
+        # first lines of Section 3, "this section" takes in 3.1.
+        home = homes.get(str(claim.get("_locator")))
+        if home and OWN.search(target):
+            at = lines_of(home) or (0, 0)
+            part = [(head["line"], head["end"])
+                    for head in (document["heads"] if document else ())
+                    if head["key"] and head["line"] <= at[0] <= head["end"]][-1:]
+            hits += [section for section in sections
+                     if section not in hits and (section is home or any(
+                         first <= (lines_of(section) or (0, 0))[1]
+                         and (lines_of(section) or (0, 0))[0] <= last
+                         for first, last in part))]
+        looked += bool(hits)
+        # With a section unread, neither form of this finding is asserted. No
+        # unread section can be ruled out by its heading: the inventory keeps
+        # the FIRST heading of each chunk, and a chunk also holds whatever
+        # headings followed too soon to start one of their own, so an unread
+        # "3. Calibration Register" may hold 3.1, a table can sit in any
+        # section, and a heading may be spelled "Section 3: ...". An earlier
+        # version compared the pointer with each unread heading and let the
+        # finding stand where they differed; a review broke that seven ways.
+        if not hits and unread:
+            # This used to read "no such section in the document", about a
+            # section that is in the document and failed at extraction.
+            findings.append(("D3", f"{target} — not among the sections that "
+                                   f"were read", [claim], open_question(
+                unread, "a section that was not read could be, or could hold, "
+                        "the place it points to")))
+            continue
+        if not hits and not document:
+            findings.append(("D3", f"{target} — not among the headings the "
+                                   f"inventory records", [claim],
+                             "the document was not consulted, and the "
+                             "inventory records the first heading of each "
+                             "chunk only"))
+            continue
+        if not hits and spans:
+            # A heading with a line or two under it is too short for the
+            # splitter to make a chunk of, and the inventory never saw it.
+            where = runs({number for first, last in spans
+                          for number in range(first, last + 1)})
+            findings.append(("D3", f"{target} — in the document, and not in "
+                                   f"the inventory", [claim],
+                             f"the inventory has no section on {where}, "
+                             f"where the document has it"))
+            continue
+        if not hits and doubt:
+            findings.append(("D3", f"{target} — not among the document's "
+                                   f"headings", [claim], doubt))
+            continue
+        if not hits:
+            findings.append(("D3", f"{target} — no such section in the document",
+                             [claim], ""))
+            continue
+        wanted = norm(said)
+        present = set()
+        for section in hits:
+            held = section.get("capabilities")
+            for capability in held if isinstance(held, list) else []:
+                # The fallback's validator accepts a capability as a bare
+                # string, where the full schema requires {"name": ...}.
+                present |= norm(str(capability.get("name") or "")
+                                if isinstance(capability, dict) else str(capability))
+        if wanted and not similar(wanted, present, 0.34):
+            findings.append(("D3", f"{said[:50]} -> {target}",
+                             [claim], open_question(
+                unread, "a section that was not read could hold it, as part "
+                        "of the place the pointer names") or doubt))
+    return findings, skipped, looked
 
 
 def main():
@@ -670,6 +1626,49 @@ def main():
         print(f"{pad}A finding that asserts an absence one of the sections not "
               f"read, or read in\n{pad}part, could answer is marked "
               f"{UNVERIFIABLE} below, and says which.")
+    # D3 is run here, ahead of the other classes, because what it rests on
+    # belongs with the lines above: which document told it where the sections
+    # are, and how many of the evidence claims it answers for. It checked 9 of
+    # the fixture's 122 and said nothing about the other 113.
+    document, unconsulted = consult(project, data)
+    if document and document["marked"]:
+        kinds = defaultdict(int)
+        for head in document["heads"]:
+            kinds[head["key"][0] if head["key"] else ""] += 1
+        print(f"document:  {document['slug']}, {len(document['heads'])} "
+              f"headings (" + (", ".join(
+                  f"{name}: {kinds[kind]}" for kind, name in (
+                      ("section", "numbered sections"),
+                      ("appendix", "appendices"), ("annex", "annexes"))
+                  if kinds[kind]) or "none numbered or lettered") + ")")
+    elif document:
+        # Text from a .docx or a .pdf, or Markdown with fewer than two
+        # headings marked "#".
+        print(f"document:  {document['slug']} DOES NOT MARK ITS HEADINGS. D3 "
+              f"takes each line that opens with\n{pad}a section number or an "
+              f"appendix letter as the start of one, to decide\n{pad}where to "
+              f"look, and asserts nothing found that way: each D3 finding\n"
+              f"{pad}is listed as {UNVERIFIABLE}.")
+    else:
+        print(f"document:  NOT CONSULTED: {unconsulted.rstrip('.')}.\n{pad}D3 "
+              f"looks each pointer up among the headings the inventory "
+              f"records, the first\n{pad}of each chunk, and asserts nothing "
+              f"found that way: each D3 finding is listed\n{pad}as "
+              f"{UNVERIFIABLE}.")
+    untrue, unchecked, looked = self_claims(claims, sections, unread, document)
+    left_out = sum(unchecked.values())
+    print(f"claims:    D3 checked {looked} of {len(claims)} evidence claims "
+          f"against the place each points to")
+    if len(claims) - left_out - looked:
+        # Not "checked": there was nothing to check them against. Each is a
+        # D3 finding, a missing section or a place that could not be found.
+        print(f"{pad}no place to check against: "
+              f"{len(claims) - left_out - looked}, each a D3 finding")
+    if left_out:
+        print(f"{pad}not checked: {left_out}")
+        for why in NOT_CHECKED:
+            if unchecked[why]:
+                print(f"{pad}    {why}: {unchecked[why]}")
     print()
 
     embedder = None
@@ -790,100 +1789,7 @@ def main():
                                            "could consume it")))
 
     # -- D3: evidence claim pointing somewhere that holds no such thing ------
-    by_heading = {}
-    for section in sections:
-        key = re.sub(r"\s+", " ", section.get("heading", "")).lower()
-        by_heading[key] = section
-    # "Closure evidence: Load test report" is a deliverable still to be
-    # produced, not an assertion that something is already recorded in the
-    # document. Only pointers at a place inside this document are self-claims.
-    LOCATION = re.compile(r"\b(section|appendix|annex|table|figure|chapter|"
-                          r"clause|paragraph|\u00a7)\b", re.I)
-    # "this section", "the section above" point at the passage making the claim,
-    # not elsewhere. They cannot be an untrue cross-reference.
-    SELF_REF = re.compile(r"\b(this|the (same|above|following|preceding)|here)\b",
-                          re.I)
-    # Traceability boilerplate. A claim reading "Requirement R-050 is addressed
-    # in Section 21" has nothing to verify once the identifier and the pointer
-    # are removed: whether the requirement is genuinely discharged is the
-    # coverage pipeline's question, and matching "requirement addressed" against
-    # a section's capability names is noise. Ten of nineteen candidates on the
-    # fixture were this shape.
-    BOILERPLATE = {"requirement", "requirements", "addressed", "covered",
-                   "satisfied", "section", "sections", "appendix", "annex",
-                   "described", "detailed", "provided", "given", "listed",
-                   "shown", "documented", "stated", "above", "below", "this"}
-    IDENTIFIER = re.compile(r"^[A-Z]{1,4}[-_]?\d{1,4}$|^\d+(\.\d+)*$")
-
-    def content_words(text):
-        out = set()
-        for word in re.findall(r"[A-Za-z][A-Za-z0-9-]{3,}", text or ""):
-            if word.lower() in BOILERPLATE or IDENTIFIER.match(word):
-                continue
-            out.add(word.lower())
-        return out
-
-    seen_d3 = set()
-    for claim in claims:
-        # The extraction schema does not say the pointer must be one string,
-        # and "Section 3 and Appendix B" has come back as a list of two.
-        target = claim.get("points_to") or ""
-        if isinstance(target, (list, tuple)):
-            target = " and ".join(str(place) for place in target)
-        target = str(target).strip()
-        if not target or not LOCATION.search(target):
-            continue
-        if SELF_REF.search(target) and not re.search(r"\d", target):
-            continue
-        # A claim must carry something checkable. Two content words is the
-        # least that can distinguish "maturity is assessed" from "is addressed".
-        if len(content_words(claim.get("claim", ""))) < 2:
-            continue
-        # One pointer can name several places — "Section 14 and Appendix F".
-        # The claim is only untrue if NONE of them holds the content.
-        numbers = re.findall(r"(\d+(?:\.\d+)*)", target)
-        appendices = re.findall(r"appendix\s+([a-z])\b", target, re.I)
-        hits = [section for key, section in by_heading.items()
-                if pointed_at(key, numbers, appendices)]
-        # Deduplicate on what the finding actually is: this claim, these places.
-        fingerprint = (" ".join(sorted(content_words(claim.get("claim", "")))),
-                       tuple(sorted(numbers)), tuple(sorted(appendices)))
-        if fingerprint in seen_d3:
-            continue
-        seen_d3.add(fingerprint)
-        # With a section unread, neither form of this finding is asserted. No
-        # unread section can be ruled out by its heading: the inventory keeps
-        # the FIRST heading of each chunk, and a chunk also holds whatever
-        # headings followed too soon to start one of their own, so an unread
-        # "3. Calibration Register" may hold 3.1, a table can sit in any
-        # section, and a heading may be spelled "Section 3: ...". An earlier
-        # version compared the pointer with each unread heading and let the
-        # finding stand where they differed; a review broke that seven ways.
-        if not hits and unread:
-            # This used to read "no such section in the document", about a
-            # section that is in the document and failed at extraction.
-            findings.append(("D3", f"{target} — not among the sections that "
-                                   f"were read", [claim], open_question(
-                unread, "a section that was not read could be, or could hold, "
-                        "the place it points to")))
-            continue
-        if not hits:
-            findings.append(("D3", f"{target} — no such section in the document",
-                             [claim], ""))
-            continue
-        wanted = norm(claim.get("claim", ""))
-        present = set()
-        for section in hits:
-            for capability in section.get("capabilities", []):
-                # The fallback's validator accepts a capability as a bare
-                # string, where the full schema requires {"name": ...}.
-                present |= norm(capability.get("name", "")
-                                if isinstance(capability, dict) else str(capability))
-        if wanted and not similar(wanted, present, 0.34):
-            findings.append(("D3", f"{claim.get('claim','')[:50]} -> {target}",
-                             [claim], open_question(
-                unread, "a section that was not read could hold it, as part "
-                        "of the place the pointer names")))
+    findings += untrue
 
     if args.adjudicate:
         client = Client(project, model=args.model, url=args.url,
@@ -928,9 +1834,10 @@ def main():
           ", ".join(f"{k}={counts[k]}" for k in sorted(counts)))
     if doubted:
         print(f"   {UNVERIFIABLE}: {doubted} of these {len(findings)}. Each "
-              f"asserts an absence that a section the\n   inventory did not "
-              f"read, or read only in part, could answer. Those are\n   "
-              f"questions for a reviewer, not findings.")
+              f"asserts an absence this run could not establish:\n   a section "
+              f"the inventory did not read, or read only in part, could answer "
+              f"it,\n   or the place a pointer names could not be looked up. "
+              f"Those are questions\n   for a reviewer, not findings.")
     print()
 
     shown = defaultdict(int)
@@ -941,8 +1848,10 @@ def main():
         print(f"[{kind}] {label[:76]}")
         for entry in members[:3]:
             who = entry.get("owner") or entry.get("to") or entry.get("points_to") or ""
-            print(f"      {entry.get('_locator',''):22} {entry.get('_heading','')[:30]:32}"
-                  f" {who[:26]}")
+            # str(): none of the three is a string by any validator's promise.
+            # A locator of null, a pointer given as {"place": ...}, raised here.
+            print(f"      {str(entry.get('_locator') or ''):22} "
+                  f"{str(entry.get('_heading') or '')[:30]:32} {str(who)[:26]}")
         if doubt:
             print(f"      {UNVERIFIABLE}: {doubt}")
 
@@ -1021,14 +1930,22 @@ def main():
         if unscorable:
             print(f"  {unscorable} defect(s) not auto-scorable — no anchor, no "
                   f"line span; read them by hand")
+        resting = sum(1 for i in claimed if findings[i][3])
         if unread or partial or short:
             # The score is of the inventory, not of the document.
             print(f"  scored over an inventory that left {len(unread)} "
                   f"section(s) unread, {len(partial)} read in part and "
                   f"{len(short)} read in\n  fewer passes than asked: a miss "
-                  f"may be a defect it never saw, and "
-                  f"{sum(1 for i in claimed if findings[i][3])} of the hits "
+                  f"may be a defect it never saw, and {resting} of the hits "
                   f"rest on\n  a finding marked {UNVERIFIABLE}")
+        elif resting:
+            # D3 has reasons of its own to list a finding and not assert it:
+            # a document that marks no headings, or was not consulted. With
+            # every section read this line was not printed, and a run in
+            # which every D3 finding was a question scored them as found.
+            print(f"  {resting} of the hits rest on a finding marked "
+                  f"{UNVERIFIABLE}: a question the\n  tool raised, not a "
+                  f"defect it established")
     return 0
 
 

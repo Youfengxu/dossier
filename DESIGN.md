@@ -491,6 +491,132 @@ inventory.** The extraction stage is not the hard part.
 > inventory quoted in this section is not in the repository, and whether it had
 > any cannot be checked.
 
+> **Which sections the document has was asked of the inventory, until
+> 2026-10-04.** D3 checks "recorded in Section 3.1" two ways: is there such a
+> place, and does it hold what the sentence says. For the first it matched the
+> pointer against the inventory's headings, and the inventory keeps one heading
+> per chunk. Of the fixture document's 88 headings, 15 head no chunk: each
+> arrived before four lines had gathered under the heading before it and was
+> taken into that chunk as text. A pointer to 14 of the 15, 5.1 or 20.4 say,
+> was "no such section in the document"; the fifteenth, 22, was found by the
+> chunks of its sub-sections. (No evidence claim in the fixture points at one
+> of them, which is why its numbers never showed it.) So was a pointer to a
+> section too short for the splitter to keep, to a heading spelled "Section 3:
+> ...", and to "Table 4" in a document with no section 4; in a document with
+> one, the table was looked for there. A section cut into several chunks was
+> looked for in the last of them only. None of this needed a failed
+> extraction. It happened with every section read.
+>
+> `synthesize.py` now reads the headings from the frozen text beside the
+> inventory, after checking that this is the text the inventory's line numbers
+> are in. An inventory records the hash of the text it read. One written before
+> it did has the hash of the source, which is the text's own hash where the
+> text is the source (a `.md`); for any other source each chunk's heading is
+> also looked for at the line its locator gives, since a re-freeze leaves the
+> source's hash unchanged and moves the lines. A place runs from its heading
+> to the next numbered heading that is not inside it, and a claim is looked for
+> in every chunk that covers those lines.
+>
+> **D3 stands behind a finding only where four things hold.** Whatever falls
+> short of them is still listed, as `unverifiable`, with the reason.
+>
+> - *The document marks its headings.* A Markdown source, by the manifest, with
+>   "#" on two headings or more. A rule of "=" or "-" under a line is
+>   Markdown's other mark and is not taken for one, because a rule under the
+>   last item of a list looks the same. A line in a fenced block, between
+>   `<pre>` and its close, in a comment or in the front matter of the file is
+>   not read as a heading.
+> - *The pointer is its places and nothing else:* "Section 14 and Appendix F",
+>   "Sections 2 to 13". In "Tables 4 and 5 of the calibration section", "the
+>   calibration section, 12 gauges" and "Section 9 of the interface control
+>   document", whose a number is has to be guessed, and each of those guesses
+>   called a section missing. Such a pointer is read as far as it names
+>   sections, to know where to look.
+> - *Each place is settled.* It is found under a heading that is one of the
+>   document's own, with no line beside it that could be the place instead: a
+>   numbered line outside any list is a heading in all but the mark. Or it is
+>   shown to be missing: the document's own headings number its sections the
+>   way the pointer does, no line opens with the number or letter, and no
+>   heading has it anywhere in it ("Part 3: Design"). A numbered heading is the
+>   document's own when every heading it stands under is the first of the
+>   document or holds it by number. "### 2. Apply the migration" under "##
+>   Operations" is the second step of that heading, in a document whose
+>   sections may carry no numbers in the source at all.
+> - *What was found was read.* Every line of it is in a chunk of the
+>   inventory, and no section went unread.
+>
+> A pointer to a table, a figure or a page is counted and not listed. The
+> header says how many evidence claims D3 checked and why it left out the
+> rest: on the fixture it checks 8 of 122, and it had checked 9 without saying
+> so.
+>
+> **In text that marks no headings it asserts nothing, and that is a cost.**
+> `extract.py` writes a `.docx` a paragraph a line: no "#", and a tab between a
+> number and its title is not text, so a heading typed "3.1<TAB>Drift limits"
+> is the line "3.1Drift limits". A line that opens with a number is all there
+> is to go on, and so is a cell of a table ("10 km"), a numbered step, a line
+> of the contents with its page hard against it, and a sentence that opens
+> "Appendix B lists". Two independent reviews each broke a version of this
+> change a dozen ways, and nearly all of them ran through a rule for telling
+> those apart: "10 km" ended Section 3 before its sub-sections; "3.1Drift
+> limits" was read as section 3 and Section 3.1 called missing; two lines of
+> shell that open with "# " turned the whole text into one whose only
+> headings were those two; rows reading "1 - Low", "2 - Medium", "3 - High",
+> in a document whose headings Word numbers itself and so keeps out of the
+> text, were taken for its sections 1 to 3. Each rule added to stop one of
+> these opened another. So no rule decides anything there. D3 takes each line
+> that opens with a section number and a word with a capital, or with an
+> appendix letter, as the start of something, looks there, passes a claim it
+> finds, and lists the rest as `unverifiable`. It does the same when the
+> document cannot be consulted. For a `.docx` or a `.pdf` that means D3 raises
+> questions and makes no findings: "Section 9 — no such section" is not said
+> of such a document, however plain it is that no line opens with a 9.
+>
+> A third review then did the same to the Markdown side, and the four
+> conditions above are what came of it. Each was a false finding first: a
+> claim held in "## A.2" reported against Appendix A, whose span ended at the
+> next heading; a step taken for the Section 2 of a document numbered by its
+> renderer; "# restart the fabric" inside `<pre>` taken for a heading; "Tables
+> 4 and 5 of the calibration section" taken for Section 5. They cost
+> assertions as well. In a document with headings of two kinds, the numbered
+> ones under a rule and their sub-sections under "###", a claim that points to
+> a numbered section is looked for in its sub-sections only, and is a question
+> when it is not found there.
+>
+> One consequence is not D3's to fix. The splitter leaves some lines in no
+> chunk (a numbered step replaced by the next, a passage of sixty characters
+> or fewer), and a claim about a section with such lines in it is
+> `unverifiable` where the rest of the section does not hold it. On the
+> fixture that is Section 12, whose lines 284 and 285 nothing read.
+>
+> **Every arm on `inv-ablation.json` now emits one candidate fewer.** Reading
+> "Sections 2 to 13" as the pointer it is brought one more traceability
+> sentence into range, "Requirements R-001 through R-042 are addressed across
+> Sections 2 to 13", whose only content words by the old list were "through"
+> and "across". Both were added to the boilerplate list. With "through" gone,
+> "A detailed mapping of requirements R-001 through R-042 is provided ->
+> Appendix A" has one content word left and is no longer checked. It was a
+> false candidate: Appendix A is the requirement mapping. D3 emits 7 where it
+> emitted 8, the other classes and recall are untouched, and the tables in
+> §3.24, §3.26, §3.28 and §3.30 carry the new figures:
+>
+> | arm | candidates, before | precision, before | candidates, now | precision, now |
+> |---|---|---|---|---|
+> | baseline | 20 | 15.0% | 19 | 15.8% |
+> | `--no-normalise` | 20 | 15.0% | 19 | 15.8% |
+> | `--no-polarity` | 21 | 14.3% | 20 | 15.0% |
+> | `--object-identity` | 21 | 14.3% | 20 | 15.0% |
+> | `--authority-as-dataflow` | 29 | 10.3% | 28 | 10.7% |
+>
+> Recall is 3 of 6 in all ten cells. Both columns were run on 2026-10-04 from
+> an embedding cache written on 2026-08-19, the day of the measurement above,
+> with the endpoint unreachable so that a text missing from the cache would
+> have stopped the run; the code as it was reproduced the "before" column
+> exactly. That cache is not in the repository. Without embeddings the same
+> change is 4 of 36 candidates to 4 of 35, recall 4 of 6 both times. The other
+> inventory quoted below (4 of 6 and 40 candidates) is not in the repository
+> either, so its figures cannot be re-run and stand as they were written.
+
 > **§3.22–§3.31 were re-measured on 2026-08-19 and the numbers below are the old
 > ones.** Every "N of 6" in this range was produced by a scorer that has since
 > been deleted: it joined every reported finding into one string and counted a
@@ -550,7 +676,8 @@ inventory.** The extraction stage is not the hard part.
 > comparing across two extractions would measure the extraction.
 >
 > **That inventory is weaker than the one above and the two sets of numbers do
-> not compare.** Its baseline is **3 of 6 and 20 candidates**, against 4 of 6
+> not compare.** Its baseline is **3 of 6 and 19 candidates** (20 until
+> 2026-10-04; the note under §3.21 says what changed), against 4 of 6
 > and 40. It captured four deferrals where the other captured twelve, so the
 > planted D6 cycle has no legs to close and the D6 class is empty in every arm;
 > the D5 and D8 defects are missed in every arm as well. Everything the four
@@ -637,8 +764,8 @@ section 3.
 >
 > | | candidates | recall | precision |
 > |---|---|---|---|
-> | baseline | 20 | 3 of 6 | 15.0% |
-> | `--no-normalise` | 20 | 3 of 6 | 15.0% |
+> | baseline | 19 | 3 of 6 | 15.8% |
+> | `--no-normalise` | 19 | 3 of 6 | 15.8% |
 >
 > Identical because the fixture ships no `components.yaml`, so the shipped
 > configuration **is already the ablation** — `load_components` finds no file,
@@ -691,8 +818,8 @@ claims is a D6 ownership gap, stated outright.
 >
 > | | authority pool | D5 candidates | recall | precision |
 > |---|---|---|---|---|
-> | baseline | 40 | 1 | 3 of 6 | 15.0% |
-> | `--no-polarity` | 45 | 2 | 3 of 6 | 14.3% |
+> | baseline | 40 | 1 | 3 of 6 | 15.8% |
+> | `--no-polarity` | 45 | 2 | 3 of 6 | 15.0% |
 >
 > The extra candidate is this section's mechanism running in front of you: the
 > fixture's Section 6.2 says the Sensor Fabric does **not** decide sensor
@@ -703,7 +830,7 @@ claims is a D6 ownership gap, stated outright.
 > here — 11%, against the 44% recorded above on a real architecture.
 >
 > **"D5 candidates halved, 10 to 5" does not reproduce.** That is a 50%
-> reduction; here polarity removes one candidate in 21. The sign is right and
+> reduction; here polarity removes one candidate in 20. The sign is right and
 > the size belongs to a different document.
 >
 > **The other direction is a trap worth recording.** Against a second inventory
@@ -748,8 +875,8 @@ same artefact.
 >
 > | | D5 candidates | recall | precision |
 > |---|---|---|---|
-> | baseline | 1 | 3 of 6 | 15.0% |
-> | `--object-identity` | 2 | 3 of 6 | 14.3% |
+> | baseline | 1 | 3 of 6 | 15.8% |
+> | `--object-identity` | 2 | 3 of 6 | 15.0% |
 >
 > One extra false positive, and it is the shape this section predicts: "execution
 > scheduling", *authoritative for* it in the fixture's Section 5.2 and *freezes*
@@ -843,8 +970,8 @@ No new threshold — the action grouping reuses the object grouping's.
 >
 > | | authority pool | D5 candidates | recall | precision |
 > |---|---|---|---|---|
-> | baseline | 40 | 1 | 3 of 6 | 15.0% |
-> | `--authority-as-dataflow` | 188 | 10 | 3 of 6 | 10.3% |
+> | baseline | 40 | 1 | 3 of 6 | 15.8% |
+> | `--authority-as-dataflow` | 188 | 10 | 3 of 6 | 10.7% |
 >
 > Nine extra candidates, not one of them a planted defect, and they are the
 > handoffs this section describes: the Platform Adapter, the Sensor Fabric and
