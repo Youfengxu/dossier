@@ -49,6 +49,86 @@ recognising the situation is the hard part, not fixing it:
   so a reader cannot mistake thin evidence for agreement;
 - never let a tie be broken by iteration order.
 
+**Two more turned up on 2026-10-04**, both in tools that take a document a
+section at a time, and neither with an error:
+
+| where | what happened | what it printed |
+|---|---|---|
+| `inventory.py` | its splitter left lines in no section, and nothing checked | "reading 100% of the document" (§3.21) |
+| `claim.py`, `undefined.py` | a section whose call failed came back as `[]`, which is what a section with nothing in it comes back as, and `--limit` cut the list of sections without a word | "4/4 sections", "0 finding(s)", "d: 2 sections" of four |
+
+What was decided for the second. Two of these the author chose, and say so.
+The rest the author delegated, on condition that each is written down, and
+they are here so that any of them can be overruled:
+
+- a failed call is `None` and never `[]`, and a run counts the sections it
+  asked and the ones that answered;
+- the count is printed beside the result it qualifies, the sections that did
+  not answer are named with the reason, and a run in which none answered says
+  NOTHING WAS READ: "0 finding(s)" over nothing is not a clean document;
+- the exit status stays 0, as it does in `inventory.py` when sections fail.
+  The author chose that over a non-zero exit, which would also have failed
+  `smoke.py`, whose stub answers no section validly;
+- a section `--limit` stopped before is listed with the ones that failed, and
+  one that answered in some of several passes is read, and listed apart;
+- the record is written with the result. `undefined.py`'s file was a bare
+  list of terms with nowhere to put it and is now an object, which the author
+  chose over a second file; `bundle.py` reads both;
+- a file with no such record, or one whose counts do not add up, is said not
+  to say how many sections it rests on. It is never taken for the whole
+  document: not known is not all;
+- what reads those files says what they say: `score-claims.py` and
+  `undefined.py --score` beside the score, `bundle.py` on the reviewer's page;
+- nothing is marked `unverifiable`. Neither tool asserts an absence over the
+  sections it did not read (one checks a definition against the whole text,
+  the other compares the claims it has), so what an unread section costs is a
+  finding missed, and the output says that in those words;
+- neither tool checks at run time that every line of the document is in a
+  section, as `inventory.py` does (§3.21). Both cut the document with its
+  splitter, which holds that by construction and under test.
+
+**That change was then reviewed on its code, by a reviewer given no account
+of it**, and the readers were where it fell short. Each of these was
+reproduced before it was touched, and each is a delegated decision:
+
+| what the review found | what was decided |
+|---|---|
+| `bundle.py` put the note on its page and not in its sheet, which is built from the findings alone | the notes are rows of the sheet, under its header and above every finding |
+| a terms file from a run no section answered holds no term, and `bundle.py` stopped with "no inputs found", sending its reader to check the flags | it stops with "nothing to bundle: no finding in" the files it did find, and what they say of their sections. "no inputs found" is kept for when none was. A bundle of no finding is still not written |
+| "NOT THE WHOLE DOCUMENT" stood over every terms file written before the record existed, the complete runs among them | three things under three names: NOT KNOWN TO BE THE WHOLE DOCUMENT, NOTHING WAS READ, NOT THE WHOLE DOCUMENT |
+| an object with no list of terms was read as a file with no terms. This change did that: before it such a file stopped the bundle with a traceback | it stops the bundle again, with the file's name and "not a terms file" |
+| `score-claims.py` said nothing of the pairs `claim.py` could not judge, which is older than this change, nor of the sections a pass failed on: "recall 0/1" and MISSED, over a defect whose pair was never judged | both are said beside the score, an index that does not record its unjudged pairs is said not to say, and a MISSED defect that an unjudged pair matches says so under its own line |
+| `claim.py --runs 0` made no call, and named every section as "extraction failed" | refused as a usage error, before anything is read |
+| a text with no section in it said so on the run's first line, and its result and its file read as a document answered in full | NOTHING WAS READ, beside the result, and to every reader of the file |
+
+**The score's figures were not changed, and that is the decision most worth
+a second look.** Recall still counts a defect whose pair was never judged as
+missed. For a figure that is reported, the rule is the other one: a failure
+to measure is left out and reported as left out. The score now names which
+defects those are, so whoever carries a figure out of a run with unjudged
+pairs can leave them out; doing it in the scorer would change what the recall
+figures already in this file mean, and was not done on the author's behalf.
+
+Three things the review found were left as they are, each for a reason:
+
+- `synthesize.moved()` does not see a line added between two sections in a
+  row that share a heading (two tables that each open on a bare "#"). The
+  second chunk looks exactly like a later piece of the first, and nothing an
+  entry holds tells them apart, so there is no check to add. The limit is in
+  its docstring and pinned by a test. It bears only on an inventory that
+  does not record the hash of its text (they do since 2026-10-04), of a
+  document that is not Markdown;
+- a terms entry whose `uses` is not a number, and an index that is not an
+  object, each stop their reader with a traceback. That is loud, and already
+  on the cautious side. `undefined.py` still writes its file in place, where
+  `claim.py` renames one into place; a terms file cut off mid-write is not
+  JSON, and stops the bundle by name;
+- `--limit -1` reads all but the last section. It says so and its counts add
+  up, here as in `inventory.py`.
+
+The same review ran 48 mutations of its own against the whole suite, and 16
+went unnoticed. Each of the 16 has a test now.
+
 *Sibling candidates not hoisted, for later judgement:* §3.4 (the model may not
 invent the evidence for its own verdict), §3.12 (ground truth is a hypothesis,
 not an oracle), §3.17 (where a deterministic check exists, it wins). Each may be

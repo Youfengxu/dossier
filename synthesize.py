@@ -1118,6 +1118,14 @@ def moved(entries, lines):
     A bare "#" is a heading with nothing in it, and so is a blank line once
     its hashes are taken off. Such a chunk is tied by a line of hashes and by
     no other: compared as text alone, a line added above it went unseen.
+
+    NOT SEEN, and not seeable from the entries: a chunk whose heading is the
+    heading before it is taken for a later piece of that section and is not
+    looked at. Two sections in a row under one heading (two tables that each
+    open on "#", two "Notes") are told from one section cut in two by nothing
+    an entry holds, so a line added between them moves the second and this
+    returns "". An inventory that records the text's own hash is not checked
+    here at all.
     """
     before, blind, tied = None, False, 0
     for entry in entries:

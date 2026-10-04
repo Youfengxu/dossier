@@ -364,6 +364,111 @@ def shortfall(results, runs):
             "skipped": skipped}
 
 
+def answers(sections, beyond, passes, runs, doc):
+    """How much of a document a tool that asks section by section was
+    answered on: {"of", "answered", "runs", "not_read", "short"}.
+
+    claim.py and undefined.py read the sections split_sections() cuts and keep
+    no entry for each. A section whose call failed therefore left nothing
+    behind: its claims or its terms were not there, under a progress line
+    that read "4/4 sections", and --limit cut the list without a word. This
+    is the record both print beside their result and write with it.
+
+      of        the sections the document was cut into
+      answered  how many of them at least one pass answered
+      not_read  the others, each by heading and locator with why: no pass
+                answered, or --limit stopped before it
+      short     answered, and in fewer passes than the `runs` asked for
+
+    `passes` is how many passes answered each of `sections`, in order.
+    """
+    def place(section):
+        return f"{doc}:{section['start']}-{section['end']}"
+
+    not_read = [{"heading": section["heading"], "locator": place(section),
+                 "why": "extraction failed"}
+                for section, count in zip(sections, passes) if not count]
+    not_read += [{"heading": entry["heading"], "locator": entry["locator"],
+                  "why": entry["error"]} for entry in beyond]
+    short = [{"heading": section["heading"], "locator": place(section),
+              "passes": count}
+             for section, count in zip(sections, passes) if 0 < count < runs]
+    return {"of": len(sections) + len(beyond),
+            "answered": sum(1 for count in passes if count),
+            "runs": runs, "not_read": not_read, "short": short}
+
+
+def asking(doc, sections, everything, beyond):
+    """What such a tool says before it starts: how many sections it will ask
+    about, and that this is not the whole document when --limit holds some
+    back or there is nothing in it to ask about."""
+    if not everything:
+        return f"{doc}: nothing to read: no line of the document holds text"
+    if beyond:
+        return (f"{doc}: asking about the first {len(sections)} of "
+                f"{len(everything)} sections (--limit): NOT the whole document")
+    return f"{doc}: {len(sections)} sections"
+
+
+def is_answers(value):
+    """Whether `value` is a record answers() wrote. Nothing else in a file is
+    taken as its account of the sections behind it: a record with a count
+    missing, read leniently, is a document read in full. Each check stands
+    alone. A count below nothing and a list of bare names can both be made
+    to add up."""
+    if not isinstance(value, dict):
+        return False
+    counted = all(type(value.get(key)) is int and value[key] >= 0
+                  for key in ("of", "answered", "runs"))
+    listed = all(isinstance(value.get(key), list)
+                 and all(isinstance(entry, dict) for entry in value[key])
+                 for key in ("not_read", "short"))
+    return counted and listed and \
+        value["answered"] + len(value["not_read"]) == value["of"]
+
+
+def unanswered(read, consequence, nothing, most=12):
+    """The lines a tool prints beside its result when it was not answered on
+    every section, and [] when it was.
+
+    `consequence` is what a section not read means for this tool's result.
+    `nothing` is what that result is when no section answered at all, which
+    is said apart and in capitals: "0 finding(s)" over nothing is not a clean
+    document. Nor is it over a text with no section in it, which is likelier
+    a parse that failed than a document with nothing to say: that was said
+    on the run's first line and nowhere near its result. The lists stop at
+    `most`; the counts above them are exact.
+    """
+    def named(entry, note):
+        heading, locator = entry.get("heading"), entry.get("locator")
+        where = f"{heading} ({locator})" if heading else \
+            f"the section at {locator}, which has no heading"
+        return f"    {where}  [{note}]"
+
+    lines, missing, short = [], read["not_read"], read["short"]
+    if not read["of"]:
+        lines += ["NOTHING WAS READ: no line of the document holds text.",
+                  f"{nothing}."]
+    elif not read["answered"]:
+        lines += [f"NOTHING WAS READ: 0 of {read['of']} sections answered.",
+                  f"{nothing}:"]
+    elif missing:
+        lines += [f"{len(missing)} of {read['of']} sections "
+                  f"{'was' if len(missing) == 1 else 'were'} NOT read.",
+                  f"{consequence}:"]
+    lines += [named(entry, entry.get("why")) for entry in missing[:most]]
+    if len(missing) > most:
+        lines.append(f"    and {len(missing) - most} more")
+    if short:
+        lines.append(f"{len(short)} section(s) answered in fewer than the "
+                     f"{read['runs']} passes asked for:")
+        lines += [named(entry, f"{entry.get('passes')} of {read['runs']}")
+                  for entry in short[:most]]
+        if len(short) > most:
+            lines.append(f"    and {len(short) - most} more")
+    return lines
+
+
 def reading(sections, everything, beyond, left_out, concurrency):
     """What a run says it is about to read.
 

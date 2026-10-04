@@ -70,16 +70,17 @@ product, not a presentation afterthought.
 
 | tier | artefact | count | industry term |
 |---|---|---|---|
-| 1 | `tests/` | 653 | unit tests |
-| 2 | `run-tests.py --mutate` | 142/142 | **mutation testing** |
+| 1 | `tests/` | 731 | unit tests |
+| 2 | `run-tests.py --mutate` | 191/191 | **mutation testing** |
 | 3 | `conformance.py` | 6/6 | **contract testing**, proved by mutation |
 | 3 | `smoke.py` | 27/27 | integration / E2E |
 | 0 | `doctor.py` | — | preflight / environment check |
 
 Tiers 1 and 2 were re-derived from a run on 2026-10-04: 578 tests and 112
 mutations before the work on the lines of a document that are in no section
-(`DESIGN` §3.21), which added 75 tests and 30 mutations. `smoke.py` was
-re-run the same day and is unchanged at 27/27.
+(`DESIGN` §3.21), which added 75 tests and 30 mutations, and the work on the
+sections that did not answer (`DESIGN` §0.1), which added 78 and 49. `smoke.py`
+was re-run the same day and is unchanged at 27/27.
 
 ### 2.4 Validation evidence — is the method right?
 
@@ -133,7 +134,7 @@ vocabulary.
 
 | 25059-style characteristic | where dossier already evidences it | strength |
 |---|---|---|
-| Functional correctness | 653 unit tests, 142 mutations, 6 contract checks | **strong** |
+| Functional correctness | 731 unit tests, 191 mutations, 6 contract checks | **strong** |
 | Robustness | fixtures carry deliberate decoys; adversarial checker tests | moderate |
 | Transparency / explicability | every finding carries `slug:line` + verbatim quote | **strong** — this is the thesis |
 | Accuracy (task-level) | eval suite on 5 labelled corpora | **weak — no human baseline (G1)** |

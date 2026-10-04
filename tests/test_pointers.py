@@ -1387,6 +1387,42 @@ class WhichDocument(Frozen):
         self.assertIn("line 7 is not the heading the inventory has there",
                       synthesize.moved(sections, shifted))
 
+    def test_nor_after_an_entry_that_says_nothing(self):
+        """An entry with no heading puts the chunk after it in doubt, and a
+        chunk in doubt is not refused for its first line. It is not tied by
+        a blank one either: with no other chunk to tie the text, nothing
+        does, and that is said."""
+        lines = ["", "Gap", "Owner", "G1", "Provider not selected", "IA lead"]
+        sections = [{"error": "extraction failed"},
+                    {"heading": "", "locator": "d:1-6"}]
+        self.assertIn("no chunk of the inventory starts on a heading",
+                      synthesize.moved(sections, lines))
+
+    def test_a_line_added_between_two_sections_of_one_heading_is_not_seen(self):
+        """A limit, pinned so that it is not taken for something checked.
+        Two tables in a row each open on a bare "#". The second chunk has
+        the heading of the one before it, which is also how a later piece of
+        one section looks, so it is not looked at: a line added between the
+        two moves the second and moved() returns "". Nothing in an entry
+        tells the two cases apart."""
+        table = ["#", "Gap", "Owner", "G1", "Provider not selected",
+                 "IA lead", "G2", "Datum not agreed with the port authority",
+                 "Hydrology lead"]
+        lines = ["# Flood twin design", "The twin is in three parts.",
+                 "Each is described below.", "Each has an owner.",
+                 "Open items follow.", "They are reviewed monthly."] \
+            + table + table
+        sections = [{"heading": part["heading"],
+                     "locator": f"d:{part['start']}-{part['end']}"}
+                    for part in inventory.split_sections(lines)]
+        self.assertEqual(where(sections), [("Flood twin design", "d:1-6"),
+                                           ("", "d:7-15"), ("", "d:16-24")])
+        between = lines[:15] + ["One more gap was closed."] + lines[15:]
+        self.assertEqual(synthesize.moved(sections, between), "")
+        above = lines[:6] + ["One more gap was closed."] + lines[6:]
+        self.assertIn("line 7 is not the heading the inventory has there",
+                      synthesize.moved(sections, above))
+
     def test_and_in_an_inventory_cut_before_the_title_had_a_chunk(self):
         report = self.run_on(sections_of(DOCUMENT, (CLAIM, "Section 9"),
                                          older=True),

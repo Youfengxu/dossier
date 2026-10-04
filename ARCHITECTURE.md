@@ -264,6 +264,19 @@ the entire text for four things: a definitional copula, a definition-list line,
 a glossary section, or a heading of its own. Nothing the model says survives
 without corroboration, and the model never gets to say "this is undefined".
 
+What it could not say until 2026-10-04 was how much of the document had been
+asked about. A section whose call failed nominated nothing, which is also what
+a section with nothing to nominate does, and `--limit` shortened the list of
+sections without saying so. It now counts the sections that answered, names
+the others beside its result, and writes the same into its file, which
+`bundle.py` carries onto the reviewer's page and into the sheet beside it
+(`DESIGN` §0.1). A term is still never wrongly listed. One that only an unread
+section would have raised is missed, and the output says so. `claim.py` reads
+the same sections and had the same gap, with the same remedy, and
+`score-claims.py` says beside a score what the index it scores does not rest
+on: sections not answered, sections a pass failed on, and pairs nobody
+judged.
+
 The tuning history is instructive about how easy the check is to get wrong. An
 early `DEFINITION` pattern accepted a hyphen after the term and cleared most
 nominations, because hyphens join compound words on every page. An early

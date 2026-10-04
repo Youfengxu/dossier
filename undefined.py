@@ -24,6 +24,16 @@ against the whole document for a definition, a glossary entry, or a heading of
 its own. Nothing the model says survives without corroboration, and the model
 is never asked whether something is absent — it cannot see the rest of the
 document, and absence is computed here.
+
+WHAT IT WAS NOT ANSWERED ON. The check runs over the whole document. The
+nominations come from the sections that answered, and a section whose call
+failed nominated nothing, which is also what a section with nothing to name
+does: "4/4 sections", with one of the four unanswered, and --limit shortened
+the list without a word. The run now counts the sections that answered, names
+the others above its list, and writes the same into --out, which is an object
+for that reason (it was the bare list of terms; bundle.py reads both). No term
+is wrongly listed for it. One that only an unread section would have raised is
+missed, and the output says so. The exit status is 0 either way.
 """
 
 import argparse
@@ -39,6 +49,12 @@ import closure                                              # noqa: E402
 import inventory                                            # noqa: E402
 
 PROMPT_VERSION = "undefined-1"
+
+# What a section that did not answer means for the list this prints, and what
+# the list is when none answered.
+NOT_READ = ("A term that only one of them would have nominated is not in the "
+            "list below")
+NOTHING_READ = '"0 undefined" below says nothing about the document'
 
 SYSTEM = """You read one section of a technical document and name the terms it
 uses without explaining them.
@@ -175,10 +191,12 @@ def main():
     client = Client(project, prompt_version=PROMPT_VERSION,
                     max_tokens=args.max_tokens, **kwargs)
 
-    sections = inventory.split_sections(lines, max_chars=args.max_chars)
-    if args.limit:
-        sections = sections[:args.limit]
-    print(f"{args.doc}: {len(sections)} sections")
+    # --limit cut this list and said nothing, and the line below read "2
+    # sections" of a document that has four. The ones it stops before are
+    # counted and named with the ones that failed.
+    everything = inventory.split_sections(lines, max_chars=args.max_chars)
+    sections, beyond = inventory.limited(everything, args.doc, args.limit)
+    print(inventory.asking(args.doc, sections, everything, beyond))
 
     def one(section):
         user = (f"SECTION: {section['heading']}\n"
@@ -188,17 +206,22 @@ def main():
             reply = client.ask(SYSTEM, user, validate=validate,
                                label=f"undef:{section['start']}")
         except LLMError:
-            return []
+            # None, not []. A section that did not answer is not a section
+            # with no term worth naming, and [] made the two the same: the
+            # run printed "4/4 sections" with one of the four unanswered.
+            return None
         return [(item["term"].strip(), item["quote"].strip(), section)
                 for item in reply["terms"]]
 
-    proposed = []
+    proposed, passes = [], []
     with ThreadPoolExecutor(max_workers=max(1, args.concurrency)) as pool:
         for index, batch in enumerate(pool.map(one, sections), 1):
-            proposed.extend(batch)
+            passes.append(0 if batch is None else 1)
+            proposed.extend(batch or [])
             if index % 50 == 0 or index == len(sections):
-                print(f"  {index}/{len(sections)} sections, "
-                      f"{len(proposed)} nominations")
+                print(f"  {index}/{len(sections)} sections asked, "
+                      f"{sum(passes)} answered, {len(proposed)} nominations")
+    read = inventory.answers(sections, beyond, passes, 1, args.doc)
 
     # THE CORPUS DISPOSES. Every nomination is checked against the whole
     # document; the model's opinion that a term is unexplained counts for
@@ -223,13 +246,23 @@ def main():
     findings = sorted(best.values(), key=lambda f: -f["uses"])
     print(f"\n  {len(proposed)} nominations -> {len(findings)} undefined "
           f"({cleared} cleared as defined, rest below --min-uses or unquotable)")
+    # Said with the count, above the list it qualifies. Whether a term is
+    # defined is checked against the whole text, so a section not read costs
+    # nominations and nothing else: terms are missed, none is wrongly listed.
+    for line in inventory.unanswered(read, NOT_READ, NOTHING_READ):
+        print(f"  {line}")
     print("=" * 74)
     for finding in findings[:60]:
         print(f"  {finding['uses']:>4}x  {finding['term'][:38]:<40} "
               f"{finding['locator']}")
     if args.out:
+        # An object since 2026-10-04. It was the bare list of terms, which
+        # has nowhere to say how many sections the terms came from; bundle.py
+        # reads either.
         path = os.path.join(project, args.out)
-        json.dump(findings, open(path, "w"), indent=1)
+        with open(path, "w", encoding="utf-8") as handle:
+            json.dump({"doc": args.doc, "sections": read, "terms": findings},
+                      handle, indent=1)
         print(f"\nwrote {path}")
 
     if args.score:
@@ -279,6 +312,11 @@ def main():
         for f in wanted:
             mark = "FOUND" if f in hit else "miss "
             print(f"  {mark} {f['id']:8} {str(f['terms'])[:58]}")
+        if read["not_read"]:
+            # The score is of what was asked about, not of the document.
+            print(f"  scored over {read['answered']} of {read['of']} sections: "
+                  f"a miss may be a term that only a section not read\n"
+                  f"  would have nominated")
     print(f"\nmodel calls: {client.stats}")
     return 0
 
