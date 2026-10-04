@@ -850,6 +850,328 @@ MUTATIONS = [
             "test_the_sections_it_stopped_before_are_recorded_as_not_read",
         ],
     },
+    # Lines of the document that are in no section. The splitter left two kinds
+    # out under a run that printed "reading 100% of the document". Each entry
+    # below is one decision of 2026-10-04: the two kinds are kept, the run
+    # checks what its splitter left out and records it, and synthesize.py
+    # asserts no absence over lines no call was shown.
+    {
+        "what": "inventory.split_sections — a heading straight after a heading "
+                "replaces it again",
+        "why": "the replaced line is then in no section. A numbered list is a "
+               "run of heading-like lines, so each step replaced the one "
+               "before: lines 284 and 285 of the fixture, the second a "
+               "corroborating anchor of the planted defect GT-D5-001",
+        "module": "inventory",
+        "old": '        elif is_heading and not current and not opened:',
+        "new": '        elif is_heading and not current:',
+        "tests": [
+            "tests.test_unread_lines.AHeadingStraightAfterAHeading."
+            "test_each_step_of_a_numbered_list_is_shown_to_a_call",
+            "tests.test_unread_lines.AHeadingStraightAfterAHeading."
+            "test_the_first_of_the_run_heads_the_section_and_the_rest_are_text",
+            "tests.test_unread_lines.AHeadingStraightAfterAHeading."
+            "test_a_heading_followed_at_once_by_its_sub_heading_keeps_both",
+            "tests.test_unread_lines.AHeadingStraightAfterAHeading."
+            "test_the_two_steps_the_fixture_lost_are_read",
+            "tests.test_unread_lines.AHeadingStraightAfterAHeading."
+            "test_no_line_of_the_fixture_that_holds_text_is_in_no_section",
+            "tests.test_unread_lines.WhatALocatorSays."
+            "test_the_committed_inventory_differs_from_a_fresh_cut_in_one_section",
+        ],
+    },
+    {
+        "what": "inventory.split_sections — the sixty-character floor put back",
+        "why": "a stub, a short front matter and a short last section were "
+               "dropped heading and all, to save a call that \"cannot produce "
+               "anything\". Forty-four characters is \"Component maturity is "
+               "assessed in Section 9.\", which is what D3 checks",
+        "module": "inventory",
+        "old": '        if opened or any(x.strip() for x in current):',
+        "new": '        if current and sum(len(x.strip()) for x in current) > 60:',
+        "tests": [
+            "tests.test_unread_lines.ASectionOfAFewWords."
+            "test_a_stub_is_a_section_of_its_own",
+            "tests.test_unread_lines.ASectionOfAFewWords."
+            "test_a_short_front_matter_is_kept",
+            "tests.test_unread_lines.ASectionOfAFewWords."
+            "test_a_short_last_section_is_kept",
+            "tests.test_unread_lines.ASectionOfAFewWords."
+            "test_a_heading_with_nothing_under_it_is_kept",
+            "tests.test_chunking.InventorySections."
+            "test_a_section_with_almost_no_text_is_still_a_section",
+            # The run's own check, on a document with a stub in it: with the
+            # floor back it no longer says it reads the whole document.
+            "tests.test_unread_lines.ARun."
+            "test_it_reads_the_whole_document_and_the_inventory_says_so",
+        ],
+    },
+    {
+        "what": "inventory.split_sections — a heading with nothing under it "
+                "is dropped",
+        "why": "a heading is text, and a section that holds nothing is not "
+               "the same as no section: a pointer to it would be called a "
+               "pointer to nowhere",
+        "module": "inventory",
+        "old": '        if opened or any(x.strip() for x in current):',
+        "new": '        if any(x.strip() for x in current):',
+        "tests": [
+            "tests.test_unread_lines.ASectionOfAFewWords."
+            "test_a_heading_with_nothing_under_it_is_kept",
+        ],
+    },
+    {
+        "what": "inventory.unread_lines — a section is taken at its locator's "
+                "word",
+        "why": "the claim is that a call was shown the line, and a locator is "
+               "the splitter's own account of that. A check that reads only "
+               "the line numbers confirms what the splitter believes",
+        "module": "inventory",
+        "old": '        if whole or headed:',
+        "new": '        if True:',
+        "tests": [
+            "tests.test_unread_lines.WhatTheRunChecks."
+            "test_a_section_whose_text_is_not_its_lines_shows_none_of_them",
+            "tests.test_unread_lines.WhatTheRunChecks."
+            "test_nor_does_one_whose_heading_is_not_the_line_it_starts_on",
+        ],
+    },
+    {
+        "what": "inventory.unread_lines — it never finds a line",
+        "why": "a check that cannot fail: the run says 100% whatever the "
+               "splitter did, which is where this started",
+        "module": "inventory",
+        "old": '            if line.strip() and number not in shown]',
+        "new": '            if False]',
+        "tests": [
+            "tests.test_unread_lines.WhatTheRunChecks."
+            "test_a_line_in_no_section_is_reported",
+            "tests.test_unread_lines.WhatTheRunChecks."
+            "test_it_finds_the_two_lines_the_committed_inventory_left_out",
+            "tests.test_unread_lines.ARun."
+            "test_a_splitter_that_leaves_lines_out_is_not_taken_at_its_word",
+            "tests.test_unread_lines.ARun."
+            "test_and_the_inventory_records_which_lines",
+        ],
+    },
+    {
+        "what": "inventory.unread_lines — a blank line in no section counts "
+                "as text not read",
+        "why": "blank lines under no heading are what the splitter still "
+               "leaves out, and nothing is lost with them. A run that says "
+               "NOT the whole document over them says it of most documents, "
+               "and stops being read",
+        "module": "inventory",
+        "old": '            if line.strip() and number not in shown]',
+        "new": '            if number not in shown]',
+        "tests": [
+            "tests.test_unread_lines.WhatTheRunChecks."
+            "test_a_blank_line_in_no_section_is_not",
+        ],
+    },
+    {
+        "what": "inventory.reading — 100% is said over lines in no section",
+        "why": "the line was a constant. It is the sentence synthesize.py's "
+               "licence to assert an absence rests on",
+        "module": "inventory",
+        "old": '    if not beyond and not left_out:',
+        "new": '    if not beyond:',
+        "tests": [
+            "tests.test_unread_lines.WhatTheRunSays.test_and_not_when_one_is",
+            "tests.test_unread_lines.ARun."
+            "test_a_splitter_that_leaves_lines_out_is_not_taken_at_its_word",
+        ],
+    },
+    {
+        "what": "inventory.py — the run does not check what its splitter "
+                "left out",
+        "why": "the splitter is tested on the documents the tests hold. The "
+               "run checks it on the document in hand, and that is the one "
+               "the inventory is about",
+        "module": "inventory",
+        "old": '    left_out = unread_lines(lines, everything)',
+        "new": '    left_out = []',
+        "tests": [
+            "tests.test_unread_lines.ARun."
+            "test_a_splitter_that_leaves_lines_out_is_not_taken_at_its_word",
+            "tests.test_unread_lines.ARun."
+            "test_and_the_inventory_records_which_lines",
+            "tests.test_unread_lines.ARun."
+            "test_and_the_last_line_of_the_run_counts_them",
+        ],
+    },
+    {
+        "what": "inventory.py — the inventory does not say which lines it "
+                "left out",
+        "why": "the announcement scrolls away and the inventory is what "
+               "synthesize.py reads. One that does not say cannot be told "
+               "from one that left out none",
+        "module": "inventory",
+        "old": '                   "runs": args.runs, "unread_lines": left_out,',
+        "new": '                   "runs": args.runs,',
+        "tests": [
+            "tests.test_unread_lines.ARun."
+            "test_it_reads_the_whole_document_and_the_inventory_says_so",
+            "tests.test_unread_lines.ARun."
+            "test_and_the_inventory_records_which_lines",
+        ],
+    },
+    {
+        "what": "synthesize.lines_left_out — the inventory's own list is "
+                "ignored",
+        "why": "the gaps between sections cannot tell a blank line from one "
+               "that holds text. An inventory that checked and found none "
+               "would be doubted over its blank lines, and one that found "
+               "some would be reported as a guess",
+        "module": "synthesize",
+        "old": '    if isinstance(recorded, list):',
+        "new": '    if False:',
+        "tests": [
+            "tests.test_unread_lines.TheInventoryLine."
+            "test_an_inventory_that_left_no_line_out_says_so",
+            "tests.test_unread_lines.TheInventoryLine."
+            "test_lines_the_inventory_left_out_are_counted_and_named",
+            "tests.test_unread_lines.AnAbsenceALineInNoSectionCouldAnswer."
+            "test_with_no_line_left_out_the_gap_and_the_orphan_are_findings",
+            "tests.test_unread_lines.WhatAnInventorySaysOfItsLines."
+            "test_the_inventorys_own_list_is_taken_first",
+            "tests.test_unread_lines.WhatAnInventorySaysOfItsLines."
+            "test_and_an_empty_list_is_an_answer",
+        ],
+    },
+    {
+        "what": "synthesize.lines_left_out — an older inventory's gaps are "
+                "not looked for",
+        "why": "inv-ablation.json, which DESIGN §3.24-§3.30 quote from, was "
+               "written before the lines left out were recorded. Its two "
+               "show only as a gap between its sections' line numbers",
+        "module": "synthesize",
+        "old": '        if first > reached + 1:',
+        "new": '        if False:',
+        "tests": [
+            "tests.test_unread_lines.TheInventoryLine."
+            "test_an_older_inventory_shows_them_as_a_gap_between_its_sections",
+            "tests.test_unread_lines.AnAbsenceALineInNoSectionCouldAnswer."
+            "test_an_older_inventorys_gap_does_the_same",
+            "tests.test_unread_lines.WhatAnInventorySaysOfItsLines."
+            "test_without_one_the_gaps_between_the_sections_are_all_there_is",
+            "tests.test_unread_lines.WhatAnInventorySaysOfItsLines."
+            "test_lines_before_the_first_section_are_a_gap",
+            "tests.test_unread_lines.WhatAnInventorySaysOfItsLines."
+            "test_the_committed_inventory_has_two",
+        ],
+    },
+    {
+        "what": "synthesize — every inventory is taken to have left no line "
+                "out",
+        "why": "\"74 of 74 sections read\" says nothing about a line that is "
+               "in none of the 74, and said nothing for as long as there "
+               "were two",
+        "module": "synthesize",
+        "old": '    left_out, recorded = lines_left_out(data)',
+        "new": '    left_out, recorded = [], True',
+        "tests": [
+            "tests.test_unread_lines.TheInventoryLine."
+            "test_lines_the_inventory_left_out_are_counted_and_named",
+            "tests.test_unread_lines.TheInventoryLine."
+            "test_an_older_inventory_with_no_gap_is_not_said_to_be_whole",
+            "tests.test_unread_lines.AnAbsenceALineInNoSectionCouldAnswer."
+            "test_an_orphan_a_line_in_no_section_could_consume",
+            "tests.test_unread_lines.AnAbsenceALineInNoSectionCouldAnswer."
+            "test_an_ownership_gap_a_line_in_no_section_could_close",
+            "tests.test_unread_lines.AnAbsenceALineInNoSectionCouldAnswer."
+            "test_a_score_says_what_the_inventory_did_not_read",
+        ],
+    },
+    {
+        "what": "synthesize — the lines left out are counted by their runs",
+        "why": "\"1 line(s)\" over lines 284-285: a count of something other "
+               "than what it names",
+        "module": "synthesize",
+        "old": '    count = sum(last - first + 1 for first, last in left_out)',
+        "new": '    count = len(left_out)',
+        "tests": [
+            "tests.test_unread_lines.TheInventoryLine."
+            "test_lines_the_inventory_left_out_are_counted_and_named",
+            "tests.test_unread_lines.TheInventoryLine."
+            "test_an_older_inventory_shows_them_as_a_gap_between_its_sections",
+            "tests.test_unread_lines.AnAbsenceALineInNoSectionCouldAnswer."
+            "test_a_score_says_what_the_inventory_did_not_read",
+        ],
+    },
+    {
+        "what": "synthesize — an orphan is asserted over lines no call was "
+                "shown",
+        "why": "\"never consumed\" needs every line's consumes. One of the "
+               "two lines the committed inventory left out is \"SF ingests "
+               "telemetry and applies quality flags.\"",
+        "module": "synthesize",
+        "old": 'line_question(left_out, "could consume it")',
+        "new": '""',
+        "tests": [
+            "tests.test_unread_lines.AnAbsenceALineInNoSectionCouldAnswer."
+            "test_an_orphan_a_line_in_no_section_could_consume",
+            "tests.test_unread_lines.AnAbsenceALineInNoSectionCouldAnswer."
+            "test_an_older_inventorys_gap_does_the_same",
+            "tests.test_unread_lines.AnAbsenceALineInNoSectionCouldAnswer."
+            "test_a_section_not_read_and_a_line_in_none_are_both_named",
+            "tests.test_unread_lines.AnAbsenceALineInNoSectionCouldAnswer."
+            "test_the_summary_counts_them",
+            "tests.test_unread_lines.AnAbsenceALineInNoSectionCouldAnswer."
+            "test_the_candidate_file_carries_the_verdict_and_the_lines",
+        ],
+    },
+    {
+        "what": "synthesize — an ownership gap is asserted over lines no "
+                "call was shown",
+        "why": "\"owned nowhere\" is a statement about every line of the "
+               "document, and the owner can be named on one that is in no "
+               "section",
+        "module": "synthesize",
+        "old": 'line_question(left_out, "could own it")',
+        "new": '""',
+        "tests": [
+            "tests.test_unread_lines.AnAbsenceALineInNoSectionCouldAnswer."
+            "test_an_ownership_gap_a_line_in_no_section_could_close",
+            "tests.test_unread_lines.AnAbsenceALineInNoSectionCouldAnswer."
+            "test_an_older_inventorys_gap_does_the_same",
+            "tests.test_unread_lines.AnAbsenceALineInNoSectionCouldAnswer."
+            "test_the_summary_counts_them",
+            "tests.test_unread_lines.AnAbsenceALineInNoSectionCouldAnswer."
+            "test_the_candidate_file_carries_the_verdict_and_the_lines",
+        ],
+    },
+    {
+        "what": "synthesize.line_question — an absence is in doubt with no "
+                "line left out",
+        "why": "the same as for sections: marking that cries wolf is marking "
+               "nobody reads. With every line in a section the absence is "
+               "the inventory's to assert",
+        "module": "synthesize",
+        "old": '    if not left_out:\n        return ""',
+        "new": '    if False:\n        return ""',
+        "tests": [
+            "tests.test_unread_lines.AnAbsenceALineInNoSectionCouldAnswer."
+            "test_with_no_line_left_out_the_gap_and_the_orphan_are_findings",
+            "tests.test_unread_lines.AnAbsenceALineInNoSectionCouldAnswer."
+            "test_an_older_inventory_with_no_gap_keeps_its_findings",
+        ],
+    },
+    {
+        "what": "synthesize — a score says nothing of the lines the "
+                "inventory left out",
+        "why": "the score is of the inventory, not of the document. \"miss "
+               "GT-D5-001\" was printed over an inventory that had never "
+               "been shown one of that defect's corroborating anchors, with "
+               "nothing beside it to say so",
+        "module": "synthesize",
+        "old": '        if unread or partial or short or left_out:',
+        "new": '        if unread or partial or short:',
+        "tests": [
+            "tests.test_unread_lines.AnAbsenceALineInNoSectionCouldAnswer."
+            "test_a_score_says_what_the_inventory_did_not_read",
+        ],
+    },
     {
         "what": "claim.judged — a pair nobody judged is dropped",
         "why": "\"judged 200/200, 0 contradictions\" is what a run printed "

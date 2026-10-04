@@ -32,6 +32,17 @@ were not, and every finding that asserts an absence one of those could answer is
 marked `unverifiable` and says which. It is still listed: a reviewer is owed the
 question, not a verdict the tool could not reach.
 
+LINES IN NO SECTION are the same premise one level down. "74 of 74 sections
+read" says nothing about a line that is in none of the 74, and until 2026-10-04
+the splitter left such lines: a heading-like line replaced by the next, a
+passage of sixty characters or fewer. inventory.py now checks for them and
+writes them as `unread_lines`; an older inventory shows them only as gaps
+between its sections' line numbers. Either way they are printed under the
+inventory line, and an ownership gap or an orphan, which assert an absence over
+every line of the document, is marked `unverifiable` over them. D3 is not: a
+pointer is checked against the sections it names, and which section a line in
+none belongs to cannot be told from the inventory.
+
     ./synthesize.py --project . --inventory inventory.json
     ./synthesize.py --project . --inventory inventory.json --ground-truth ground-truth.yaml
 """
@@ -45,6 +56,7 @@ import sys
 from collections import defaultdict
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import inventory                                             # noqa: E402
 import llm                                                   # noqa: E402
 from llm import Client, Embedder, LLMError, cosine        # noqa: E402
 import vocabulary                                            # noqa: E402
@@ -449,6 +461,60 @@ def fully_read(entry):
     return any(entry.get(key) for key in UNASKED)
 
 
+def lines_left_out(data):
+    """(the lines of the document that are in no section, as runs
+    [(first, last), ...]; whether the inventory itself says which they are).
+
+    inventory.py checks its sections against the text and writes the lines no
+    call was shown as `unread_lines`: [] when there are none. An inventory
+    written before 2026-10-04 has no such list, and its splitter left lines
+    out: a heading-like line replaced by the next, a passage of sixty
+    characters or fewer. Those show as gaps between the sections' own line
+    numbers, and that is all there is to go on here. It cannot tell a blank
+    line from one that holds text, and it cannot see past the last section,
+    where a short last section was dropped the same way.
+    """
+    recorded = data.get("unread_lines")
+    if isinstance(recorded, list):
+        return inventory.runs_of(n for n in recorded
+                                 if type(n) is int and n > 0), True
+    spans = []
+    for entry in data.get("sections") or []:
+        locator = entry.get("locator") if isinstance(entry, dict) else None
+        found = re.search(r":(\d{1,9})-(\d{1,9})$", str(locator or ""))
+        if found:
+            spans.append((int(found.group(1)), int(found.group(2))))
+    gaps, reached = [], 0
+    for first, last in sorted(spans):
+        if first > reached + 1:
+            gaps.append((reached + 1, first - 1))
+        reached = max(reached, last)
+    return gaps, False
+
+
+def where_left_out(left_out, most):
+    """The lines in no section as a reader is told them: the first `most`
+    runs, and how many lines the rest of them come to."""
+    rest = sum(last - first + 1 for first, last in left_out[most:])
+    return inventory.line_runs(left_out[:most]) + (
+        f", and {rest} more" if rest else "")
+
+
+def line_question(left_out, what):
+    """Why an absence over the whole document cannot be asserted: lines of it
+    are in no section, and no call was shown them. "" when none is."""
+    if not left_out:
+        return ""
+    return f"a line that is in no section {what}: {where_left_out(left_out, 3)}"
+
+
+def in_doubt(*questions):
+    """The open questions behind one finding as one line, "" when there is
+    none: sections not read and lines in no section are separate reasons, and
+    a finding can have both."""
+    return "; ".join(filter(None, questions))
+
+
 def named(section):
     """A section as a reader can find it, whether or not it was read."""
     heading, locator = section.get("heading"), section.get("locator")
@@ -545,6 +611,7 @@ def main():
     with open(os.path.join(project, args.inventory), encoding="utf-8") as handle:
         data = json.load(handle)
     sections, unread, partial, short = read_inventory(data)
+    left_out, recorded = lines_left_out(data)
     # Needed by D6, and by --authority-as-dataflow to attribute a produces entry
     # to somebody, so it is resolved once here rather than at either use.
     owners_by_section = section_owner_map(sections)
@@ -666,10 +733,42 @@ def main():
         print(f"{pad}READ IN FEWER than the {data['runs']} passes the "
               f"inventory asked for: {len(short)} section(s)")
         listed(short, lambda s: f"  [{s.get('passes')} of {data['runs']}]")
+    # A line in no section was shown to no call. "N of N sections read" says
+    # nothing about it, and said nothing for as long as the splitter left
+    # lines out: the inventory DESIGN 3.24-3.30 are measured on has two.
+    count = sum(last - first + 1 for first, last in left_out)
+    if left_out and recorded:
+        print(f"{pad}NOT IN ANY SECTION: {count} line(s) that hold text, and "
+              f"no call was shown\n{pad}them: {where_left_out(left_out, 12)}")
+    elif left_out:
+        print(f"{pad}NOT IN ANY SECTION: {count} line(s), going by the "
+              f"sections' own line\n{pad}numbers: "
+              f"{where_left_out(left_out, 12)}\n{pad}The inventory does not "
+              f"record the lines it left out, so whether\n{pad}these hold text "
+              f"is not known here, nor whether the document runs\n{pad}on past "
+              f"its last section.")
+    elif recorded:
+        print(f"{pad}no line that holds text is outside those "
+              f"{len(data['sections'])} sections")
+    else:
+        print(f"{pad}The inventory does not record the lines it left out. "
+              f"Going by its\n{pad}sections' line numbers there is none before "
+              f"the last of them;\n{pad}whether the document runs on past that "
+              f"is not known here.")
     if unread or partial:
         print(f"{pad}A finding that asserts an absence one of the sections not "
               f"read, or read in\n{pad}part, could answer is marked "
               f"{UNVERIFIABLE} below, and says which.")
+    if left_out:
+        # D3 is not marked for a line in no section. Its absence is about the
+        # sections a pointer names, and the inventory cannot say which section
+        # such a line belongs to. Said here, so that the silence under a D3
+        # finding is not read as a check.
+        print(f"{pad}An ownership gap (D6) and an orphan (D8) assert an "
+              f"absence over every\n{pad}line of the document, and are marked "
+              f"{UNVERIFIABLE} below. A pointer (D3)\n{pad}is checked against "
+              f"the sections it names and is NOT marked: which\n{pad}section a "
+              f"line in none belongs to is not known here.")
     print()
 
     embedder = None
@@ -772,22 +871,29 @@ def main():
         # at all can be holding the owner. Under --authority-as-dataflow
         # ownership is also taken from produces and consumes, which the
         # fallback never asks for, and a section read in part can hold it too.
+        # It is a statement about every LINE as well: one that is in no
+        # section was shown to no call, and can name the owner.
         owners_unseen = unread + (partial if args.authority_as_dataflow else [])
-        findings.append(("D6", group["label"], group["members"], open_question(
-            owners_unseen, "a section that was not read could own it")))
+        findings.append(("D6", group["label"], group["members"], in_doubt(
+            open_question(owners_unseen,
+                          "a section that was not read could own it"),
+            line_question(left_out, "could own it"))))
 
     # -- D8: produced and never consumed -------------------------------------
     #
     # "Never consumed" needs every section's consumes. A section read by the
-    # fallback alone has none recorded, and it was never asked for any.
+    # fallback alone has none recorded, and it was never asked for any. Nor
+    # was a line in no section: in the fixture's committed inventory one of
+    # the two is "SF ingests telemetry and applies quality flags."
     consumed = [norm(e.get("value", "")) for e in consumes]
     for group in group_by_concept(produces, "value", embedder):
         if not any(similar(group["tokens"], c, 0.6) for c in consumed if c):
-            findings.append(("D8", group["label"], group["members"][:2],
-                             open_question(unread + partial,
-                                           "a section that was not read, or "
-                                           "was read without its consumes, "
-                                           "could consume it")))
+            findings.append((
+                "D8", group["label"], group["members"][:2], in_doubt(
+                    open_question(unread + partial,
+                                  "a section that was not read, or was read "
+                                  "without its consumes, could consume it"),
+                    line_question(left_out, "could consume it"))))
 
     # -- D3: evidence claim pointing somewhere that holds no such thing ------
     by_heading = {}
@@ -929,8 +1035,9 @@ def main():
     if doubted:
         print(f"   {UNVERIFIABLE}: {doubted} of these {len(findings)}. Each "
               f"asserts an absence that a section the\n   inventory did not "
-              f"read, or read only in part, could answer. Those are\n   "
-              f"questions for a reviewer, not findings.")
+              f"read, or read only in part, or a line it has in no\n   "
+              f"section, could answer. Those are questions for a reviewer, "
+              f"not findings.")
     print()
 
     shown = defaultdict(int)
@@ -1021,14 +1128,15 @@ def main():
         if unscorable:
             print(f"  {unscorable} defect(s) not auto-scorable — no anchor, no "
                   f"line span; read them by hand")
-        if unread or partial or short:
+        if unread or partial or short or left_out:
             # The score is of the inventory, not of the document.
             print(f"  scored over an inventory that left {len(unread)} "
                   f"section(s) unread, {len(partial)} read in part and "
-                  f"{len(short)} read in\n  fewer passes than asked: a miss "
-                  f"may be a defect it never saw, and "
+                  f"{len(short)} read in\n  fewer passes than asked, and has "
+                  f"{count} line(s) in no section: a miss may be a defect it\n"
+                  f"  never saw, and "
                   f"{sum(1 for i in claimed if findings[i][3])} of the hits "
-                  f"rest on\n  a finding marked {UNVERIFIABLE}")
+                  f"rest on a finding marked {UNVERIFIABLE}")
     return 0
 
 

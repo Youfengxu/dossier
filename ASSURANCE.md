@@ -70,11 +70,16 @@ product, not a presentation afterthought.
 
 | tier | artefact | count | industry term |
 |---|---|---|---|
-| 1 | `tests/` | 370 | unit tests |
-| 2 | `run-tests.py --mutate` | 54/54 | **mutation testing** |
+| 1 | `tests/` | 424 | unit tests |
+| 2 | `run-tests.py --mutate` | 71/71 | **mutation testing** |
 | 3 | `conformance.py` | 6/6 | **contract testing**, proved by mutation |
 | 3 | `smoke.py` | 27/27 | integration / E2E |
 | 0 | `doctor.py` | — | preflight / environment check |
+
+Tiers 1 and 2 were re-derived from a run on 2026-10-04: 370 tests and 54
+mutations before `tests/test_unread_lines.py`, which added 54 tests and 17
+mutations for the lines of a document that are in no section (`DESIGN` §3.21).
+`smoke.py` was re-run the same day and is unchanged at 27/27.
 
 ### 2.4 Validation evidence — is the method right?
 
@@ -128,7 +133,7 @@ vocabulary.
 
 | 25059-style characteristic | where dossier already evidences it | strength |
 |---|---|---|
-| Functional correctness | 370 unit tests, 54 mutations, 6 contract checks | **strong** |
+| Functional correctness | 424 unit tests, 71 mutations, 6 contract checks | **strong** |
 | Robustness | fixtures carry deliberate decoys; adversarial checker tests | moderate |
 | Transparency / explicability | every finding carries `slug:line` + verbatim quote | **strong** — this is the thesis |
 | Accuracy (task-level) | eval suite on 5 labelled corpora | **weak — no human baseline (G1)** |

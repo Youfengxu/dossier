@@ -81,7 +81,7 @@ flowchart TD
     COV --> CLUST["cluster-findings.py<br/>rank by convergence<br/>EMBEDDINGS"]
     CLUST --> CAND[("candidates-&lt;doc&gt;.csv")]
 
-    FROZEN --> INV["inventory.py<br/>read 100% of the document<br/>MODEL, heavily"]
+    FROZEN --> INV["inventory.py<br/>read 100% of the document, and check it<br/>MODEL, heavily"]
     INV --> INVJ[("inventory.json")]
     INVJ --> SYN["6 · synthesize.py<br/>query the inventory in code<br/>EMBEDDINGS"]
     COMP --> SYN
@@ -296,7 +296,12 @@ inventory was built by reading 100% of the document rather than a sample.
 That is a premise, and `synthesize.py` checks it: a section whose extraction
 failed, or that was read by the fallback schema alone, is counted and named on
 the inventory line, and a finding it could answer is listed as `unverifiable`
-rather than asserted.
+rather than asserted. `inventory.py` checks the other half, that every line
+which holds text is in a section: it compares each section's text with the
+lines its locator names, and writes the lines in none into the inventory as
+`unread_lines`. `synthesize.py` prints those too, and lists an ownership gap or
+an orphan over them as `unverifiable`. A pointer (D3) is not marked for them,
+and the report says so.
 
 ### Where it does not
 

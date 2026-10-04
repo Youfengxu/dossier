@@ -460,7 +460,8 @@ rather than whether an obligation is met. Description, not judgement.
   97%, not the 83% at 52k (§3.18)
 - no agent asserts absence. Absence is a property of the whole document, and
   becomes a deterministic query over a finished inventory
-- 100% coverage instead of 47%
+- 100% coverage instead of 47% (of the lines that hold text; checked on every
+  run since 2026-10-04, and not true before it: the second note below)
 
 Measured on the fixture: 72 sections yield 84 capabilities, 127 identifiers, 62
 evidence claims, 20 authority assertions, 8 deferrals, 24 produces / 31 consumes.
@@ -490,6 +491,66 @@ inventory.** The extraction stage is not the hard part.
 > no degraded section, so no number re-derived from it moves. The earlier
 > inventory quoted in this section is not in the repository, and whether it had
 > any cannot be checked.
+
+> **"100% coverage" was a constant, and until 2026-10-04 it was not true.**
+> `inventory.py` printed "reading 100% of the document" whatever its splitter
+> had done, and the splitter left two kinds of line in no section, where no
+> call is shown them. A heading-like line followed at once by another was
+> replaced by it, and a numbered list is a run of such lines, so each step
+> replaced the one before. A section of sixty characters or fewer was dropped
+> whole, heading included.
+>
+> Measured on the fixture with the splitter as it was: 572 of the 574 lines of
+> `deliverable-v1` were in a section (396 of the 398 that hold text), and 530
+> of the 532 of `deliverable-v2`. The sixty-character rule drops nothing in
+> either. The two lines are steps 2 and 3 of the per-tick sequence in the
+> fixture's Section 12, and step 3, "AS reorders the frozen execution order by
+> candidate severity and evaluates", is a corroborating anchor of the planted
+> D5 defect. A document nobody here wrote fares worse: `kep-1287`, at the
+> revision `fixtures/kep` pins, had 55 of its 1,467 lines that hold text in no
+> section, every one a step of a numbered list, and the KEP template lost its
+> Drawbacks section, a heading over a three-line comment, to the
+> sixty-character rule.
+>
+> The loss had been seen, and put down to the model. `claim.py` cuts with the
+> same splitter, and since the first commit its docstring had given this as
+> the example of extraction sampling a section instead of enumerating it:
+> "steps 1, 4 and 5 of a five-step sequence came back and step 3 … did not".
+> Steps 2 and 3 were in no section. The three that came back are the three
+> that were shown, and no number of passes returns a line no pass is given.
+>
+> The splitter now keeps both kinds. The first heading keeps its section and
+> the next becomes its first line of text, which is what a heading arriving
+> within `min_lines` already did; and a section is kept if it has a heading
+> line of its own or any text. Blank lines under no heading are all that is
+> still in no section. The claim is also checked now, which matters more than
+> the fix: on every run `inventory.py` compares the text of each section with
+> the lines its locator names, prints "100%" only when no line that holds text
+> is left out, and writes the lines that are into the inventory as
+> `unread_lines`, `[]` included. `synthesize.py` prints them under its
+> inventory line and marks an ownership gap or an orphan `unverifiable` when
+> there are any, because both assert an absence over every line. D3 is not
+> marked, and the header says so: which section a line in none belongs to
+> cannot be told from the inventory, so a pointer to a section an older
+> inventory dropped is still reported as a pointer to no section.
+>
+> The committed inventory was cut the old way and has the two lines in no
+> section. It records no `unread_lines`, so `synthesize.py` reads them off the
+> gap between its sections' line numbers, and says that it cannot see past the
+> last section or tell a blank line from text. Re-run on it in every arm of
+> §3.24–§3.30: no count, no score and no finding moves, and the eleven D8
+> candidates are marked `unverifiable`. A fresh cut of the same text differs
+> from it in one section of 74: lines 286–293, headed by step 4, become
+> 284–293, headed by step 2.
+>
+> **Whether reading step 3 would have found the D5 defect is not known.** Its
+> primary anchor is in Section 5.2, which was read. The inventory shows both
+> outcomes for the neighbours of the missing step: step 1, read as text, is
+> recorded as an authority entry, in two spellings; steps 4 and 5, read as
+> well, are recorded as capabilities and as no authority at all. Nothing has
+> been re-extracted, and "the D5 defect is missed in every arm" below is a
+> statement about an inventory that was never shown one of that defect's
+> three statements.
 
 > **§3.22–§3.31 were re-measured on 2026-08-19 and the numbers below are the old
 > ones.** Every "N of 6" in this range was produced by a scorer that has since
@@ -858,6 +919,8 @@ No new threshold — the action grouping reuses the object grouping's.
 > D5 defect is missed in every arm, baseline included, so this section's
 > both-directions verification survives only in the direction that says the
 > handoff is ignored. The other direction is untested here rather than refuted.
+> One of the defect's three statements was in no section of this inventory, so
+> no arm was shown it (§3.21).
 >
 > **The flag is the weakest of the four and should not be quoted as a faithful
 > restoration.** The fix itself lives in the extraction prompt, held constant

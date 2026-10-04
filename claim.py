@@ -216,11 +216,16 @@ def load_aliases(project):
 def extract(client, sections, concurrency, runs=1, verbose=True):
     """Union of `runs` passes.
 
-    Extraction samples what a section says rather than enumerating it: on the
-    fixture, steps 1, 4 and 5 of a five-step sequence came back and step 3 —
-    the one that contradicted an authority rule forty lines earlier — did not.
-    A claim missed here cannot be recovered downstream, so recall at this stage
-    is worth paying for twice.
+    Extraction samples what a section says rather than enumerating it (DESIGN
+    3.27). A claim missed here cannot be recovered downstream, so recall at
+    this stage is worth paying for twice.
+
+    The example that stood here was not one: "on the fixture, steps 1, 4 and 5
+    of a five-step sequence came back and step 3 — the one that contradicted
+    an authority rule — did not". Until 2026-10-04 inventory.split_sections put
+    steps 2 and 3 in no section, so the three that came back are the three
+    that were shown, and no number of passes returns a line no pass is given.
+    A failure to show is not a model's miss.
     """
     claims = []
     def one(index_section):
